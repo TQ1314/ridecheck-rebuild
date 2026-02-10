@@ -1,0 +1,233 @@
+You are building RideCheck as a production-grade Next.js 14 App Router (TypeScript) project that runs in Replit with `npm run dev`, and later deploys to Vercel.
+
+ABSOLUTE RULES
+- No missing files. No missing imports. No TODOs in core flows.
+- Buyers MUST query orders ONLY by customer_id = auth.uid() (never email).
+- profiles role is ALWAYS 'customer' on signup (trigger already does this). Never trust metadata role.
+- booking_type is ONLY 'self_arrange' | 'concierge'.
+- Use Supabase Storage buckets EXACTLY:
+  - reports (PDF only, private)
+  - inspection-media (images/videos, private)
+- Stripe: Only webhook can set payment_status='paid'. Webhook must verify signature from raw body and run on Node runtime.
+- Idempotency: order creation must use Idempotency-Key header and write it to orders.idempotency_key. If same key repeats, return the existing order.
+
+STACK
+- Next.js 14 (App Router), TypeScript
+- Tailwind CSS
+- shadcn/ui + lucide-react
+- Supabase (DB + Auth + Storage) via @supabase/auth-helpers-nextjs
+- Stripe (Elements + webhooks)
+- Resend (email)
+- Twilio (SMS)
+- react-hook-form + zod
+- date-fns
+
+ROLES (profiles.role values)
+customer, operations, operations_lead, qa, developer, platform, owner
+
+ROUTE RULES
+Public:
+- /
+- /pricing
+- /how-it-works
+- /book
+- /order/received
+- /auth/login
+- /auth/register
+- /auth/callback
+
+Authenticated:
+- customer: /dashboard, /orders, /orders/[orderId], /profile
+- operations: /operations, /operations/orders, /operations/orders/[orderId]
+- operations_lead: /operations/lead, plus operations routes
+- owner: /admin (full)
+- platform: /platform (read-only)
+- qa: /qa (read-only)
+- developer: /dev (read-only)
+
+MIDDLEWARE
+- Skip /_next, /api, /favicon, static files.
+- Allow public routes without session.
+- Require session everywhere else.
+- Load profile.role and profile.is_active.
+- If is_active=false: sign out and redirect /auth/login?error=deactivated
+- RBAC redirects:
+  - /admin: owner only; operations/operations_lead -> /operations ; others -> /dashboard
+  - /operations: operations + operations_lead + owner
+  - /platform: platform + owner
+  - /qa: qa + owner
+  - /dev: developer + owner
+  - /dashboard,/orders,/profile: any authenticated user
+
+DATABASE ASSUMPTIONS (Supabase v2 already created)
+Tables:
+- profiles(id uuid pk references auth.users, email, full_name, phone, role, is_active, ...)
+- orders(
+    id text pk like RC-XXXXXXXX,
+    customer_id uuid,
+    customer_name, customer_email, customer_phone,
+    vehicle_year int, vehicle_make text, vehicle_model text, vehicle_description text,
+    listing_url text,
+    seller_name text, seller_phone text, vehicle_location text,
+    booking_type text check in (self_arrange, concierge),
+    package text check in (standard,premium,comprehensive),
+    base_price numeric, discount_amount numeric, final_price numeric,
+    payment_status text default 'not_requested',
+    payment_intent_id text,
+    paid_at timestamptz,
+    status text default 'submitted',
+    preferred_date timestamptz,
+    scheduled_date timestamptz,
+    assigned_ops_id uuid,
+    report_url text,
+    idempotency_key text unique where not null,
+    created_at, updated_at
+  )
+- activity_log(id uuid, user_id uuid, order_id text, action text, details jsonb, created_at)
+
+PRICING
+- standard: full 119, self 113
+- premium: full 179, self 170
+- comprehensive: full 299, self 284
+
+BOOKING FLOW REQUIREMENTS
+Booking types:
+1) self_arrange (buyer already arranged appointment)
+  - Create order
+  - Create Stripe PaymentIntent (automatic capture)
+  - Return client_secret to frontend
+  - Buyer pays using Stripe Elements
+  - Webhook payment_intent.succeeded updates orders.payment_status='paid' and status='payment_received'
+
+2) concierge (RideCheck contacts seller, then requests payment after seller confirms)
+  - Create order with payment_status='not_requested'
+  - operations/operations_lead updates order status through operations UI
+  - When seller confirmed: operations/lead clicks “Send Payment Link”
+  - Create Stripe Checkout Session (or Payment Link) and email it (Resend)
+  - Webhook marks paid; then ops schedules inspection
+
+EMAIL + SMS
+- On order created: email confirmation (Resend)
+- On payment requested: email payment link
+- On report uploaded: email report-ready with link
+- SMS optional but include Twilio client and a toggle; if missing env vars, do not crash—log dev mode.
+
+UI REQUIREMENTS (must be beautiful, not static)
+- AppShell layout with role-based sidebar
+- Tables with filters (status, payment_status, booking_type, package)
+- Order detail view with:
+  - summary cards
+  - editable status (ops/lead/owner only)
+  - assignment (ops lead/owner only)
+  - activity timeline (from activity_log)
+  - upload report (ops lead/owner only)
+- Toasts, loading states, empty states
+- No raw JSON dumps
+
+FILE TREE (must create all)
+ridecheck/
+  app/
+    (public)/page.tsx
+    (public)/pricing/page.tsx
+    (public)/how-it-works/page.tsx
+    (public)/book/page.tsx
+    (public)/order/received/page.tsx
+    (buyer)/dashboard/page.tsx
+    (buyer)/orders/page.tsx
+    (buyer)/orders/[orderId]/page.tsx
+    (buyer)/profile/page.tsx
+    (admin)/admin/page.tsx
+    (admin)/admin/orders/page.tsx
+    (admin)/admin/orders/[orderId]/page.tsx
+    (admin)/admin/users/page.tsx
+    (admin)/admin/settings/page.tsx
+    (ops)/operations/page.tsx
+    (ops)/operations/orders/page.tsx
+    (ops)/operations/orders/[orderId]/page.tsx
+    (ops)/operations/lead/page.tsx
+    (audit)/platform/page.tsx
+    (audit)/qa/page.tsx
+    (audit)/dev/page.tsx
+    auth/login/page.tsx
+    auth/register/page.tsx
+    auth/callback/route.ts
+    api/orders/create/route.ts
+    api/orders/route.ts
+    api/orders/[orderId]/route.ts
+    api/orders/[orderId]/status/route.ts
+    api/orders/[orderId]/assign/route.ts
+    api/orders/[orderId]/send-payment/route.ts
+    api/orders/[orderId]/upload-report/route.ts
+    api/orders/[orderId]/send-report/route.ts
+    api/admin/users/promote/route.ts
+    api/payments/webhook/route.ts   (export const runtime="nodejs")
+    api/health/route.ts
+  components/
+    layout/AppShell.tsx
+    layout/Navbar.tsx
+    layout/Footer.tsx
+    layout/BuyerSidebar.tsx
+    layout/OpsSidebar.tsx
+    layout/AdminSidebar.tsx
+    layout/AuditSidebar.tsx
+    booking/BookingForm.tsx
+    booking/BookingTypeSelector.tsx
+    booking/PackageSelector.tsx
+    booking/CheckoutPanel.tsx
+    orders/OrderTable.tsx
+    orders/OrderCard.tsx
+    orders/OrderDetailPanel.tsx
+    orders/OrderStatusBadge.tsx
+    orders/StatusUpdateDialog.tsx
+    orders/AssignOpsDialog.tsx
+    orders/UploadReportDialog.tsx
+    shared/ToastProvider.tsx
+    shared/LoadingSpinner.tsx
+    shared/EmptyState.tsx
+    shared/ErrorBanner.tsx
+    shared/CopyButton.tsx
+  lib/
+    supabase/client.ts
+    supabase/server.ts
+    supabase/admin.ts (service role client)
+    stripe/server.ts
+    stripe/client.ts
+    email/resend.ts
+    email/templates/order-confirmation.ts
+    email/templates/payment-request.ts
+    email/templates/report-ready.ts
+    sms/twilio.ts
+    utils/pricing.ts
+    utils/orderId.ts
+    utils/roles.ts
+    utils/idempotency.ts
+    utils/format.ts
+    types/orders.ts
+  middleware.ts
+  app/layout.tsx
+  app/globals.css
+
+ENV VARS (use Replit Secrets)
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+RESEND_API_KEY
+RESEND_FROM_EMAIL
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER
+NEXT_PUBLIC_APP_URL
+ADMIN_EMAIL
+
+BUILD REQUIREMENT
+- The repo must run immediately on Replit
+- Provide a /api/health endpoint that verifies:
+  - Supabase connectivity
+  - Can read profiles table (basic select)
+  - Stripe key present
+  - Resend key present
+  - Twilio key present
+Return a JSON status map.
