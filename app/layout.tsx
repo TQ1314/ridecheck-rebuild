@@ -6,9 +6,9 @@ import { Toaster } from "@/components/ui/toaster";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "RideCheck - Professional Pre-Purchase Vehicle Inspections",
+  title: "RideCheck - Pre-Car-Purchase Intelligence",
   description:
-    "Get peace of mind before buying a used car. RideCheck provides thorough, professional vehicle inspections with detailed reports.",
+    "Get peace of mind before buying a used car. RideCheck provides thorough, professional vehicle assessments with detailed intelligence reports.",
 };
 
 export default function RootLayout({

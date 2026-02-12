@@ -59,7 +59,7 @@ export async function POST(
             price_data: {
               currency: "usd",
               product_data: {
-                name: `RideCheck ${order.package.charAt(0).toUpperCase() + order.package.slice(1)} Inspection`,
+                name: `RideCheck ${order.package.charAt(0).toUpperCase() + order.package.slice(1)} Assessment`,
                 description: `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`,
               },
               unit_amount: Math.round(Number(order.final_price) * 100),

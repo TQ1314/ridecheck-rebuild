@@ -1,0 +1,205 @@
+# RIDECHECK: PRE-CAR-PURCHASE INTELLIGENCE PLATFORM UPGRADE — REPLIT SAFE RUN PACKAGE (v3)
+# Objective: Upgrade RideCheck from “inspection” to “pre-car-purchase intelligence” without breaking Concierge.
+# Absolute constraints:
+# - Concierge order flow MUST remain working end-to-end for guest buyers.
+# - Never rename/drop existing tables/columns. Additive DB changes only.
+# - Do NOT modify existing environment values or regenerate .env.local.
+# - Any new functionality MUST be behind feature flags with default OFF.
+# - Listing parsing MUST NEVER block checkout.
+
+========================================
+0) PRE-FLIGHT SAFETY (MANDATORY)
+========================================
+A) Runtime env presence checks (do NOT print secrets):
+- NEXT_PUBLIC_SUPABASE_URL exists?
+- NEXT_PUBLIC_SUPABASE_ANON_KEY exists?
+If missing: stop and print “Missing Supabase env vars in Replit Secrets.”
+
+B) Service-role strategy:
+- Prefer server-side inserts using SUPABASE_SERVICE_ROLE_KEY.
+- If SUPABASE_SERVICE_ROLE_KEY is missing:
+  1) Do NOT change RLS to permissive by default.
+  2) Keep existing behavior and print exact Supabase RLS policy SQL needed OR instructions to add service role key.
+
+C) Add diagnostics routes:
+1) GET /api/health/app -> { ok:true, version, timestamp }
+2) GET /api/health/supabase -> must validate BOTH:
+   - Connectivity: simple select
+   - Write path: attempt an INSERT into a dedicated health table (health_pings) using the SAME client used for server-side order creation.
+Return ok:true if both pass; otherwise ok:false + actionable error (no secrets).
+
+D) Feature flags (default OFF if missing):
+- NEXT_PUBLIC_FEATURE_BUYER_ARRANGED
+- NEXT_PUBLIC_FEATURE_BILL_OF_SALE
+- NEXT_PUBLIC_FEATURE_INTELLIGENCE_REPORT
+
+IMPORTANT: Flags should be read as booleans safely (treat undefined/empty as false).
+
+========================================
+1) POSITIONING UPDATE (SAFE COPY CHANGES)
+========================================
+Update site language from “Pre-Purchase Inspection” to:
+“Pre-Car-Purchase Intelligence”
+
+Approved terms:
+- Intelligence Report
+- Risk Screening
+- Title & Ownership Review (if presented)
+- VIN Consistency Check
+- Fraud / Red Flag Screening
+- Bill of Sale Template (fillable)
+- Observational at time of inspection
+
+Forbidden claims (must not appear):
+- title verification / lien verification / stolen vehicle verification
+- guaranteed / ensure clear title
+- legal protection (too broad)
+Use: review / screening / flags / documented.
+
+========================================
+2) PRICING + PACKAGES (UPDATED)
+========================================
+Packages:
+- Standard: $119
+- Plus (Euro/EV/Heavy Duty): $149
+- Premium/Exotic: $299+ (contact)
+
+Booking methods:
+- Concierge = full price (default)
+- Buyer-Arranged = 5% discount (only if FEATURE BUYER ARRANGED true)
+
+Discounted prices (rounded to whole dollars):
+- Standard: $113
+- Plus: $142
+- Premium: $284 (for “starts at” reference; still contact)
+
+Implement pure functions:
+- getPackageTier(vehicle)
+- getPriceCents(tier, booking_method)
+Add unit tests for these functions.
+
+========================================
+3) BOOKING UX (DO NOT BREAK CONCIERGE)
+========================================
+Booking page:
+- Concierge (default, always visible)
+- Buyer-Arranged card ONLY if NEXT_PUBLIC_FEATURE_BUYER_ARRANGED=true
+
+Concierge flow stays EXACTLY as is from user perspective:
+Paste link -> create order -> RideCheck handles seller
+
+Buyer-Arranged requires BEFORE payment:
+- inspection_address (required)
+- inspection_time_window (required)
+- seller_phone (required)
+- seller_name (optional)
+- notes_to_inspector (optional)
+
+Add language toggle EN/ES; store preferred_language on order.
+
+After submitting order ALWAYS route to:
+ /order/confirmation?order_id=...
+Show next steps based on booking_method and language.
+
+Seller script appears ONLY for Buyer-Arranged (EN + ES) with copy button.
+
+========================================
+4) LISTING PARSING + PLATFORM DETECTION (NON-BLOCKING)
+========================================
+Detect platform from listing_url host:
+- facebook, craigslist, other
+Store listing_platform.
+
+Attempt best-effort parsing:
+- If parsing succeeds, store vehicle_year/make/model, listing_title, listing_price, listing_location_text.
+- If parsing fails, DO NOT block order creation. Save url + platform and prompt buyer to confirm vehicle basics later.
+
+CRITICAL: If vehicle can be identified (e.g., 2021 Mercedes-Benz GLE), auto-select Plus tier and show it to user.
+If uncertain, default to Standard but show: “We’ll confirm package after vehicle is identified.”
+
+========================================
+5) DATABASE CHANGES (SUPABASE) — ADDITIVE ONLY
+========================================
+Create migration SQL files under /supabase/migrations/*.sql (DO NOT auto-run).
+Use IF NOT EXISTS patterns. Never drop/rename.
+
+A) Orders table columns (nullable, add-only):
+- booking_method TEXT DEFAULT 'concierge'
+- package_tier TEXT
+- calculated_price_cents INTEGER
+- preferred_language TEXT DEFAULT 'en'
+- inspection_address TEXT
+- inspection_time_window TEXT
+- seller_name TEXT
+- seller_phone TEXT
+- listing_platform TEXT
+- listing_title TEXT
+- listing_price TEXT
+- listing_location_text TEXT
+- vehicle_year INTEGER
+- vehicle_make TEXT
+- vehicle_model TEXT
+- vehicle_trim TEXT
+Add two stability fields:
+- order_status TEXT DEFAULT 'created'
+- last_error TEXT
+
+B) New tables:
+1) health_pings (for /api/health/supabase write test)
+2) intelligence_reports
+3) title_ownership_review (note: REVIEW not verification)
+4) bill_of_sale_documents
+
+C) RLS guidance:
+- Default to strict RLS.
+- Server-side API should create orders using service role when available.
+- If service role is not available, output exact policy SQL required to allow guest inserts SAFELY (time-limited or minimal fields) and clearly label it as less preferred.
+
+========================================
+6) ORDER CREATION (SERVER-SIDE RELIABILITY)
+========================================
+Identify existing order creation API route(s) used by the frontend.
+Do NOT change Concierge payload requirements.
+Only extend payload to accept optional new fields.
+
+Implement createOrder server-side:
+- Uses service role if available.
+- If service role not available, fall back to anon but ensure errors are returned cleanly and stored in last_error (no secrets).
+
+Must fix the classic issue:
+- Guest buyers can create Concierge orders successfully with no login.
+
+========================================
+7) INTELLIGENCE REPORT + BILL OF SALE (BEHIND FLAGS)
+========================================
+If NEXT_PUBLIC_FEATURE_INTELLIGENCE_REPORT=true:
+- Add report templates and DB insert at report_delivered.
+If flag false:
+- Do nothing (no break).
+
+If NEXT_PUBLIC_FEATURE_BILL_OF_SALE=true:
+- Generate a fillable bill of sale template (EN/ES) as HTML first.
+- PDF export is optional; do not block.
+
+========================================
+8) ACCEPTANCE TESTS (MUST PASS)
+========================================
+1) Concierge flow works end-to-end (guest buyer).
+2) /api/health/app ok:true
+3) /api/health/supabase ok:true (SELECT + INSERT into health_pings)
+4) Buyer-Arranged UI hidden if flag missing.
+5) Pricing functions return correct cents.
+6) Mercedes GLE identified => Plus tier selected when vehicle identified.
+7) npm run build passes cleanly.
+
+========================================
+9) REQUIRED OUTPUT
+========================================
+After implementation, print:
+- Files changed/added
+- Migration SQL contents (full)
+- New optional env vars (feature flags + service role only)
+- If RLS blocks inserts: exact Supabase policy SQL instructions
+- A how-to-test checklist with URLs and expected outputs
+
+Proceed now.

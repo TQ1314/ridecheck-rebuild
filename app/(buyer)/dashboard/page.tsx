@@ -58,13 +58,13 @@ export default function DashboardPage() {
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Your inspection overview
+            Your assessment overview
           </p>
         </div>
         <Link href="/book">
           <Button data-testid="button-new-inspection">
             <Plus className="mr-2 h-4 w-4" />
-            New Inspection
+            New Assessment
           </Button>
         </Link>
       </div>

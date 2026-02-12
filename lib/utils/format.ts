@@ -24,6 +24,7 @@ export function statusLabel(status: string): string {
 
 export function bookingTypeLabel(type: string): string {
   if (type === "self_arrange") return "Self-Arranged";
+  if (type === "buyer_arranged") return "Buyer-Arranged";
   if (type === "concierge") return "Concierge";
   return type;
 }

@@ -216,7 +216,7 @@ export function OrderDetailPanel({
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
-              Inspection Report
+              Intelligence Report
             </CardTitle>
           </CardHeader>
           <CardContent>

@@ -18,8 +18,16 @@ const createOrderSchema = z.object({
   seller_name: z.string().max(100).nullable().optional(),
   seller_phone: z.string().max(20).nullable().optional(),
   booking_type: z.enum(["self_arrange", "concierge"]),
-  package: z.enum(["standard", "premium", "comprehensive"]),
+  package: z.enum(["standard", "premium", "comprehensive", "plus"]),
   preferred_date: z.string().nullable().optional(),
+  booking_method: z.string().optional(),
+  preferred_language: z.string().optional(),
+  listing_platform: z.string().nullable().optional(),
+  package_tier: z.string().optional(),
+  inspection_address: z.string().optional(),
+  inspection_time_window: z.string().optional(),
+  notes_to_inspector: z.string().nullable().optional(),
+  vehicle_trim: z.string().nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -79,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     const orderId = generateOrderId();
 
-    const orderPayload = {
+    const orderPayload: Record<string, any> = {
       id: orderId,
       customer_id: customerId,
       customer_name: customerName,
@@ -104,6 +112,17 @@ export async function POST(req: NextRequest) {
       idempotency_key: idempotencyKey || null,
     };
 
+    if (data.booking_method) orderPayload.booking_method = data.booking_method;
+    if (data.preferred_language) orderPayload.preferred_language = data.preferred_language;
+    if (data.listing_platform) orderPayload.listing_platform = data.listing_platform;
+    if (data.package_tier) orderPayload.package_tier = data.package_tier;
+    if (data.inspection_address) orderPayload.inspection_address = data.inspection_address;
+    if (data.inspection_time_window) orderPayload.inspection_time_window = data.inspection_time_window;
+    if (data.notes_to_inspector) orderPayload.notes_to_inspector = data.notes_to_inspector;
+    if (data.vehicle_trim) orderPayload.vehicle_trim = data.vehicle_trim;
+
+    orderPayload.calculated_price_cents = Math.round(finalPrice * 100);
+
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .insert(orderPayload)
@@ -112,6 +131,11 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("[Order Create Error]", error);
+      try {
+        await supabaseAdmin.from("orders").update({
+          last_error: error.message,
+        }).eq("id", orderId);
+      } catch (_) {}
       return NextResponse.json(
         { error: "Failed to create order" },
         { status: 500 },
@@ -122,7 +146,11 @@ export async function POST(req: NextRequest) {
       user_id: customerId,
       order_id: orderId,
       action: "order_created",
-      details: { booking_type: data.booking_type, package: data.package },
+      details: {
+        booking_type: data.booking_type,
+        package: data.package,
+        booking_method: data.booking_method || "concierge",
+      },
     });
 
     if (data.booking_type === "self_arrange") {
@@ -130,6 +158,8 @@ export async function POST(req: NextRequest) {
       if (stripe) {
         try {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+          const bookingMethod = data.booking_method || "self_arrange";
+          const lang = data.preferred_language || "en";
           const session = await stripe.checkout.sessions.create({
             mode: "payment",
             line_items: [
@@ -137,7 +167,7 @@ export async function POST(req: NextRequest) {
                 price_data: {
                   currency: "usd",
                   product_data: {
-                    name: `RideCheck ${data.package.charAt(0).toUpperCase() + data.package.slice(1)} Inspection`,
+                    name: `RideCheck ${data.package.charAt(0).toUpperCase() + data.package.slice(1)} Assessment`,
                     description: `${data.vehicle_year} ${data.vehicle_make} ${data.vehicle_model}`,
                   },
                   unit_amount: Math.round(finalPrice * 100),
@@ -146,7 +176,7 @@ export async function POST(req: NextRequest) {
               },
             ],
             metadata: { order_id: orderId },
-            success_url: `${appUrl}/order/received?orderId=${orderId}`,
+            success_url: `${appUrl}/order/confirmation?order_id=${orderId}&lang=${lang}&method=${bookingMethod}`,
             cancel_url: `${appUrl}/book`,
           });
 

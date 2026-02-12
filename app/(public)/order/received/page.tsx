@@ -25,7 +25,7 @@ export default function OrderReceivedPage() {
               </p>
             )}
             <p className="text-muted-foreground mb-8">
-              Your inspection order has been submitted successfully.
+              Your assessment order has been submitted successfully.
               You&apos;ll receive a confirmation email shortly with the next steps.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">

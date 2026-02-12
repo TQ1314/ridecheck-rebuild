@@ -48,7 +48,7 @@ export default function OperationsPage() {
           Operations Dashboard
         </h1>
         <p className="text-sm text-muted-foreground">
-          Manage inspections and orders
+          Manage assessments and orders
         </p>
       </div>
 

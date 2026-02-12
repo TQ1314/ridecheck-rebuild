@@ -20,26 +20,26 @@ const STEPS = [
     icon: Search,
     title: "Book Online",
     description:
-      "Select your package, enter vehicle details, and choose your preferred inspection date.",
+      "Select your package, enter vehicle details, and choose your preferred assessment date.",
   },
   {
     icon: Wrench,
     title: "We Inspect",
     description:
-      "Our certified technician performs a thorough multi-point inspection at the vehicle location.",
+      "Our certified technician performs a thorough multi-point assessment at the vehicle location.",
   },
   {
     icon: FileText,
     title: "Get Your Report",
     description:
-      "Receive a detailed digital report with photos, findings, and a clear buy/don't-buy recommendation.",
+      "Receive a detailed digital report with photos, risk screening findings and observational data.",
   },
 ];
 
 const STATS = [
-  { value: "10,000+", label: "Inspections Completed" },
+  { value: "10,000+", label: "Assessments Completed" },
   { value: "98%", label: "Customer Satisfaction" },
-  { value: "150+", label: "Inspection Points" },
+  { value: "150+", label: "Assessment Points" },
   { value: "24hr", label: "Report Turnaround" },
 ];
 
@@ -60,13 +60,13 @@ export default function LandingPage() {
               Not with worry.
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl">
-              RideCheck sends certified mechanics to inspect any used car before you buy.
-              Get a detailed report with photos, diagnostics, and a clear recommendation.
+              RideCheck provides pre-car-purchase intelligence for used car buyers.
+              Get a detailed intelligence report with photos, diagnostics, and risk screening data.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/book">
                 <Button size="lg" data-testid="button-hero-book">
-                  Book an Inspection
+                  Book Your Assessment
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -151,7 +151,7 @@ export default function LandingPage() {
               {
                 icon: FileText,
                 title: "Detailed Reports",
-                desc: "Photo-documented findings with clear recommendations.",
+                desc: "Photo-documented findings with observational data and risk flags.",
               },
               {
                 icon: Shield,
@@ -160,8 +160,8 @@ export default function LandingPage() {
               },
               {
                 icon: Star,
-                title: "Satisfaction Guaranteed",
-                desc: "If you're not happy, we'll make it right.",
+                title: "Satisfaction Focused",
+                desc: "If you're not satisfied, we'll review and work to resolve your concerns.",
               },
             ].map((item) => (
               <Card key={item.title}>
@@ -183,11 +183,11 @@ export default function LandingPage() {
           </h2>
           <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
             Don't let a bad deal cost you thousands. Book a professional
-            inspection today and know exactly what you're getting.
+            assessment today and know exactly what you're getting.
           </p>
           <Link href="/book">
             <Button size="lg" data-testid="button-cta-book">
-              Book Your Inspection
+              Book Your Assessment
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>

@@ -63,7 +63,7 @@ export default function OrdersPage() {
             My Orders
           </h1>
           <p className="text-sm text-muted-foreground">
-            View all your inspection orders
+            View all your assessment orders
           </p>
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>

@@ -74,7 +74,7 @@ export default function RegisterPage() {
           </Link>
           <CardTitle className="text-xl">Create an account</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Start booking professional inspections
+            Start booking professional assessments
           </p>
         </CardHeader>
         <CardContent>

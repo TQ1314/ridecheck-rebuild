@@ -1,5 +1,5 @@
 export type BookingType = "self_arrange" | "concierge";
-export type PackageType = "standard" | "premium" | "comprehensive";
+export type PackageType = "standard" | "premium" | "comprehensive" | "plus";
 
 export type OrderStatus =
   | "submitted"
@@ -51,6 +51,20 @@ export interface Order {
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
+  booking_method?: string;
+  package_tier?: string;
+  calculated_price_cents?: number;
+  preferred_language?: string;
+  inspection_address?: string;
+  inspection_time_window?: string;
+  listing_platform?: string;
+  listing_title?: string;
+  listing_price?: string;
+  listing_location_text?: string;
+  vehicle_trim?: string;
+  order_status?: string;
+  last_error?: string;
+  notes_to_inspector?: string;
 }
 
 export interface Profile {
@@ -69,5 +83,31 @@ export interface ActivityLogEntry {
   order_id: string | null;
   action: string;
   details: Record<string, any> | null;
+  created_at: string;
+}
+
+export interface IntelligenceReport {
+  id: string;
+  order_id: string;
+  report_type: string;
+  vin_consistency_check: Record<string, any> | null;
+  fraud_screening: Record<string, any> | null;
+  title_ownership_review: Record<string, any> | null;
+  risk_flags: Record<string, any> | null;
+  observations: string | null;
+  inspector_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillOfSaleDocument {
+  id: string;
+  order_id: string;
+  language: string;
+  buyer_name: string | null;
+  seller_name: string | null;
+  vehicle_description: string | null;
+  sale_price: string | null;
+  document_html: string | null;
   created_at: string;
 }

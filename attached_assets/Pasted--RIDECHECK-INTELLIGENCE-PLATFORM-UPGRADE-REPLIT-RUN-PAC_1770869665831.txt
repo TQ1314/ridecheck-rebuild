@@ -1,0 +1,300 @@
+# RIDECHECK INTELLIGENCE PLATFORM UPGRADE — REPLIT RUN PACKAGE
+# Goal: Upgrade platform positioning + UX + backend data model from “inspection” to “pre-car-purchase intelligence”
+# Hard constraints:
+# - DO NOT break the existing working buyer order flow.
+# - Keep current paste-link → order created flow working as Concierge default.
+# - Do NOT modify any existing env variable values. Never regenerate .env.local.
+# - All changes must be additive + safe + behind feature flags where possible.
+
+========================================
+A) PRODUCT POSITIONING UPDATE (NO CODE RISK)
+========================================
+1) Update all marketing copy from:
+   "Pre-purchase inspection"
+   to:
+   "Pre-Car-Purchase Intelligence"
+
+2) Approved positioning language (use everywhere):
+   - "Risk Screening"
+   - "Intelligence Report"
+   - "Title & Ownership Review (if presented)"
+   - "VIN Consistency Check"
+   - "Fraud / Red Flag Screening"
+   - "Bill of Sale Template (fillable)"
+   - "Observational at time of inspection"
+
+3) Forbidden language (MUST NOT appear anywhere):
+   - “Title verification”
+   - “Lien verification”
+   - “Stolen vehicle verification”
+   - “Guaranteed”
+   - “We ensure clear title”
+   - “Legal protection” (too broad)
+   Use “review”, “screening”, “flags”, “documented”, “based on info available”.
+
+========================================
+B) FRONTEND UX CHANGES (BUYER CONFIDENCE BOOST)
+========================================
+Implement these pages/sections without breaking existing checkout:
+
+1) Homepage (Hero)
+   - Headline: "Don’t Buy Blind. Buy With Intelligence."
+   - Subhead: "RideCheck combines mechanical checks + digital diagnostics + ownership risk flags so you can make a confident decision before you pay."
+   - Primary CTA: "RideCheck It" (takes to booking)
+
+2) Homepage (How It Works) — replace section:
+   Step 1: Paste listing link
+   Step 2: Choose booking method (Concierge or Buyer-Arranged)
+   Step 3: We coordinate & inspect
+   Step 4: Receive Intelligence Report (English/Spanish)
+
+3) Pricing Page
+   Base packages (use the updated structure user provided):
+   - Standard: $119
+   - Plus (Euro/EV/HD): $149
+   - Premium/Exotic: $299+
+   Add booking methods:
+   - Concierge: full price
+   - Buyer-Arranged: 5% lower rate (calculated + displayed)
+   Display as:
+   "Standard: $119 Concierge / $113 Buyer-Arranged"
+   "Plus: $149 Concierge / $142 Buyer-Arranged"
+   "Premium: $299+ Concierge / $284 Buyer-Arranged"
+   Use exact math rounding to nearest whole dollar.
+
+4) Booking Page (CRITICAL)
+   Add a new Step 0 selection:
+   - Concierge (default selected): "Paste link — we contact seller and schedule."
+   - Buyer-Arranged (save 5%): "You confirm time/location with seller — we show up."
+
+   Buyer-Arranged requires fields BEFORE payment:
+   - inspection_address (required)
+   - inspection_time_window (required)
+   - seller_phone (required)
+   - seller_name (optional)
+   - notes_to_inspector (optional)
+
+   Concierge keeps current flow intact:
+   - listing_url (required)
+   - seller_phone (optional)
+   - buyer profile creation stays as is
+
+5) Buyer language selection
+   Add language selector: English / Español
+   Store on order as preferred_language.
+
+6) Seller script (Buyer-Arranged)
+   Show a copy button with script:
+   "Hi, I’m interested in your car. Before I buy, I’d like a professional inspection by RideCheck (ridecheckauto.com). I’m paying for it. It takes about 45 minutes and you can be present. Would that be okay?"
+   Also provide Spanish version:
+   "Hola, me interesa su carro. Antes de comprarlo, quisiera una inspección profesional con RideCheck (ridecheckauto.com). Yo la pago. Toma unos 45 minutos y usted puede estar presente. ¿Le parece bien?"
+
+========================================
+C) DATA MODEL / DATABASE (SUPABASE) — ADDITIVE ONLY
+========================================
+Add fields/tables without breaking existing ones.
+
+1) Update orders table (or equivalent)
+   Add columns (nullable):
+   - booking_method TEXT CHECK in ('concierge','buyer_arranged') DEFAULT 'concierge'
+   - package_tier TEXT CHECK in ('standard','plus','premium') (or reuse existing)
+   - calculated_price_cents INTEGER
+   - preferred_language TEXT CHECK in ('en','es') DEFAULT 'en'
+   - inspection_address TEXT
+   - inspection_time_window TEXT
+   - seller_name TEXT
+   - seller_phone TEXT
+   - listing_platform TEXT  (facebook, craigslist, etc)
+   - listing_title TEXT
+   - listing_price TEXT
+   - listing_location_text TEXT
+   - vehicle_year INTEGER
+   - vehicle_make TEXT
+   - vehicle_model TEXT
+   - vehicle_trim TEXT
+
+2) Create a new table: intelligence_reports
+   - id UUID PK
+   - order_id UUID FK to orders
+   - created_at TIMESTAMPTZ default now()
+   - overall_risk_score INTEGER (1-10)
+   - mechanical_risk INTEGER (1-10)
+   - title_ownership_risk INTEGER (1-10)
+   - fraud_redflag_risk INTEGER (1-10)
+   - recommendation TEXT (enum-like: 'proceed', 'proceed_with_caution', 'walk_away')
+   - executive_summary TEXT
+   - key_findings JSONB
+   - photos JSONB
+   - language TEXT ('en','es')
+
+3) Create a new table: title_ownership_review
+   IMPORTANT: name it "review", not "verification".
+   - id UUID PK
+   - order_id UUID FK
+   - title_present BOOLEAN
+   - title_state TEXT
+   - title_brand TEXT (clean/salvage/rebuilt/flood/lemon/unknown) as TEXT
+   - owner_count INTEGER
+   - ownership_conjunction TEXT ('AND','OR','UNKNOWN')
+   - co_owner_present BOOLEAN
+   - lien_noted_on_title BOOLEAN
+   - lienholder_name TEXT
+   - vin_listed TEXT
+   - vin_dash TEXT
+   - vin_doorjamb TEXT
+   - vin_matches BOOLEAN
+   - odometer_reading INTEGER
+   - odometer_notes TEXT
+   - red_flags TEXT[]
+   - reviewer_notes TEXT
+   Add disclaimer field:
+   - disclaimer TEXT default:
+     "RideCheck documents information presented at the time of inspection. Buyer is responsible for confirming transfer requirements with their state DMV."
+
+4) Bill of Sale template support
+   Add table: bill_of_sale_documents
+   - id UUID PK
+   - order_id UUID FK
+   - buyer_name TEXT
+   - buyer_phone TEXT
+   - buyer_email TEXT
+   - seller_name TEXT
+   - seller_phone TEXT
+   - sale_price TEXT
+   - sale_date DATE
+   - vin TEXT
+   - odometer INTEGER
+   - as_is BOOLEAN default true
+   - generated_pdf_url TEXT (if you store)
+   - language TEXT ('en','es')
+
+========================================
+D) LISTING PARSING + PACKAGE INTELLIGENCE (CORE TRUST BOOST)
+========================================
+1) Platform detection (facebook/craigslist/other)
+   - Parse listing_url host and store listing_platform.
+   - Show platform badge to buyer after paste.
+
+2) Basic listing parsing (MVP)
+   Implement best-effort parsing:
+   - For Facebook: extract basic title text if available from og:title when accessible.
+   - For Craigslist: parse HTML title + price + location when accessible.
+   If blocked or fails:
+   - fallback: ask buyer to confirm year/make/model manually.
+
+3) Package Intelligence (must fix current issue where all default to Standard)
+   Create deterministic rules:
+   - Standard: default
+   - Plus: if make is in European brands OR vehicle is EV OR model matches heavy duty list
+   - Premium: exotics/classics/manual quote (keep as “Contact” or “Starts at $299+”)
+   For now, if uncertain, default to Standard BUT show:
+   “We’ll confirm final package once vehicle is identified.”
+   (Better than silently defaulting wrong.)
+
+4) If user pastes a link and we can infer “Mercedes Benz GLE 2021”
+   It should auto-switch to Plus tier ($149) and show breakdown.
+
+========================================
+E) REPORT UPGRADE — FROM INSPECTION TO INTELLIGENCE REPORT
+========================================
+Create a new report format with these sections (EN + ES templates):
+
+1) Executive Summary
+   - Overall Risk Score (1–10)
+   - Recommendation: Proceed / Proceed with Caution / Walk Away
+   - Top 3 findings (plain language)
+   - “What to do next” bullets
+
+2) Mechanical Findings (focused, not exaggerated)
+   - Issues + estimated range (broad ranges only)
+
+3) Digital Diagnostics (if Plus/Premium or if OBD included)
+   - OBD status, readiness, codes (if any)
+   - Keep language neutral: “observed at time of scan”
+
+4) Title & Ownership Review (if title presented)
+   - owner_count + AND/OR warning
+   - lien noted or not
+   - title brand
+   - VIN consistency check
+   Include disclaimer text.
+
+5) Fraud / Red Flag Screening
+   - neutral flags: “seller declined title review”, “VIN mismatch observed”, etc.
+
+6) Photo Evidence
+   - minimum required photos count per package; embed or link.
+
+7) Bill of Sale Template
+   - Provide download link/button after report
+   - Include bilingual template if preferred_language = es.
+
+========================================
+F) ORDER STATUS + AUTOMATION (NO BREAKAGE)
+========================================
+Keep existing order creation working.
+Add statuses (additive):
+- created
+- awaiting_seller_contact (concierge)
+- awaiting_buyer_arranged_details (buyer_arranged)
+- seller_confirmed
+- payment_pending
+- paid
+- inspector_assigned
+- inspection_in_progress
+- report_delivered
+- cancelled_refunded
+
+Concierge payment rule:
+- do not charge until seller_confirmed (as you already intended)
+Buyer-Arranged payment rule:
+- charge at booking (discounted), since buyer asserts seller agreed.
+
+========================================
+G) MULTILINGUAL (ENGLISH + SPANISH) — MVP IMPLEMENTATION
+========================================
+1) Add a simple translation map file with key UI strings for EN/ES.
+2) Store preferred_language on order.
+3) Send report email using preferred language.
+4) If full report translation is too heavy, translate:
+   - executive summary
+   - recommendation
+   - top findings
+   Keep technical terms bilingual or in English with short Spanish hints.
+
+========================================
+H) IMPLEMENTATION STEPS (REPLIT SAFE MODE)
+========================================
+1) Create a git branch: feature/intelligence-platform
+2) Run typecheck/lint/tests after each milestone.
+3) Do not edit env files or secrets.
+4) Implement in order:
+   (1) Copy updates + new sections
+   (2) Booking method selection UI + pricing display
+   (3) Database migrations (Supabase SQL)
+   (4) Listing parsing + package intelligence
+   (5) Report generation + bilingual templates
+   (6) Bill of Sale template generation (HTML -> PDF optional)
+   (7) Verify Vercel build passes
+
+========================================
+I) ACCEPTANCE TESTS (MUST PASS)
+========================================
+1) Concierge flow still works end-to-end for a pasted link.
+2) Buyer-Arranged flow creates order with correct discounted price.
+3) Mercedes / Euro / EV gets Plus tier auto-selected when identified.
+4) Report contains "Title & Ownership Review (if presented)" section.
+5) Spanish language selection changes the email + summary language.
+6) Build succeeds (npm run build) and no runtime errors.
+
+========================================
+OUTPUT REQUIRED
+========================================
+When done, print:
+- List of files changed/added
+- SQL migration scripts
+- Any new environment variables required (should be none)
+- A short “How to test” checklist
+- Screenshots not required, but include routes/URLs to click
+
+Proceed to implement now.

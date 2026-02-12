@@ -49,7 +49,7 @@ export function Navbar() {
           </Link>
           <Link href="/book">
             <Button size="sm" data-testid="link-book-inspection">
-              Book Inspection
+              Book Assessment
             </Button>
           </Link>
         </div>
@@ -85,7 +85,7 @@ export function Navbar() {
               </Button>
             </Link>
             <Link href="/book" className="flex-1">
-              <Button className="w-full">Book Inspection</Button>
+              <Button className="w-full">Book Assessment</Button>
             </Link>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { Check, ArrowRight } from "lucide-react";
 import { PACKAGE_INFO, PRICING, formatCurrency } from "@/lib/utils/pricing";
 import type { PackageType } from "@/lib/utils/pricing";
 
-const PACKAGES: PackageType[] = ["standard", "premium", "comprehensive"];
+const PACKAGES: PackageType[] = ["standard", "plus", "premium", "comprehensive"];
 
 export default function PricingPage() {
   return (
@@ -17,16 +17,16 @@ export default function PricingPage() {
         <div className="text-center mb-14">
           <h1 className="text-4xl font-bold mb-3">Simple, Transparent Pricing</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Choose the inspection package that fits your needs. Self-arranged
+            Choose the assessment package that fits your needs. Self-arranged
             appointments save you money.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {PACKAGES.map((pkg) => {
             const info = PACKAGE_INFO[pkg];
             const prices = PRICING[pkg];
-            const isPremium = pkg === "premium";
+            const isPremium = pkg === "plus";
             return (
               <Card
                 key={pkg}
@@ -88,7 +88,7 @@ export default function PricingPage() {
           <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
             <Card>
               <CardContent className="pt-6">
-                <h4 className="font-semibold mb-2">Self-Arranged</h4>
+                <h4 className="font-semibold mb-2">Buyer-Arranged</h4>
                 <p className="text-sm text-muted-foreground">
                   You schedule the appointment with the seller. We show up,
                   inspect, and deliver your report. You save a few dollars.
@@ -100,7 +100,7 @@ export default function PricingPage() {
                 <h4 className="font-semibold mb-2">Concierge</h4>
                 <p className="text-sm text-muted-foreground">
                   We handle everything — contact the seller, schedule the
-                  appointment, and coordinate the inspection. Sit back and
+                  appointment, and coordinate the assessment. Sit back and
                   wait for your report.
                 </p>
               </CardContent>

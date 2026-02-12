@@ -7,6 +7,7 @@ const PUBLIC_ROUTES = [
   "/how-it-works",
   "/book",
   "/order/received",
+  "/order/confirmation",
   "/auth/login",
   "/auth/register",
   "/auth/callback",

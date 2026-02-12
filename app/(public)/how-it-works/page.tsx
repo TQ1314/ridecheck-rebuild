@@ -27,13 +27,13 @@ const SELF_STEPS = [
   },
   {
     icon: Wrench,
-    title: "3. Inspection Day",
-    desc: "Our certified tech arrives at the vehicle location for a thorough inspection.",
+    title: "3. Assessment Day",
+    desc: "Our certified tech arrives at the vehicle location for a thorough assessment.",
   },
   {
     icon: FileText,
     title: "4. Get Your Report",
-    desc: "Receive a detailed digital report with photos and a clear buy/don't-buy recommendation.",
+    desc: "Receive a detailed digital report with photos, risk screening data and observational findings.",
   },
 ];
 
@@ -55,18 +55,18 @@ const CONCIERGE_STEPS = [
   },
   {
     icon: Calendar,
-    title: "4. Inspection Scheduled",
-    desc: "We handle all logistics and schedule the inspection at the confirmed time.",
+    title: "4. Assessment Scheduled",
+    desc: "We handle all logistics and schedule the assessment at the confirmed time.",
   },
   {
     icon: Wrench,
-    title: "5. Inspection Day",
-    desc: "Our certified tech performs the multi-point inspection at the vehicle location.",
+    title: "5. Assessment Day",
+    desc: "Our certified tech performs the multi-point assessment at the vehicle location.",
   },
   {
     icon: FileText,
     title: "6. Get Your Report",
-    desc: "Receive a detailed digital report delivered straight to your inbox.",
+    desc: "Receive a detailed intelligence report delivered straight to your inbox.",
   },
 ];
 
@@ -78,14 +78,14 @@ export default function HowItWorksPage() {
           <h1 className="text-4xl font-bold mb-3">How RideCheck Works</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
             Whether you arrange the appointment yourself or let us handle
-            everything, getting a professional inspection is easy.
+            everything, getting a professional assessment is easy.
           </p>
         </div>
 
         <div className="mb-16">
           <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
             <CheckCircle2 className="h-6 w-6 text-primary" />
-            Self-Arranged
+            Buyer-Arranged
           </h2>
           <p className="text-muted-foreground mb-6">
             Already have an appointment with the seller? Save money and book
@@ -137,11 +137,11 @@ export default function HowItWorksPage() {
         <div className="text-center py-10 rounded-lg bg-muted/50">
           <h2 className="text-2xl font-bold mb-3">Ready to get started?</h2>
           <p className="text-muted-foreground mb-6">
-            Book your inspection in minutes. It could save you thousands.
+            Book your assessment in minutes. It could save you thousands.
           </p>
           <Link href="/book">
             <Button size="lg" data-testid="button-book-cta">
-              Book an Inspection
+              Book Your Assessment
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>

@@ -15,7 +15,7 @@ export function Footer() {
               <span>RideCheck</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Professional pre-purchase vehicle inspections you can trust.
+              Pre-car-purchase intelligence you can trust.
             </p>
           </div>
           <div>
@@ -33,7 +33,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/book" className="hover:text-foreground transition-colors">
-                  Book Inspection
+                  Book Assessment
                 </Link>
               </li>
             </ul>
