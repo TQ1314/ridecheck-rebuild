@@ -14,6 +14,22 @@ export type OrderStatus =
   | "completed"
   | "cancelled";
 
+export type OpsStatus =
+  | "new"
+  | "seller_outreach"
+  | "seller_confirmed"
+  | "payment_pending"
+  | "payment_received"
+  | "inspector_assigned"
+  | "scheduled"
+  | "in_progress"
+  | "report_drafting"
+  | "report_review"
+  | "delivered"
+  | "completed"
+  | "on_hold"
+  | "cancelled";
+
 export type PaymentStatus =
   | "not_requested"
   | "requested"
@@ -65,6 +81,22 @@ export interface Order {
   order_status?: string;
   last_error?: string;
   notes_to_inspector?: string;
+  ops_status?: OpsStatus;
+  assigned_inspector_id?: string;
+  assigned_at?: string;
+  seller_contact_attempts?: number;
+  seller_contacted_at?: string;
+  seller_confirmed_at?: string;
+  payment_requested_at?: string;
+  inspection_scheduled_for?: string;
+  inspection_completed_at?: string;
+  report_delivered_at?: string;
+  ops_priority?: number;
+  ops_notes?: string;
+  hold_status?: string;
+  payment_link_url?: string;
+  buyer_email?: string;
+  buyer_phone?: string;
 }
 
 export interface Profile {
@@ -84,6 +116,46 @@ export interface ActivityLogEntry {
   action: string;
   details: Record<string, any> | null;
   created_at: string;
+}
+
+export interface OrderEvent {
+  id: string;
+  order_id: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  details: Record<string, any> | null;
+  is_internal: boolean;
+  created_at: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  old_value: Record<string, any> | null;
+  new_value: Record<string, any> | null;
+  metadata: Record<string, any> | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface Inspector {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  region: string | null;
+  specialties: string[] | null;
+  is_active: boolean;
+  max_daily_capacity: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface IntelligenceReport {

@@ -673,6 +673,9 @@ video {
 .left-2 {
   left: 0.5rem;
 }
+.left-3 {
+  left: 0.75rem;
+}
 .left-\[50\%\] {
   left: 50%;
 }
@@ -1486,6 +1489,9 @@ video {
 .border-muted-foreground\/30 {
   border-color: hsl(var(--muted-foreground) / 0.3);
 }
+.border-orange-500\/30 {
+  border-color: rgb(249 115 22 / 0.3);
+}
 .border-primary {
   --tw-border-opacity: 1;
   border-color: hsl(var(--primary) / var(--tw-border-opacity, 1));
@@ -1502,6 +1508,9 @@ video {
 }
 .border-transparent {
   border-color: transparent;
+}
+.border-yellow-500\/30 {
+  border-color: rgb(234 179 8 / 0.3);
 }
 .border-l-transparent {
   border-left-color: transparent;
@@ -1570,6 +1579,10 @@ video {
   --tw-bg-opacity: 1;
   background-color: hsl(var(--muted) / var(--tw-bg-opacity, 1));
 }
+.bg-muted-foreground {
+  --tw-bg-opacity: 1;
+  background-color: hsl(var(--muted-foreground) / var(--tw-bg-opacity, 1));
+}
 .bg-muted\/30 {
   background-color: hsl(var(--muted) / 0.3);
 }
@@ -1578,6 +1591,9 @@ video {
 }
 .bg-orange-500\/10 {
   background-color: rgb(249 115 22 / 0.1);
+}
+.bg-orange-500\/15 {
+  background-color: rgb(249 115 22 / 0.15);
 }
 .bg-popover {
   --tw-bg-opacity: 1;
@@ -1616,6 +1632,9 @@ video {
 }
 .bg-transparent {
   background-color: transparent;
+}
+.bg-yellow-500\/15 {
+  background-color: rgb(234 179 8 / 0.15);
 }
 .bg-gradient-to-br {
   background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
@@ -1765,6 +1784,9 @@ video {
 }
 .pl-8 {
   padding-left: 2rem;
+}
+.pl-9 {
+  padding-left: 2.25rem;
 }
 .pr-2 {
   padding-right: 0.5rem;
@@ -2013,6 +2035,10 @@ video {
 .text-teal-700 {
   --tw-text-opacity: 1;
   color: rgb(15 118 110 / var(--tw-text-opacity, 1));
+}
+.text-yellow-700 {
+  --tw-text-opacity: 1;
+  color: rgb(161 98 7 / var(--tw-text-opacity, 1));
 }
 .antialiased {
   -webkit-font-smoothing: antialiased;
@@ -3406,6 +3432,11 @@ video {
 .dark\:text-teal-400:is(.dark *) {
   --tw-text-opacity: 1;
   color: rgb(45 212 191 / var(--tw-text-opacity, 1));
+}
+
+.dark\:text-yellow-400:is(.dark *) {
+  --tw-text-opacity: 1;
+  color: rgb(250 204 21 / var(--tw-text-opacity, 1));
 }
 
 .dark\:after\:border-white\/10:is(.dark *)::after {

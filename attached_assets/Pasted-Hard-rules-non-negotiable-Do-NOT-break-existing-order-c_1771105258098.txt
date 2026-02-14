@@ -1,0 +1,297 @@
+Hard rules (non-negotiable)
+
+Do NOT break existing order creation flow.
+
+Add-only DB changes (no renames, no drops).
+
+Admin access must be server-verified (not frontend-only).
+
+Every admin action must write to audit log.
+
+FIFO queue must be deterministic (created_at asc).
+
+1) Database upgrades (Supabase) — add-only
+A) Add columns to orders
+
+Add these columns if missing:
+
+order_status (text) default created
+
+ops_status (text) default new (ops pipeline state)
+
+assigned_inspector_id (uuid nullable)
+
+assigned_at (timestamptz nullable)
+
+seller_contact_attempts (int default 0)
+
+seller_contacted_at (timestamptz nullable)
+
+seller_confirmed_at (timestamptz nullable)
+
+payment_requested_at (timestamptz nullable)
+
+paid_at (timestamptz nullable)
+
+inspection_scheduled_for (timestamptz nullable)
+
+inspection_completed_at (timestamptz nullable)
+
+report_delivered_at (timestamptz nullable)
+
+ops_priority (int default 0)
+
+ops_notes (text nullable)
+
+hold_status (text default 'none') (for later: hold/capture)
+
+last_error (text nullable)
+
+B) Create admin/RBAC tables
+
+Create:
+
+roles
+
+user_roles
+
+audit_log
+
+inspectors
+
+order_events
+
+roles
+
+admin
+
+ops
+
+inspector
+
+va
+
+audit_log: every change by admins/ops goes here
+order_events: timeline of what happened to the order (customer-safe + internal)
+
+C) RLS strategy (important)
+
+Keep public/guest order creation working via your existing supabaseAdmin server insert.
+
+Lock down admin tables: only service role or admin can write.
+
+2) Backend (server) — RBAC enforcement
+A) Create a single RBAC helper
+
+Create:
+
+/lib/rbac.ts
+
+Functions:
+
+requireRole(req, ['admin','ops'])
+
+getActor(req) returns { userId, email, roles[] }
+
+Uses Supabase auth session OR your existing admin cookie system.
+
+Rule: If user is not authorized → return 401/403.
+
+B) Add Admin API routes (Phase 2 core)
+
+Create routes:
+
+GET /api/admin/orders?status=new&limit=50
+
+returns FIFO queue: ORDER BY ops_priority desc, created_at asc
+
+GET /api/admin/orders/:id
+
+returns full order + events + audit log snapshot
+
+POST /api/admin/orders/:id/status
+
+body: { ops_status, ops_notes? }
+
+writes to orders
+
+writes to order_events
+
+writes to audit_log
+
+POST /api/admin/orders/:id/assign
+
+body: { inspector_id }
+
+sets assigned_inspector_id, assigned_at
+
+writes logs
+
+POST /api/admin/orders/:id/contact-seller
+
+increments seller_contact_attempts
+
+sets seller_contacted_at on first attempt
+
+writes logs
+
+(optional) triggers email/sms later — for now just records action
+
+POST /api/admin/orders/:id/request-payment
+
+generates Stripe payment link
+
+stores payment_link_url (new column if needed)
+
+sets payment_requested_at
+
+emails buyer
+
+logs everything
+
+3) Frontend Admin Dashboard (investor-grade but simple)
+
+Create:
+
+/admin (landing)
+
+/admin/orders (queue)
+
+/admin/orders/[id] (order detail + actions)
+
+/admin/inspectors (manage inspector list)
+
+/admin/audit (audit log viewer)
+
+Admin queue page must have:
+
+Filters: ops_status, booking_type, package, platform
+
+Sorting: default FIFO
+
+Columns:
+
+Order ID
+
+created_at
+
+booking_type (self_arrange/concierge)
+
+package
+
+vehicle
+
+ops_status
+
+seller_attempts
+
+assigned_inspector
+
+next_action (computed)
+
+Order detail page must have:
+
+Timeline (order_events)
+
+Audit history (audit_log)
+
+Action buttons:
+
+Update status
+
+Assign inspector
+
+Log “seller contact attempt”
+
+Request payment (concierge only)
+
+Mark scheduled / completed / delivered
+
+“Copy buyer email/phone” buttons for ops speed
+
+4) FIFO queue + SLA rules
+
+Queue ordering:
+
+ops_priority desc
+
+created_at asc
+
+SLA flags (computed on UI):
+
+Stale: created_at > 2 hours and still ops_status='new'
+
+Seller lag: seller_contact_attempts >= 3 and no seller_confirmed_at
+
+Payment lag: payment_requested_at > 6 hours and not paid
+
+Inspection lag: scheduled_for < now and not completed
+
+These become a “🔥 needs attention” badge.
+
+ACCEPTANCE TESTS (Phase 2 must pass)
+
+Buyer creates order (concierge) → still works
+
+Buyer creates order (self-arranged) → discount + checkout still works
+
+/admin/orders loads only for admin/ops
+
+Updating status writes:
+
+orders updated
+
+order_events inserted
+
+audit_log inserted
+
+FIFO queue shows correct oldest-first ordering
+
+Vercel builds clean
+
+🔥 What you do next (no guessing)
+Step 1 (Today)
+
+Run SQL migrations above in Supabase.
+
+Step 2
+
+Tell Replit Agent to implement:
+
+RBAC helper
+
+Admin API routes
+
+Admin UI pages
+
+Step 3
+
+Smoke test:
+
+create 2 orders
+
+confirm they appear in admin queue FIFO
+
+update status
+
+assign inspector
+
+check audit_log entry exists
+
+Payments — “hold funds” design (Phase 2.5 ready)
+
+You said: hold funds until seller confirms. That’s great, but it’s a separate flag so we don’t break working payments.
+
+Add feature flag:
+
+NEXT_PUBLIC_FEATURE_PAYMENT_HOLD=true
+
+If OFF: keep current flow.
+If ON: use Stripe PaymentIntent manual capture (authorize now, capture later).
+
+We won’t flip this until the ops queue is stable.
+
+✅ Paste this exact prompt into Replit Agent
+
+Implement Phase 2 “Ops Engine B” for RideCheck. Add RBAC (admin/ops/va/inspector), audit logs for all admin actions, an admin dashboard with FIFO queue, and admin API routes to update order statuses and assign inspectors. Hard rules: do not break existing order creation flow; DB changes are add-only; concierge remains default; admin routes must be server-protected; every admin action writes to audit_log and order_events. Create /admin/orders, /admin/orders/[id], /admin/inspectors, /admin/audit. Add filters + FIFO sorting. Add SLA warning badges. Output: list of files changed + any SQL needed.
+

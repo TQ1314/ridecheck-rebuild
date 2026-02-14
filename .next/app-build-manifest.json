@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/(public)/page": [
+    "/(public)/book/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(public)/page.js"
+      "static/chunks/app/(public)/book/page.js"
     ],
     "/(public)/layout": [
       "static/chunks/webpack.js",

@@ -12,7 +12,7 @@ export function canAccessOps(role: Role): boolean {
 }
 
 export function canAccessAdmin(role: Role): boolean {
-  return role === "owner";
+  return ["owner", "operations", "operations_lead"].includes(role);
 }
 
 export function canAccessPlatform(role: Role): boolean {
@@ -62,7 +62,7 @@ export function getRoleLabel(role: Role): string {
 
 export function getDashboardPath(role: Role): string {
   if (role === "owner") return "/admin";
-  if (["operations", "operations_lead"].includes(role)) return "/operations";
+  if (["operations", "operations_lead"].includes(role)) return "/admin";
   if (role === "platform") return "/platform";
   if (role === "qa") return "/qa";
   if (role === "developer") return "/dev";

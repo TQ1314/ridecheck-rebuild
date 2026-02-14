@@ -2,42 +2,112 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type { Order, ActivityLogEntry } from "@/types/orders";
+import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry, Inspector } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
-import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  ArrowLeft,
+  RefreshCw,
+  UserPlus,
+  PhoneCall,
+  CreditCard,
+  Copy,
+  Clock,
+  Shield,
+} from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateTime, formatRelative, statusLabel } from "@/lib/utils/format";
+
+const OPS_STATUSES = [
+  "new",
+  "seller_outreach",
+  "seller_confirmed",
+  "payment_pending",
+  "payment_received",
+  "inspector_assigned",
+  "scheduled",
+  "in_progress",
+  "report_drafting",
+  "report_review",
+  "delivered",
+  "completed",
+  "on_hold",
+  "cancelled",
+];
 
 export default function AdminOrderDetailPage() {
   const params = useParams();
   const orderId = params.orderId as string;
-  const supabase = createClient();
   const { toast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
+  const [events, setEvents] = useState<OrderEvent[]>([]);
+  const [audit, setAudit] = useState<AuditLogEntry[]>([]);
+  const [inspector, setInspector] = useState<Inspector | null>(null);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [opsStatusOpen, setOpsStatusOpen] = useState(false);
+  const [opsStatus, setOpsStatus] = useState("");
+  const [opsNotes, setOpsNotes] = useState("");
+  const [opsLoading, setOpsLoading] = useState(false);
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [inspectors, setInspectors] = useState<Inspector[]>([]);
+  const [selectedInspector, setSelectedInspector] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+
   async function loadData() {
-    const [orderRes, activityRes] = await Promise.all([
-      supabase.from("orders").select("*").eq("id", orderId).single(),
-      supabase
-        .from("activity_log")
-        .select("*")
-        .eq("order_id", orderId)
-        .order("created_at", { ascending: false }),
-    ]);
-    if (orderRes.data) setOrder(orderRes.data);
-    if (activityRes.data) setActivities(activityRes.data);
+    const res = await fetch(`/api/admin/orders/${orderId}`);
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
+    const data = await res.json();
+    if (data.order) {
+      setOrder(data.order);
+      setOpsStatus(data.order.ops_status || "new");
+    }
+    if (data.events) setEvents(data.events);
+    if (data.audit) setAudit(data.audit);
+    if (data.inspector) setInspector(data.inspector);
+    if (data.activities) setActivities(data.activities);
     setLoading(false);
   }
 
   useEffect(() => {
     loadData();
   }, [orderId]);
+
+  useEffect(() => {
+    if (assignOpen) {
+      fetch("/api/admin/inspectors")
+        .then((r) => r.json())
+        .then((data) => {
+          const list = Array.isArray(data) ? data : data?.inspectors || [];
+          setInspectors(list.filter((i: Inspector) => i.is_active));
+        });
+    }
+  }, [assignOpen]);
 
   const handleStatusUpdate = async (newStatus: string) => {
     const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -54,23 +124,46 @@ export default function AdminOrderDetailPage() {
     loadData();
   };
 
-  const handleAssign = async (opsId: string) => {
-    const res = await fetch(`/api/orders/${orderId}/assign`, {
-      method: "PATCH",
+  const handleOpsStatusUpdate = async () => {
+    setOpsLoading(true);
+    const res = await fetch(`/api/admin/orders/${orderId}/ops-status`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assigned_ops_id: opsId }),
+      body: JSON.stringify({ ops_status: opsStatus, notes: opsNotes || undefined }),
     });
+    setOpsLoading(false);
     if (!res.ok) {
       const err = await res.json();
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: "Order assigned" });
+    toast({ title: "Ops status updated" });
+    setOpsStatusOpen(false);
+    setOpsNotes("");
     loadData();
   };
 
-  const handleSendPayment = async () => {
-    const res = await fetch(`/api/orders/${orderId}/send-payment`, {
+  const handleAssignInspector = async () => {
+    if (!selectedInspector) return;
+    setAssignLoading(true);
+    const res = await fetch(`/api/orders/${orderId}/assign`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inspector_id: selectedInspector }),
+    });
+    setAssignLoading(false);
+    if (!res.ok) {
+      const err = await res.json();
+      toast({ title: "Error", description: err.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Inspector assigned" });
+    setAssignOpen(false);
+    loadData();
+  };
+
+  const handleContactSeller = async () => {
+    const res = await fetch(`/api/admin/orders/${orderId}/contact-seller`, {
       method: "POST",
     });
     if (!res.ok) {
@@ -78,8 +171,30 @@ export default function AdminOrderDetailPage() {
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: "Payment link sent" });
+    toast({ title: "Seller contact logged" });
     loadData();
+  };
+
+  const handleRequestPayment = async () => {
+    const res = await fetch(`/api/admin/orders/${orderId}/request-payment`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      toast({ title: "Error", description: err.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Payment requested" });
+    loadData();
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied to clipboard` });
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
   };
 
   if (loading) {
@@ -102,37 +217,246 @@ export default function AdminOrderDetailPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link href="/admin/orders">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" data-testid="button-back">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
         </Link>
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusUpdateDialog
-            orderId={orderId}
-            currentStatus={order.status}
-            onUpdate={handleStatusUpdate}
-          />
-          <AssignOpsDialog
-            orderId={orderId}
-            currentOpsId={order.assigned_ops_id}
-            onAssign={handleAssign}
-          />
-          {order.booking_type === "concierge" &&
-            order.payment_status === "not_requested" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSendPayment}
-                data-testid="button-send-payment"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send Payment Link
-              </Button>
-            )}
+          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ops-status">
+            Ops: {statusLabel(order.ops_status || "new")}
+          </Badge>
+          {inspector && (
+            <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-inspector">
+              Inspector: {inspector.full_name}
+            </Badge>
+          )}
         </div>
       </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Dialog open={opsStatusOpen} onOpenChange={setOpsStatusOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-update-ops-status">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Update Ops Status
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Ops Status</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="mb-2 block">New Ops Status</Label>
+                <Select value={opsStatus} onValueChange={setOpsStatus}>
+                  <SelectTrigger data-testid="select-ops-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPS_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {statusLabel(s)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-2 block">Notes (optional)</Label>
+                <Textarea
+                  value={opsNotes}
+                  onChange={(e) => setOpsNotes(e.target.value)}
+                  placeholder="Add notes..."
+                  data-testid="input-ops-notes"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpsStatusOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleOpsStatusUpdate}
+                  disabled={opsLoading}
+                  data-testid="button-confirm-ops-status"
+                >
+                  {opsLoading ? "Updating..." : "Update"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-assign-inspector">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Assign Inspector
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Inspector</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="mb-2 block">Select Inspector</Label>
+                <Select value={selectedInspector} onValueChange={setSelectedInspector}>
+                  <SelectTrigger data-testid="select-inspector">
+                    <SelectValue placeholder="Select an inspector..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inspectors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.full_name} {i.region ? `(${i.region})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setAssignOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAssignInspector}
+                  disabled={assignLoading || !selectedInspector}
+                  data-testid="button-confirm-assign-inspector"
+                >
+                  {assignLoading ? "Assigning..." : "Assign"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Button
+          variant="outline"
+          onClick={handleContactSeller}
+          data-testid="button-contact-seller"
+        >
+          <PhoneCall className="h-4 w-4 mr-2" />
+          Log Seller Contact
+        </Button>
+
+        {order.booking_type === "concierge" && order.payment_status !== "paid" && (
+          <Button
+            variant="outline"
+            onClick={handleRequestPayment}
+            data-testid="button-request-payment"
+          >
+            <CreditCard className="h-4 w-4 mr-2" />
+            Request Payment
+          </Button>
+        )}
+
+        <StatusUpdateDialog
+          orderId={orderId}
+          currentStatus={order.status}
+          onUpdate={handleStatusUpdate}
+        />
+
+        {order.customer_email && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => copyToClipboard(order.customer_email, "Email")}
+            data-testid="button-copy-email"
+            title="Copy email"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        )}
+        {order.customer_phone && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => copyToClipboard(order.customer_phone!, "Phone")}
+            data-testid="button-copy-phone"
+            title="Copy phone"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
       <OrderDetailPanel order={order} activities={activities} />
+
+      {events.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Order Events Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-start gap-3 text-sm"
+                  data-testid={`event-${event.id}`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{statusLabel(event.event_type)}</p>
+                    {event.actor_email && (
+                      <p className="text-muted-foreground text-xs">by {event.actor_email}</p>
+                    )}
+                    {event.details && (
+                      <p className="text-muted-foreground text-xs">
+                        {JSON.stringify(event.details)}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {formatRelative(event.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {audit.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              Audit History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {audit.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-start gap-3 text-sm"
+                  data-testid={`audit-${entry.id}`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground mt-1.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{entry.action}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {entry.actor_email || "System"} ({entry.actor_role || "—"})
+                    </p>
+                    {entry.new_value && (
+                      <p className="text-muted-foreground text-xs truncate max-w-md">
+                        {JSON.stringify(entry.new_value)}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {formatRelative(entry.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -61,10 +61,7 @@ export async function middleware(req: NextRequest) {
   const role = profile.role;
 
   if (pathname.startsWith("/admin")) {
-    if (role === "owner") return res;
-    if (["operations", "operations_lead"].includes(role)) {
-      return NextResponse.redirect(new URL("/operations", req.url));
-    }
+    if (["owner", "operations", "operations_lead"].includes(role)) return res;
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

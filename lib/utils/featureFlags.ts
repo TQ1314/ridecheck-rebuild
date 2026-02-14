@@ -2,6 +2,7 @@ export const FEATURE_FLAGS = {
   BUYER_ARRANGED: "NEXT_PUBLIC_FEATURE_BUYER_ARRANGED",
   BILL_OF_SALE: "NEXT_PUBLIC_FEATURE_BILL_OF_SALE",
   INTELLIGENCE_REPORT: "NEXT_PUBLIC_FEATURE_INTELLIGENCE_REPORT",
+  PAYMENT_HOLD: "NEXT_PUBLIC_FEATURE_PAYMENT_HOLD",
 } as const;
 
 export function isFeatureEnabled(flag: string): boolean {
@@ -23,4 +24,8 @@ export function isBillOfSaleEnabled(): boolean {
 
 export function isIntelligenceReportEnabled(): boolean {
   return isFeatureEnabled(FEATURE_FLAGS.INTELLIGENCE_REPORT);
+}
+
+export function isPaymentHoldEnabled(): boolean {
+  return isFeatureEnabled(FEATURE_FLAGS.PAYMENT_HOLD);
 }

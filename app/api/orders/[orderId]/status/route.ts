@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { canUpdateStatus, type Role } from "@/lib/utils/roles";
+import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
 
 const statusSchema = z.object({
@@ -18,6 +17,7 @@ const statusSchema = z.object({
     "completed",
     "cancelled",
   ]),
+  ops_notes: z.string().optional(),
 });
 
 export async function PATCH(
@@ -25,24 +25,9 @@ export async function PATCH(
   { params }: { params: { orderId: string } },
 ) {
   try {
-    const supabase = createRouteHandlerSupabaseClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (!profile || !canUpdateStatus(profile.role as Role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    if (!isAuthorized(result)) return result.error;
+    const { actor } = result;
 
     const body = await req.json();
     const parsed = statusSchema.safeParse(body);
@@ -50,21 +35,60 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
+    const { data: currentOrder } = await supabaseAdmin
+      .from("orders")
+      .select("status")
+      .eq("id", params.orderId)
+      .single();
+
+    const oldStatus = currentOrder?.status || "unknown";
+
+    const updatePayload: Record<string, any> = {
+      status: parsed.data.status,
+      updated_at: new Date().toISOString(),
+    };
+    if (parsed.data.ops_notes) {
+      updatePayload.ops_notes = parsed.data.ops_notes;
+    }
+
     const { error } = await supabaseAdmin
       .from("orders")
-      .update({ status: parsed.data.status, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", params.orderId);
 
     if (error) {
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
 
-    await supabaseAdmin.from("activity_log").insert({
-      user_id: session.user.id,
-      order_id: params.orderId,
-      action: "status_changed",
-      details: { new_status: parsed.data.status },
-    });
+    await Promise.all([
+      supabaseAdmin.from("activity_log").insert({
+        user_id: actor.userId,
+        order_id: params.orderId,
+        action: "status_changed",
+        details: { old_status: oldStatus, new_status: parsed.data.status },
+      }),
+      writeOrderEvent({
+        orderId: params.orderId,
+        eventType: "status_changed",
+        actorId: actor.userId,
+        actorEmail: actor.email,
+        details: {
+          old_status: oldStatus,
+          new_status: parsed.data.status,
+          ...(parsed.data.ops_notes ? { notes: parsed.data.ops_notes } : {}),
+        },
+      }),
+      writeAuditLog({
+        actorId: actor.userId,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        action: "order.status_changed",
+        resourceType: "order",
+        resourceId: params.orderId,
+        oldValue: { status: oldStatus },
+        newValue: { status: parsed.data.status },
+      }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

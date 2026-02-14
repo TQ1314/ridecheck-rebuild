@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { canAssignOps, type Role } from "@/lib/utils/roles";
+import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
 
 const assignSchema = z.object({
-  assigned_ops_id: z.string().uuid(),
+  assigned_ops_id: z.string().uuid().optional(),
+  inspector_id: z.string().uuid().optional(),
 });
 
 export async function PATCH(
@@ -13,24 +13,9 @@ export async function PATCH(
   { params }: { params: { orderId: string } },
 ) {
   try {
-    const supabase = createRouteHandlerSupabaseClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (!profile || !canAssignOps(profile.role as Role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const result = await requireRole(["operations_lead", "owner"]);
+    if (!isAuthorized(result)) return result.error;
+    const { actor } = result;
 
     const body = await req.json();
     const parsed = assignSchema.safeParse(body);
@@ -38,24 +23,55 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    const eventDetails: Record<string, any> = {};
+
+    if (parsed.data.assigned_ops_id) {
+      updatePayload.assigned_ops_id = parsed.data.assigned_ops_id;
+      eventDetails.assigned_ops_id = parsed.data.assigned_ops_id;
+    }
+
+    if (parsed.data.inspector_id) {
+      updatePayload.assigned_inspector_id = parsed.data.inspector_id;
+      updatePayload.assigned_at = new Date().toISOString();
+      eventDetails.inspector_id = parsed.data.inspector_id;
+    }
+
     const { error } = await supabaseAdmin
       .from("orders")
-      .update({
-        assigned_ops_id: parsed.data.assigned_ops_id,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", params.orderId);
 
     if (error) {
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
 
-    await supabaseAdmin.from("activity_log").insert({
-      user_id: session.user.id,
-      order_id: params.orderId,
-      action: "order_assigned",
-      details: { assigned_ops_id: parsed.data.assigned_ops_id },
-    });
+    await Promise.all([
+      supabaseAdmin.from("activity_log").insert({
+        user_id: actor.userId,
+        order_id: params.orderId,
+        action: "order_assigned",
+        details: eventDetails,
+      }),
+      writeOrderEvent({
+        orderId: params.orderId,
+        eventType: "assignment_changed",
+        actorId: actor.userId,
+        actorEmail: actor.email,
+        details: eventDetails,
+      }),
+      writeAuditLog({
+        actorId: actor.userId,
+        actorEmail: actor.email,
+        actorRole: actor.role,
+        action: "order.assigned",
+        resourceType: "order",
+        resourceId: params.orderId,
+        newValue: eventDetails,
+      }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

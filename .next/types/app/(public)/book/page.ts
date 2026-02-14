@@ -1,8 +1,8 @@
-// File: /home/runner/workspace/app/(public)/page.tsx
-import * as entry from '../../../../app/(public)/page.js'
+// File: /home/runner/workspace/app/(public)/book/page.tsx
+import * as entry from '../../../../../app/(public)/book/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
-type TEntry = typeof import('../../../../app/(public)/page.js')
+type TEntry = typeof import('../../../../../app/(public)/book/page.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
