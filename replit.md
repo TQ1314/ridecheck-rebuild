@@ -110,3 +110,10 @@ Migration SQL in /supabase/migrations/ (run manually):
   - FIFO ordering: ops_priority DESC, created_at ASC
   - PAYMENT_HOLD feature flag added
   - All admin actions logged to both audit_log and order_events
+- Auth flow fixes (Feb 2026):
+  - Server-side registration API (/api/auth/register) creates auth user + profile with role='customer'
+  - Profile auto-creation via secured /api/auth/ensure-profile (uses SESSION_SECRET for internal auth)
+  - Middleware auto-creates missing profiles on login via ensure-profile API
+  - Password visibility toggle on login, register, and reset-password pages
+  - Forgot password flow (/auth/forgot-password) and reset password flow (/auth/reset-password)
+  - Security: No user can self-assign admin/operations roles; all signups hardcode role='customer'

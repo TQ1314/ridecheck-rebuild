@@ -11,6 +11,8 @@ const PUBLIC_ROUTES = [
   "/auth/login",
   "/auth/register",
   "/auth/callback",
+  "/auth/forgot-password",
+  "/auth/reset-password",
 ];
 
 const SKIP_PREFIXES = ["/_next", "/api", "/favicon", "/images", "/fonts"];
@@ -88,9 +90,37 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // No profile row found (common when profile not created yet)
+  // No profile row found - redirect to a page that will auto-create via API
   if (!profile) {
     console.log("MIDDLEWARE: profile missing for user:", session.user.id);
+
+    try {
+      const apiUrl = new URL("/api/auth/ensure-profile", req.url);
+      const apiRes = await fetch(apiUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": process.env.SESSION_SECRET || "",
+        },
+        body: JSON.stringify({ userId: session.user.id }),
+      });
+
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        const role = data.profile?.role || "customer";
+        if (
+          normalizedPath.startsWith("/admin") ||
+          normalizedPath.startsWith("/operations")
+        ) {
+          if (!["owner", "operations", "operations_lead"].includes(role)) {
+            return NextResponse.redirect(new URL("/dashboard", req.url));
+          }
+        }
+        return res;
+      }
+    } catch (err) {
+      console.error("MIDDLEWARE: ensure-profile call failed:", err);
+    }
 
     await supabase.auth.signOut();
     const loginUrl = new URL("/auth/login", req.url);

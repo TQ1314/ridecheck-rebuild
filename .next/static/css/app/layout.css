@@ -1788,6 +1788,9 @@ video {
 .pl-9 {
   padding-left: 2.25rem;
 }
+.pr-10 {
+  padding-right: 2.5rem;
+}
 .pr-2 {
   padding-right: 0.5rem;
 }
@@ -1969,6 +1972,10 @@ video {
 }
 .text-foreground\/50 {
   color: hsl(var(--foreground) / 0.5);
+}
+.text-green-500 {
+  --tw-text-opacity: 1;
+  color: rgb(34 197 94 / var(--tw-text-opacity, 1));
 }
 .text-green-600 {
   --tw-text-opacity: 1;
