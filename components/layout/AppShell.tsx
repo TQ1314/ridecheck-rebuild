@@ -47,22 +47,23 @@ function getNavItems(role: Role): NavItem[] {
   if (role === "owner") {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/admin/orders", label: "All Orders", icon: Package },
-      { href: "/admin/users", label: "Users", icon: Users },
-      { href: "/admin/settings", label: "Settings", icon: Settings },
+      { href: "/admin/orders", label: "Order Queue", icon: Package },
+      { href: "/admin/inspectors", label: "Inspectors", icon: Users },
+      { href: "/admin/audit", label: "Audit Log", icon: ClipboardList },
+      { href: "/admin/users", label: "Users", icon: Settings },
     ];
   }
   if (role === "operations_lead") {
     return [
-      { href: "/operations", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/operations/orders", label: "Orders", icon: Package },
-      { href: "/operations/lead", label: "Lead Tools", icon: ClipboardList },
+      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/orders", label: "Order Queue", icon: Package },
+      { href: "/admin/inspectors", label: "Inspectors", icon: Users },
     ];
   }
   if (role === "operations") {
     return [
-      { href: "/operations", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/operations/orders", label: "Orders", icon: Package },
+      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/orders", label: "Order Queue", icon: Package },
     ];
   }
   if (role === "platform") {

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getDashboardPath, type Role } from "@/lib/utils/roles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,18 +23,32 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const error = searchParams.get("error");
-  const redirect = searchParams.get("redirect") || "/dashboard";
+  const redirect = searchParams.get("redirect");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
-      router.push(redirect);
+
+      if (redirect) {
+        router.push(redirect);
+      } else if (data.session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.session.user.id)
+          .maybeSingle();
+
+        const role = (profile?.role || "customer") as Role;
+        router.push(getDashboardPath(role));
+      } else {
+        router.push("/dashboard");
+      }
       router.refresh();
     } catch (err: any) {
       toast({
@@ -63,10 +78,16 @@ export default function LoginPage() {
           </p>
         </CardHeader>
         <CardContent>
-          {error === "deactivated" && (
-            <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm mb-4">
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm mb-4" data-testid="text-login-error">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              Your account has been deactivated. Contact support for help.
+              {error === "deactivated"
+                ? "Your account has been deactivated. Contact support for help."
+                : error === "profile_missing"
+                ? "Your account profile was not found. Please contact support."
+                : error === "profile_read_failed"
+                ? "Unable to verify your account. Please try again or contact support."
+                : "An error occurred. Please try again."}
             </div>
           )}
           <form onSubmit={handleLogin} className="space-y-4">

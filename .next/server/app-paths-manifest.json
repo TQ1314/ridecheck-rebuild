@@ -1,4 +1,4 @@
 {
-  "/api/health/app/route": "app/api/health/app/route.js",
-  "/(public)/book/page": "app/(public)/book/page.js"
+  "/(public)/book/page": "app/(public)/book/page.js",
+  "/(public)/page": "app/(public)/page.js"
 }
