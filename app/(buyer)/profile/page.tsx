@@ -29,7 +29,7 @@ export default function ProfilePage() {
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
       if (data) {
         setProfile(data);
         setFullName(data.full_name || "");

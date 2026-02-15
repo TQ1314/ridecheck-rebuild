@@ -22,7 +22,7 @@ export async function getActor(): Promise<Actor | null> {
       .from("profiles")
       .select("role, full_name, email, is_active")
       .eq("id", session.user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile || !profile.is_active) return null;
 

@@ -36,7 +36,7 @@ export default function OpsOrderDetailPage() {
         .select("*")
         .eq("order_id", orderId)
         .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("*").eq("id", session.user.id).single(),
+      supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle(),
     ]);
 
     if (orderRes.data) setOrder(orderRes.data);

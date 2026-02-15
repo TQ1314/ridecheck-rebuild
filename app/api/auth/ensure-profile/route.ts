@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         { onConflict: "id" }
       )
       .select("id, role")
-      .single();
+      .maybeSingle();
 
     if (insertError) {
       console.error("ensure-profile insert error:", insertError);

@@ -34,7 +34,7 @@ export async function PATCH(
       .from("profiles")
       .select("role")
       .eq("id", session.user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile || !canManageUsers(profile.role as Role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
