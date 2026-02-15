@@ -1,6 +1,3 @@
 {
-  "/auth/login/page": "app/auth/login/page.js",
-  "/api/auth/ensure-profile/route": "app/api/auth/ensure-profile/route.js",
-  "/(public)/book/page": "app/(public)/book/page.js",
-  "/(public)/page": "app/(public)/page.js"
+  "/(public)/book/page": "app/(public)/book/page.js"
 }
