@@ -112,10 +112,10 @@ export async function POST(req: NextRequest) {
 
     // Insert order
     const { data: order, error } = await supabaseAdmin
-      .from("orders")
-      .insert(insertPayload)
-      .select("*")
-      .single();
+    .from("orders")
+    .insert(payload)
+    .select("id, order_number, created_at")
+    .single();
 
     if (error) {
       console.error("[Order Create Error]", error);

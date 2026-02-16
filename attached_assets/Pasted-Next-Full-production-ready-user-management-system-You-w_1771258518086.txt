@@ -1,0 +1,233 @@
+Next — “Full production-ready user management system”
+
+You want the Operations Lead to:
+
+create users (or invite them)
+
+assign roles
+
+activate/deactivate
+
+define job titles/responsibilities
+
+Here’s the production model that works well with Supabase + Next.js:
+
+Tables
+
+profiles (already have)
+
+id uuid primary key references auth.users(id)
+
+email text
+
+full_name text
+
+role text (or roles text[] if multi-role)
+
+is_active boolean default true
+
+role_definitions
+
+role text primary key (operations, operations_lead, inspector, qa, owner)
+
+display_name text
+
+description text
+
+permissions jsonb (optional)
+
+user_role_assignments (if you want multi-role)
+
+id uuid pk
+
+user_id uuid
+
+role text
+
+assigned_by uuid
+
+created_at timestamptz
+
+user_invites
+
+id uuid pk
+
+email text
+
+role text
+
+token text unique
+
+expires_at timestamptz
+
+created_by uuid
+
+used_at timestamptz
+
+Flows
+
+Ops Lead creates invite → user signs up → token verifies → profile created + role applied.
+
+Ops Lead can deactivate user (sets is_active=false) → middleware blocks.
+
+Admin APIs
+
+POST /api/admin/users/invite
+
+GET /api/admin/users
+
+PATCH /api/admin/users/:id (role, active)
+
+GET /api/admin/roles
+
+If you want, I can give you the single Replit prompt to generate this whole system cleanly, but since you asked for inspector portal + phases 5–9 too, I’ll bundle it into one master prompt below.
+
+Your 2026 call is right: build a structured Inspector Portal
+
+Yes. If we’re doing this for real ops + Facebook launch, you want an inspector portal that feels like “DoorDash driver app, but for inspections”.
+
+Phases 5–9 Map (so Replit can build without breaking current system)
+Phase 5 — User Management (Ops Lead)
+
+Invite users + role assignment
+
+Activate/deactivate accounts
+
+Roles: owner, operations_lead, operations, inspector, qa
+
+Phase 6 — Inspector Portal v1
+
+Inspector login
+
+“My Assigned Jobs”
+
+Job details view
+
+Status updates: on_the_way, arrived, in_progress, uploaded, needs_clarification
+
+Notes + photo attachments (optional)
+
+Phase 7 — Report Upload + Storage
+
+Upload endpoint (PDF)
+
+Store in Supabase Storage (bucket: reports)
+
+Save report_url + report_uploaded_at in orders
+
+Audit log entry
+
+Phase 8 — QA Review Portal
+
+QA dashboard: “Reports awaiting review”
+
+View PDF, checklist, request changes, approve
+
+Versioning: report_versions table (optional but recommended)
+
+Phase 9 — Delivery + Notifications
+
+Approve triggers:
+
+email buyer with report link
+
+mark order delivered/completed
+
+log activity + audit
+
+Add resend option + delivery tracking
+
+One Single “Replit Build Prompt” (Phase 5–9) — Safe, non-breaking
+
+Copy/paste this into Replit AI. It’s designed to extend what you have, not rewrite it.
+
+You are working inside an existing Next.js 14 (App Router) + Supabase project called RideCheck.
+
+CRITICAL RULES:
+- Do NOT break existing features/routes. Only add new files or extend existing ones in small diffs.
+- Do NOT rename existing tables/columns. If something is missing, add new columns via SQL migrations.
+- Keep the current RBAC approach: requireRole(), isAuthorized(), profiles role/is_active checks.
+- Keep current admin pages working.
+- Use Supabase Admin server client for privileged API routes.
+- Add strict validation with zod on all inputs.
+- Add audit logging on privileged actions.
+- Add indexes when needed.
+
+OBJECTIVES (Build Phase 5–9):
+
+PHASE 5 — USER MANAGEMENT (OPS LEAD)
+1) Database:
+   - Ensure profiles table has: id (uuid), email (text), full_name (text), role (text), is_active (boolean default true), created_at.
+   - Create role_definitions table (role text PK, display_name text, description text).
+   - Create user_invites table: id uuid, email text, role text, token text unique, expires_at timestamptz, created_by uuid, used_at timestamptz.
+   - Add indexes: profiles(role), profiles(is_active), user_invites(token), user_invites(email).
+
+2) Admin UI:
+   - Add /admin/users page:
+     - List users from profiles
+     - Search by email
+     - Role dropdown
+     - Activate/deactivate toggle
+     - Invite user modal
+   - Only operations_lead or owner can access.
+
+3) Admin APIs:
+   - POST /api/admin/users/invite (ops_lead/owner): create invite token, expiry 7 days
+   - GET /api/admin/users (ops_lead/owner): list profiles with search + pagination
+   - PATCH /api/admin/users/[userId] (ops_lead/owner): update role and is_active
+   - GET /api/admin/roles: list role_definitions
+
+4) Invite Flow:
+   - Create /invite/[token] page:
+     - Token validation endpoint: GET /api/invites/[token]
+     - If valid, user signs up/logs in, then POST /api/invites/[token]/accept
+     - accept creates/updates profile with the invited role and sets is_active=true, marks invite used_at.
+
+PHASE 6 — INSPECTOR PORTAL V1
+1) Create /inspector layout + pages:
+   - /inspector (dashboard)
+   - /inspector/jobs (assigned jobs list)
+   - /inspector/jobs/[orderId] (job detail with vehicle, location, seller info if available)
+2) Inspector APIs:
+   - GET /api/inspector/jobs (role inspector): orders assigned to inspector user_id or inspector_id mapping
+   - GET /api/inspector/jobs/[orderId]
+   - PATCH /api/inspector/jobs/[orderId]/status (updates inspector_status + notes)
+
+PHASE 7 — REPORT UPLOAD + STORAGE
+1) Supabase Storage:
+   - bucket: reports (private)
+2) Orders table:
+   - add columns if missing: report_url text, report_uploaded_at timestamptz, report_status text default 'none'
+3) Upload endpoint:
+   - POST /api/inspector/jobs/[orderId]/upload-report
+   - Accept multipart/form-data with pdf
+   - Upload to Supabase Storage
+   - Save report_url + report_uploaded_at, set report_status='submitted'
+   - Log activity + audit
+
+PHASE 8 — QA REVIEW PORTAL
+1) Create /qa pages:
+   - /qa/review (reports in submitted status)
+   - /qa/review/[orderId] (view report + approve/request changes)
+2) QA APIs:
+   - GET /api/qa/reports?status=submitted
+   - POST /api/qa/reports/[orderId]/decision { decision: 'approve'|'changes', note?: string }
+   - Updates orders.report_status accordingly: approved / changes_requested
+   - Logs activity + audit
+
+PHASE 9 — DELIVERY + NOTIFICATIONS
+1) On approve:
+   - Send buyer email (Resend) with secure report link (or signed URL)
+   - Update order status: delivered/completed (do not break existing ops_status flow)
+   - Log activity
+2) Add Admin button on /admin/orders/[id] to resend report email when report_status='approved'
+
+EXTRAS REQUIRED:
+- Add search by order_number in /api/admin/orders GET: accept ?search= and filter by UUID id OR numeric order_number safely (no 500s).
+- Make order_number clickable in Admin order detail header to copy to clipboard (keep existing UI, only small edits).
+- Add DB index on orders(order_number).
+
+DELIVERABLES:
+- SQL migration file(s) under /supabase/migrations (or a clearly labeled SQL block) for new tables/columns/indexes.
+- New pages + API routes as above.
+- Minimal changes to existing files, only where needed to integrate.

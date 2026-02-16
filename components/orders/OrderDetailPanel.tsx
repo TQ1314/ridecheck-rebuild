@@ -11,6 +11,7 @@ import {
   bookingTypeLabel,
   packageLabel,
   statusLabel,
+  formatOrderCode,
 } from "@/lib/utils/format";
 import { formatCurrency } from "@/lib/utils/pricing";
 import {
@@ -30,24 +31,33 @@ interface OrderDetailPanelProps {
   activities?: ActivityLogEntry[];
 }
 
-export function OrderDetailPanel({
-  order,
-  activities = [],
-}: OrderDetailPanelProps) {
+export function OrderDetailPanel({ order, activities = [] }: OrderDetailPanelProps) {
+  const displayOrderId =
+    (order as any).order_number != null
+      ? formatOrderCode((order as any).order_number, order.created_at)
+      : (order as any).order_id || order.id;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
         <div>
           <h1
-            className="text-2xl font-bold font-mono"
+            className="text-2xl font-bold font-mono cursor-pointer hover:underline"
             data-testid="text-order-id"
+            title="Click to copy order number"
+            onClick={() => {
+              // copy the human-friendly order code (or uuid fallback)
+              navigator.clipboard.writeText(displayOrderId);
+            }}
           >
-            {order.id}
+            {displayOrderId}
           </h1>
+
           <p className="text-sm text-muted-foreground">
             Created {formatRelative(order.created_at)}
           </p>
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
           <OrderStatusBadge status={order.status} />
           <PaymentStatusBadge status={order.payment_status} />
@@ -69,6 +79,7 @@ export function OrderDetailPanel({
                 {order.vehicle_year} {order.vehicle_make} {order.vehicle_model}
               </span>
             </div>
+
             {order.vehicle_description && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Description</span>
@@ -77,6 +88,7 @@ export function OrderDetailPanel({
                 </span>
               </div>
             )}
+
             {order.listing_url && (
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Listing</span>
@@ -91,6 +103,7 @@ export function OrderDetailPanel({
                 </a>
               </div>
             )}
+
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Location</span>
               <span className="flex items-center gap-1">
@@ -118,20 +131,24 @@ export function OrderDetailPanel({
                 {packageLabel(order.package)}
               </Badge>
             </div>
+
             <div className="flex justify-between">
               <span className="text-muted-foreground">Booking Type</span>
               <span>{bookingTypeLabel(order.booking_type)}</span>
             </div>
+
             <div className="flex justify-between">
               <span className="text-muted-foreground">Base Price</span>
               <span>{formatCurrency(order.base_price)}</span>
             </div>
+
             {Number(order.discount_amount) > 0 && (
               <div className="flex justify-between text-green-600 dark:text-green-400">
                 <span>Discount</span>
                 <span>-{formatCurrency(order.discount_amount)}</span>
               </div>
             )}
+
             <div className="flex justify-between font-semibold border-t pt-2">
               <span>Total</span>
               <span>{formatCurrency(order.final_price)}</span>
@@ -151,10 +168,12 @@ export function OrderDetailPanel({
               <span className="text-muted-foreground">Name</span>
               <span className="font-medium">{order.customer_name}</span>
             </div>
+
             <div className="flex justify-between">
               <span className="text-muted-foreground">Email</span>
               <span>{order.customer_email}</span>
             </div>
+
             {order.customer_phone && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone</span>
@@ -178,6 +197,7 @@ export function OrderDetailPanel({
                 <span>{formatDate(order.preferred_date)}</span>
               </div>
             )}
+
             {order.scheduled_date && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scheduled</span>
@@ -186,18 +206,21 @@ export function OrderDetailPanel({
                 </span>
               </div>
             )}
+
             {order.paid_at && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Paid At</span>
                 <span>{formatDateTime(order.paid_at)}</span>
               </div>
             )}
+
             {order.seller_name && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Seller</span>
                 <span>{order.seller_name}</span>
               </div>
             )}
+
             {order.seller_phone && (
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Seller Phone</span>
@@ -210,65 +233,6 @@ export function OrderDetailPanel({
           </CardContent>
         </Card>
       </div>
-
-      {order.report_url && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              Intelligence Report
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <a
-              href={order.report_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline text-sm"
-              data-testid="link-report"
-            >
-              Download Report (PDF)
-            </a>
-          </CardContent>
-        </Card>
-      )}
-
-      {activities.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              Activity Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {activities.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 text-sm"
-                  data-testid={`activity-${entry.id}`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{statusLabel(entry.action)}</p>
-                    {entry.details && (
-                      <p className="text-muted-foreground text-xs">
-                        {typeof entry.details === "object"
-                          ? (entry.details as any).note || JSON.stringify(entry.details)
-                          : String(entry.details)}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {formatRelative(entry.created_at)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

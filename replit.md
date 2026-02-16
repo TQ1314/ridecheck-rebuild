@@ -19,19 +19,28 @@ app/
   (buyer)/            - Authenticated customer pages (dashboard, orders, profile)
   (ops)/              - Operations staff pages (order management)
   (admin)/            - Admin/owner pages (dashboard, users, orders, settings)
+  (inspector)/        - Inspector/RideChecker portal (jobs, job detail, report upload)
+  (qa)/               - QA reviewer portal (review queue, review detail)
   auth/               - Login, register, callback
+  invite/[token]/     - Invite acceptance page (public, no auth required)
   api/                - API route handlers
     orders/create/    - Order creation (supports concierge + buyer-arranged)
     orders/[orderId]/ - Status, assign, send-payment
     health/app/       - App health check
     health/supabase/  - Supabase connectivity + write test
     webhooks/stripe/  - Stripe webhook handler
-    admin/users/      - User role/status management
-    admin/orders/     - FIFO queue + order detail with ops actions
+    admin/users/      - User role/status management + invite creation
+    admin/orders/     - FIFO queue + order detail with ops actions + deliver-report
     admin/inspectors/ - Inspector CRUD
     admin/audit/      - Audit log viewer
+    admin/roles/      - Role definitions
+    inspector/jobs/   - Inspector job list + detail + status updates
+    inspector/jobs/[orderId]/upload/ - Report file upload (Supabase Storage)
+    inspector/profile/ - Inspector profile
+    invites/[token]/  - Invite validation + acceptance
+    qa/review/        - QA review queue + detail + approve/revision
 components/
-  layout/             - Navbar, Footer, AppShell
+  layout/             - Navbar, Footer, AppShell (with role-based nav for inspector/qa)
   orders/             - OrderTable, OrderDetailPanel, StatusUpdateDialog, AssignOpsDialog
   ui/                 - shadcn/ui components
 lib/
@@ -43,7 +52,7 @@ lib/
   utils/              - Pricing, roles, formatting, orderId generation, featureFlags
   i18n/               - EN/ES translations
   templates/          - Intelligence report + bill of sale HTML templates
-types/                - TypeScript type definitions
+types/                - TypeScript type definitions (Order, Profile, UserInvite, etc.)
 supabase/migrations/  - Migration SQL files (run manually in Supabase)
 middleware.ts         - Auth and role-based route protection
 ```
@@ -66,13 +75,45 @@ middleware.ts         - Auth and role-based route protection
 - NEXT_PUBLIC_FEATURE_PAYMENT_HOLD - Enables payment hold/escrow functionality
 
 ## Roles
-- customer, operations, operations_lead, qa, developer, platform, owner
+- customer, operations, operations_lead, inspector, qa, developer, platform, owner
+- Inspector role called "RideChecker" in UI; no direct buyer contact allowed
+- operations_lead can manage users (invite, role changes) in addition to owner
 
 ## Database (Supabase)
-Tables: profiles, orders, activity_log, health_pings, intelligence_reports, title_ownership_review, bill_of_sale_documents, inspectors, order_events, audit_log
+Tables: profiles, orders, activity_log, health_pings, intelligence_reports, title_ownership_review, bill_of_sale_documents, inspectors, order_events, audit_log, role_definitions, user_invites
 Migration SQL in /supabase/migrations/ (run manually):
 - 001_add_upgrade_columns.sql - Initial schema upgrades
-- 002_ops_engine.sql - Ops engine: new order columns (ops_status, seller_contact_attempts, inspector assignments, timestamps), inspectors table, order_events table, audit_log table
+- 002_ops_engine.sql - Ops engine: new order columns, inspectors table, order_events table, audit_log table
+- 003_phases_5_9.sql - Role definitions table, user_invites table, order report columns (report_status, qa_status, inspector_status, report_storage_path, etc.)
+
+## Report Workflow
+1. Inspector completes assessment -> inspector_status = "completed", report_status = "pending_upload"
+2. Inspector uploads report file -> report_status = "uploaded", file stored in Supabase Storage (reports bucket)
+3. QA reviewer reviews report -> qa_status = "approved" or "revision_needed"
+4. If approved -> report_status = "approved"
+5. Admin delivers report -> sends email with signed URL, report_status = "delivered"
+
+## Inspector Portal
+- Route: /inspector (requires inspector or owner role)
+- Dashboard shows assigned jobs with stats (active, needing upload, completed)
+- Job detail page: vehicle info, schedule, location, status updates, report upload
+- Inspector statuses: en_route, on_site, inspecting, wrapping_up, completed
+- Report upload supports PDF, DOCX, JPEG, PNG, WebP (max 50MB)
+- No buyer contact info shown to inspectors
+
+## QA Portal
+- Route: /qa/review (requires qa or owner role)
+- Review queue shows reports pending review, needing revision, and approved
+- Detail page: vehicle info, report download link (signed URL), approve/revision decision
+- QA notes sent back to inspector when revision needed
+
+## User Invite System
+- operations_lead and owner can create invites from admin users page
+- Invites generate a unique token URL valid for 7 days
+- Accept page: /invite/[token] (public, no auth required)
+- On acceptance: creates auth user + profile with invited role
+- If role is inspector, also creates inspectors table entry
+- Used invites are marked and cannot be reused
 
 ## Key Decisions
 - Using Supabase for auth, NOT local auth
@@ -85,6 +126,8 @@ Migration SQL in /supabase/migrations/ (run manually):
 - Platform detection from listing URL (detectListingPlatform)
 - All new features behind feature flags (default OFF)
 - No "guarantee" language - use "review/screening/flags/observed at time of inspection"
+- Reports stored in Supabase Storage "reports" bucket
+- Signed URLs for report access (1hr for QA, 7 days for delivery)
 
 ## Recent Changes (Feb 2026)
 - Phase 1: Upgraded from "inspection" to "intelligence" positioning across ALL pages, emails, and templates
@@ -117,3 +160,13 @@ Migration SQL in /supabase/migrations/ (run manually):
   - Password visibility toggle on login, register, and reset-password pages
   - Forgot password flow (/auth/forgot-password) and reset password flow (/auth/reset-password)
   - Security: No user can self-assign admin/operations roles; all signups hardcode role='customer'
+- Phase 5-9 (Inspector/QA/Reports):
+  - Migration 003_phases_5_9.sql: role_definitions, user_invites tables, report workflow columns on orders
+  - Inspector role added system-wide (called "RideChecker" in UI)
+  - User invite system: create invites, acceptance page, token-based onboarding
+  - Inspector portal: /inspector with job list, detail, status updates, report upload
+  - QA review portal: /qa/review with queue, detail, approve/revision workflow
+  - Report delivery API: /api/admin/orders/[orderId]/deliver-report with email notification
+  - Admin order detail: Deliver Report button + report status badge
+  - AppShell nav updated for inspector and qa roles
+  - Middleware updated: /invite/[token] routes are public, /inspector and /qa routes protected

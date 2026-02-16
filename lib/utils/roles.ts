@@ -2,6 +2,7 @@ export type Role =
   | "customer"
   | "operations"
   | "operations_lead"
+  | "inspector"
   | "qa"
   | "developer"
   | "platform"
@@ -44,7 +45,11 @@ export function canSendPayment(role: Role): boolean {
 }
 
 export function canManageUsers(role: Role): boolean {
-  return role === "owner";
+  return ["owner", "operations_lead"].includes(role);
+}
+
+export function canAccessInspector(role: Role): boolean {
+  return ["inspector", "owner"].includes(role);
 }
 
 export function getRoleLabel(role: Role): string {
@@ -52,6 +57,7 @@ export function getRoleLabel(role: Role): string {
     customer: "Customer",
     operations: "Operations",
     operations_lead: "Operations Lead",
+    inspector: "RideChecker",
     qa: "QA",
     developer: "Developer",
     platform: "Platform",
@@ -63,8 +69,9 @@ export function getRoleLabel(role: Role): string {
 export function getDashboardPath(role: Role): string {
   if (role === "owner") return "/admin";
   if (["operations", "operations_lead"].includes(role)) return "/admin";
+  if (role === "inspector") return "/inspector";
   if (role === "platform") return "/platform";
-  if (role === "qa") return "/qa";
+  if (role === "qa") return "/qa/review";
   if (role === "developer") return "/dev";
   return "/dashboard";
 }

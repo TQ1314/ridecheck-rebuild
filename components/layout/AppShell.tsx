@@ -69,8 +69,13 @@ function getNavItems(role: Role): NavItem[] {
   if (role === "platform") {
     return [{ href: "/platform", label: "Platform View", icon: BarChart3 }];
   }
+  if (role === "inspector") {
+    return [
+      { href: "/inspector", label: "My Jobs", icon: Package },
+    ];
+  }
   if (role === "qa") {
-    return [{ href: "/qa", label: "QA View", icon: Eye }];
+    return [{ href: "/qa/review", label: "QA Review", icon: Eye }];
   }
   if (role === "developer") {
     return [{ href: "/dev", label: "Dev View", icon: Bug }];

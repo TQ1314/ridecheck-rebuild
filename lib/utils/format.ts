@@ -15,11 +15,26 @@ export function formatRelative(date: string | Date | null): string {
   return formatDistanceToNow(new Date(date), { addSuffix: true });
 }
 
-export function statusLabel(status: string): string {
+export function statusLabel(status: string | null | undefined): string {
+  if (!status) return "Unknown";
+
   return status
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+export function formatOrderCode(
+  orderNumber: number | null | undefined,
+  createdAt?: string | Date | null
+): string {
+  if (!orderNumber) return "—";
+
+  const year = createdAt
+    ? new Date(createdAt).getFullYear()
+    : new Date().getFullYear();
+
+  return `RC-${year}-${String(orderNumber).padStart(7, "0")}`;
 }
 
 export function bookingTypeLabel(type: string): string {

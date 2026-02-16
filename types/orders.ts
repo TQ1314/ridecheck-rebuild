@@ -97,6 +97,15 @@ export interface Order {
   payment_link_url?: string;
   buyer_email?: string;
   buyer_phone?: string;
+  report_status?: string;
+  report_storage_path?: string;
+  report_uploaded_at?: string;
+  qa_status?: string;
+  qa_notes?: string;
+  qa_reviewed_by?: string;
+  qa_reviewed_at?: string;
+  inspector_status?: string;
+  inspector_notes?: string;
 }
 
 export interface Profile {
@@ -170,6 +179,17 @@ export interface IntelligenceReport {
   inspector_notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserInvite {
+  id: string;
+  email: string;
+  role: string;
+  token: string;
+  expires_at: string;
+  created_by: string | null;
+  used_at: string | null;
+  created_at: string;
 }
 
 export interface BillOfSaleDocument {

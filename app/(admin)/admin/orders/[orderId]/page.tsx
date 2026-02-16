@@ -6,6 +6,7 @@ import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry, Inspector } fr
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { Button } from "@/components/ui/button";
+import { formatOrderCode } from "@/lib/utils/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,6 +34,8 @@ import {
   Copy,
   Clock,
   Shield,
+  Send,
+  FileCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -186,6 +189,28 @@ export default function AdminOrderDetailPage() {
     }
     toast({ title: "Payment requested" });
     loadData();
+  };
+
+  const [deliverLoading, setDeliverLoading] = useState(false);
+
+  const handleDeliverReport = async () => {
+    setDeliverLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/deliver-report`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Report delivered to customer" });
+      loadData();
+    } catch {
+      toast({ title: "Delivery failed", variant: "destructive" });
+    } finally {
+      setDeliverLoading(false);
+    }
   };
 
   const copyToClipboard = async (text: string, label: string) => {
@@ -348,6 +373,25 @@ export default function AdminOrderDetailPage() {
             <CreditCard className="h-4 w-4 mr-2" />
             Request Payment
           </Button>
+        )}
+
+        {order.report_status === "approved" && (
+          <Button
+            variant="outline"
+            onClick={handleDeliverReport}
+            disabled={deliverLoading}
+            data-testid="button-deliver-report"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {deliverLoading ? "Delivering..." : "Deliver Report"}
+          </Button>
+        )}
+
+        {order.report_status && (
+          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
+            <FileCheck className="h-3 w-3 mr-1" />
+            Report: {order.report_status}
+          </Badge>
         )}
 
         <StatusUpdateDialog
