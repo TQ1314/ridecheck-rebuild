@@ -46,7 +46,7 @@ ALTER TABLE user_invites ENABLE ROW LEVEL SECURITY;
 -- ==============================================
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='report_status') THEN
-    ALTER TABLE orders ADD COLUMN report_status TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE orders ADD COLUMN report_status TEXT DEFAULT 'none';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='report_storage_path') THEN
@@ -58,7 +58,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='qa_status') THEN
-    ALTER TABLE orders ADD COLUMN qa_status TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE orders ADD COLUMN qa_status TEXT DEFAULT 'none';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='qa_notes') THEN
@@ -74,7 +74,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='inspector_status') THEN
-    ALTER TABLE orders ADD COLUMN inspector_status TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE orders ADD COLUMN inspector_status TEXT DEFAULT 'none';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='inspector_notes') THEN
@@ -92,7 +92,20 @@ DO $$ BEGIN
 END $$;
 
 -- ==============================================
--- E) Indexes for new workflows
+-- E) Ensure profiles has needed columns for indexes
+-- ==============================================
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='role') THEN
+    ALTER TABLE profiles ADD COLUMN role TEXT DEFAULT 'customer';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='is_active') THEN
+    ALTER TABLE profiles ADD COLUMN is_active BOOLEAN DEFAULT true;
+  END IF;
+END $$;
+
+-- ==============================================
+-- F) Indexes for new workflows
 -- ==============================================
 CREATE INDEX IF NOT EXISTS idx_orders_report_status ON orders(report_status);
 CREATE INDEX IF NOT EXISTS idx_orders_qa_status ON orders(qa_status);

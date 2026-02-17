@@ -7,7 +7,7 @@
 -- ==============================================
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ops_status') THEN
-    ALTER TABLE orders ADD COLUMN ops_status TEXT NOT NULL DEFAULT 'new';
+    ALTER TABLE orders ADD COLUMN ops_status TEXT DEFAULT 'new';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='assigned_inspector_id') THEN
@@ -19,7 +19,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='seller_contact_attempts') THEN
-    ALTER TABLE orders ADD COLUMN seller_contact_attempts INT NOT NULL DEFAULT 0;
+    ALTER TABLE orders ADD COLUMN seller_contact_attempts INT DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='seller_contacted_at') THEN
@@ -47,7 +47,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ops_priority') THEN
-    ALTER TABLE orders ADD COLUMN ops_priority INT NOT NULL DEFAULT 0;
+    ALTER TABLE orders ADD COLUMN ops_priority INT DEFAULT 0;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='ops_notes') THEN
@@ -55,7 +55,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='hold_status') THEN
-    ALTER TABLE orders ADD COLUMN hold_status TEXT NOT NULL DEFAULT 'none';
+    ALTER TABLE orders ADD COLUMN hold_status TEXT DEFAULT 'none';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='payment_link_url') THEN
@@ -96,6 +96,22 @@ CREATE TABLE IF NOT EXISTS order_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- If order_events already existed with missing columns, add them
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='order_events' AND column_name='actor_id') THEN
+    ALTER TABLE order_events ADD COLUMN actor_id UUID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='order_events' AND column_name='actor_email') THEN
+    ALTER TABLE order_events ADD COLUMN actor_email TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='order_events' AND column_name='details') THEN
+    ALTER TABLE order_events ADD COLUMN details JSONB;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='order_events' AND column_name='is_internal') THEN
+    ALTER TABLE order_events ADD COLUMN is_internal BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_events_created_at ON order_events(created_at);
 
@@ -118,6 +134,37 @@ CREATE TABLE IF NOT EXISTS audit_log (
   ip_address TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- If audit_log already existed with missing columns, add them
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='actor_id') THEN
+    ALTER TABLE audit_log ADD COLUMN actor_id UUID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='actor_email') THEN
+    ALTER TABLE audit_log ADD COLUMN actor_email TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='actor_role') THEN
+    ALTER TABLE audit_log ADD COLUMN actor_role TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='resource_type') THEN
+    ALTER TABLE audit_log ADD COLUMN resource_type TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='resource_id') THEN
+    ALTER TABLE audit_log ADD COLUMN resource_id TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='old_value') THEN
+    ALTER TABLE audit_log ADD COLUMN old_value JSONB;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='new_value') THEN
+    ALTER TABLE audit_log ADD COLUMN new_value JSONB;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='metadata') THEN
+    ALTER TABLE audit_log ADD COLUMN metadata JSONB;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_log' AND column_name='ip_address') THEN
+    ALTER TABLE audit_log ADD COLUMN ip_address TEXT;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_actor_id ON audit_log(actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_resource ON audit_log(resource_type, resource_id);

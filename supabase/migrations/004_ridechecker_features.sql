@@ -15,7 +15,7 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='referral_code') THEN
-    ALTER TABLE profiles ADD COLUMN referral_code TEXT UNIQUE;
+    ALTER TABLE profiles ADD COLUMN referral_code TEXT;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='rating') THEN
@@ -36,6 +36,19 @@ DO $$ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='rejected_at') THEN
     ALTER TABLE profiles ADD COLUMN rejected_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
+-- Add unique constraint on referral_code if not already present
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'profiles_referral_code_key'
+  ) THEN
+    BEGIN
+      ALTER TABLE profiles ADD CONSTRAINT profiles_referral_code_key UNIQUE (referral_code);
+    EXCEPTION WHEN duplicate_table THEN
+      NULL;
+    END;
   END IF;
 END $$;
 
@@ -69,10 +82,32 @@ ALTER TABLE ridechecker_earnings ENABLE ROW LEVEL SECURITY;
 -- ==============================================
 CREATE TABLE IF NOT EXISTS referral_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL UNIQUE,
-  code TEXT NOT NULL UNIQUE,
+  user_id UUID NOT NULL,
+  code TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add unique constraints safely
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'referral_codes_user_id_key'
+  ) THEN
+    BEGIN
+      ALTER TABLE referral_codes ADD CONSTRAINT referral_codes_user_id_key UNIQUE (user_id);
+    EXCEPTION WHEN duplicate_table THEN
+      NULL;
+    END;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'referral_codes_code_key'
+  ) THEN
+    BEGIN
+      ALTER TABLE referral_codes ADD CONSTRAINT referral_codes_code_key UNIQUE (code);
+    EXCEPTION WHEN duplicate_table THEN
+      NULL;
+    END;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
 CREATE INDEX IF NOT EXISTS idx_referral_codes_user ON referral_codes(user_id);
@@ -104,12 +139,16 @@ CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 
 -- ==============================================
--- E) Add ridechecker roles to role_definitions
+-- E) Add ridechecker roles to role_definitions (if table exists)
 -- ==============================================
-INSERT INTO role_definitions (role, display_name, description) VALUES
-  ('ridechecker', 'RideChecker (Pending)', 'Applicant awaiting approval'),
-  ('ridechecker_active', 'RideChecker (Active)', 'Approved vehicle assessment professional')
-ON CONFLICT (role) DO NOTHING;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='role_definitions') THEN
+    INSERT INTO role_definitions (role, display_name, description) VALUES
+      ('ridechecker', 'RideChecker (Pending)', 'Applicant awaiting approval'),
+      ('ridechecker_active', 'RideChecker (Active)', 'Approved vehicle assessment professional')
+    ON CONFLICT (role) DO NOTHING;
+  END IF;
+END $$;
 
 -- ==============================================
 -- F) New column on orders for ridechecker pay
