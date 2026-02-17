@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = [
   "/auth/callback",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/ridechecker/signup",
 ];
 
 const INVITE_PREFIX = "/invite/";
@@ -104,6 +105,11 @@ export async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/dev")) {
     if (["developer", "owner"].includes(role)) return res;
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  if (pathname.startsWith("/ridechecker/dashboard") || pathname.startsWith("/ridechecker/jobs")) {
+    if (["ridechecker", "ridechecker_active", "owner"].includes(role)) return res;
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

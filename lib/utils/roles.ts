@@ -6,7 +6,9 @@ export type Role =
   | "qa"
   | "developer"
   | "platform"
-  | "owner";
+  | "owner"
+  | "ridechecker"
+  | "ridechecker_active";
 
 export function canAccessOps(role: Role): boolean {
   return ["operations", "operations_lead", "owner"].includes(role);
@@ -52,6 +54,10 @@ export function canAccessInspector(role: Role): boolean {
   return ["inspector", "owner"].includes(role);
 }
 
+export function canAccessRideChecker(role: Role): boolean {
+  return ["ridechecker", "ridechecker_active", "owner"].includes(role);
+}
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     customer: "Customer",
@@ -62,6 +68,8 @@ export function getRoleLabel(role: Role): string {
     developer: "Developer",
     platform: "Platform",
     owner: "Owner",
+    ridechecker: "RideChecker (Pending)",
+    ridechecker_active: "RideChecker (Active)",
   };
   return labels[role] ?? role;
 }
@@ -70,6 +78,7 @@ export function getDashboardPath(role: Role): string {
   if (role === "owner") return "/admin";
   if (["operations", "operations_lead"].includes(role)) return "/admin";
   if (role === "inspector") return "/inspector";
+  if (["ridechecker", "ridechecker_active"].includes(role)) return "/ridechecker/dashboard";
   if (role === "platform") return "/platform";
   if (role === "qa") return "/qa/review";
   if (role === "developer") return "/dev";

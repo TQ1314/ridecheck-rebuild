@@ -74,6 +74,12 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/inspector", label: "My Jobs", icon: Package },
     ];
   }
+  if (role === "ridechecker" || role === "ridechecker_active") {
+    return [
+      { href: "/ridechecker/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/ridechecker/jobs", label: "My Jobs", icon: Package },
+    ];
+  }
   if (role === "qa") {
     return [{ href: "/qa/review", label: "QA Review", icon: Eye }];
   }

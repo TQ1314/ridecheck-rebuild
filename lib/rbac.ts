@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -38,7 +38,7 @@ export async function getActor(): Promise<Actor | null> {
 }
 
 export async function requireRole(
-  allowedRoles: string[]
+  allowedRoles: string[],
 ): Promise<{ actor: Actor } | { error: NextResponse }> {
   const actor = await getActor();
 
@@ -58,35 +58,53 @@ export async function requireRole(
 }
 
 export function isAuthorized(
-  result: { actor: Actor } | { error: NextResponse }
+  result: { actor: Actor } | { error: NextResponse },
 ): result is { actor: Actor } {
   return "actor" in result;
 }
 
+/**
+ * NOTE:
+ * Your DB columns are:
+ * - actor_user_id
+ * - actor_email
+ * - actor_roles
+ * - action
+ * - resource_id
+ * - old_value
+ * - new_value
+ * - metadata
+ * - ip_address
+ *
+ * It does NOT appear to have resource_type.
+ */
 export async function writeAuditLog(params: {
   actorId: string;
   actorEmail: string;
-  actorRole: string;
+  actorRole: string; // single role string from profiles.role
   action: string;
-  resourceType: string;
-  resourceId?: string;
-  oldValue?: Record<string, any>;
-  newValue?: Record<string, any>;
-  metadata?: Record<string, any>;
-  ipAddress?: string;
+  resourceId?: string; // uuid as string
+  oldValue?: Record<string, any> | null;
+  newValue?: Record<string, any> | null;
+  metadata?: Record<string, any> | null;
+  ipAddress?: string | null;
 }) {
-  await supabaseAdmin.from("audit_log").insert({
-    actor_id: params.actorId,
+  const payload = {
+    actor_user_id: params.actorId,
     actor_email: params.actorEmail,
-    actor_role: params.actorRole,
+    actor_roles: params.actorRole, // DB column name is actor_roles (plural)
     action: params.action,
-    resource_type: params.resourceType,
-    resource_id: params.resourceId || null,
-    old_value: params.oldValue || null,
-    new_value: params.newValue || null,
-    metadata: params.metadata || null,
-    ip_address: params.ipAddress || null,
-  });
+    resource_id: params.resourceId ?? null,
+    old_value: params.oldValue ?? null,
+    new_value: params.newValue ?? null,
+    metadata: params.metadata ?? null,
+    ip_address: params.ipAddress ?? null,
+  };
+
+  const { error } = await supabaseAdmin.from("audit_log").insert(payload);
+  if (error) {
+    console.error("[audit_log insert error]", error);
+  }
 }
 
 export async function writeOrderEvent(params: {
@@ -97,12 +115,16 @@ export async function writeOrderEvent(params: {
   details?: Record<string, any>;
   isInternal?: boolean;
 }) {
-  await supabaseAdmin.from("order_events").insert({
+  const { error } = await supabaseAdmin.from("order_events").insert({
     order_id: params.orderId,
     event_type: params.eventType,
     actor_id: params.actorId,
     actor_email: params.actorEmail,
-    details: params.details || null,
+    details: params.details ?? null,
     is_internal: params.isInternal ?? false,
   });
+
+  if (error) {
+    console.error("[order_events insert error]", error);
+  }
 }
