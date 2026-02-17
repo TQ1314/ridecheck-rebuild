@@ -79,6 +79,11 @@ export default function AdminOrderDetailPage() {
   const [selectedInspector, setSelectedInspector] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
 
+  const [assignRcOpen, setAssignRcOpen] = useState(false);
+  const [rcSuggestions, setRcSuggestions] = useState<any[]>([]);
+  const [selectedRc, setSelectedRc] = useState("");
+  const [assignRcLoading, setAssignRcLoading] = useState(false);
+
   async function loadData() {
     const res = await fetch(`/api/admin/orders/${orderId}`);
     if (!res.ok) {
@@ -111,6 +116,17 @@ export default function AdminOrderDetailPage() {
         });
     }
   }, [assignOpen]);
+
+  useEffect(() => {
+    if (assignRcOpen && order) {
+      const area = order.vehicle_location || order.inspection_address || "";
+      fetch(`/api/admin/ridecheckers/suggest?area=${encodeURIComponent(area)}&orderId=${orderId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setRcSuggestions(data.suggestions || []);
+        });
+    }
+  }, [assignRcOpen]);
 
   const handleStatusUpdate = async (newStatus: string) => {
     const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -162,6 +178,25 @@ export default function AdminOrderDetailPage() {
     }
     toast({ title: "Inspector assigned" });
     setAssignOpen(false);
+    loadData();
+  };
+
+  const handleAssignRidechecker = async () => {
+    if (!selectedRc) return;
+    setAssignRcLoading(true);
+    const res = await fetch(`/api/orders/${orderId}/assign`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inspector_id: selectedRc }),
+    });
+    setAssignRcLoading(false);
+    if (!res.ok) {
+      const err = await res.json();
+      toast({ title: "Error", description: err.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "RideChecker assigned" });
+    setAssignRcOpen(false);
     loadData();
   };
 
@@ -349,6 +384,66 @@ export default function AdminOrderDetailPage() {
                   data-testid="button-confirm-assign-inspector"
                 >
                   {assignLoading ? "Assigning..." : "Assign"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={assignRcOpen} onOpenChange={setAssignRcOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-assign-ridechecker">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Assign RideChecker
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Assign RideChecker</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              {rcSuggestions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active RideCheckers available.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">Ranked by area match, rating, and current load</p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {rcSuggestions.map((rc: any) => (
+                      <div
+                        key={rc.id}
+                        className={`p-3 rounded-md border cursor-pointer transition-colors ${selectedRc === rc.id ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                        onClick={() => setSelectedRc(rc.id)}
+                        data-testid={`rc-option-${rc.id}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <span className="font-medium text-sm">{rc.full_name}</span>
+                            {rc.service_area && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {rc.service_area}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>Rating: {rc.rating?.toFixed(1)}</span>
+                            <span>Jobs: {rc.active_jobs}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setAssignRcOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAssignRidechecker}
+                  disabled={assignRcLoading || !selectedRc}
+                  data-testid="button-confirm-assign-ridechecker"
+                >
+                  {assignRcLoading ? "Assigning..." : "Assign"}
                 </Button>
               </div>
             </div>

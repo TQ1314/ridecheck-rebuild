@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
+import { createEarningForOrder } from "@/lib/utils/earnings-trigger";
 import { z } from "zod";
 
 export async function GET(
@@ -117,11 +118,14 @@ export async function PATCH(
       actorEmail: actor.email,
       actorRole: actor.role,
       action: `qa.${parsed.data.qa_status}`,
-      resourceType: "order",
       resourceId: order.order_id,
       oldValue: { qa_status: order.qa_status, report_status: order.report_status },
       newValue: updates,
     });
+
+    if (parsed.data.qa_status === "approved") {
+      await createEarningForOrder(order.order_id);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

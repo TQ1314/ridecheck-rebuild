@@ -75,16 +75,18 @@ middleware.ts         - Auth and role-based route protection
 - NEXT_PUBLIC_FEATURE_PAYMENT_HOLD - Enables payment hold/escrow functionality
 
 ## Roles
-- customer, operations, operations_lead, inspector, qa, developer, platform, owner
+- customer, operations, operations_lead, inspector, qa, developer, platform, owner, ridechecker, ridechecker_active
 - Inspector role called "RideChecker" in UI; no direct buyer contact allowed
+- ridechecker = pending approval applicant, ridechecker_active = approved professional
 - operations_lead can manage users (invite, role changes) in addition to owner
 
 ## Database (Supabase)
-Tables: profiles, orders, activity_log, health_pings, intelligence_reports, title_ownership_review, bill_of_sale_documents, inspectors, order_events, audit_log, role_definitions, user_invites
+Tables: profiles, orders, activity_log, health_pings, intelligence_reports, title_ownership_review, bill_of_sale_documents, inspectors, order_events, audit_log, role_definitions, user_invites, ridechecker_earnings, referral_codes, referrals
 Migration SQL in /supabase/migrations/ (run manually):
 - 001_add_upgrade_columns.sql - Initial schema upgrades
 - 002_ops_engine.sql - Ops engine: new order columns, inspectors table, order_events table, audit_log table
 - 003_phases_5_9.sql - Role definitions table, user_invites table, order report columns (report_status, qa_status, inspector_status, report_storage_path, etc.)
+- 004_ridechecker_features.sql - ridechecker_earnings, referral_codes, referrals tables + profile columns (service_area, experience, referral_code, rating, approval tracking)
 
 ## Report Workflow
 1. Inspector completes assessment -> inspector_status = "completed", report_status = "pending_upload"
@@ -170,3 +172,18 @@ Migration SQL in /supabase/migrations/ (run manually):
   - Admin order detail: Deliver Report button + report status badge
   - AppShell nav updated for inspector and qa roles
   - Middleware updated: /invite/[token] routes are public, /inspector and /qa routes protected
+- Phase 10 (RideChecker Features - Feb 2026):
+  - Migration 004_ridechecker_features.sql: ridechecker_earnings, referral_codes, referrals tables + profile columns
+  - RideChecker signup (/ridechecker/signup) with referral code input (?ref= URL param support)
+  - RideChecker registration API (/api/ridechecker/register) creates user with role='ridechecker' (pending approval)
+  - Approval Flow: Admin API (/api/admin/ridecheckers) to list, approve, reject ridechecker applications with email notification via Resend
+  - Admin RideCheckers page (/admin/ridecheckers) with approval/rejection UI
+  - Assignment Engine: /api/admin/ridecheckers/suggest ranks active ridecheckers by service area match (+50), rating (+5/pt), workload (-10/job)
+  - Assignment integrated into admin order detail page
+  - Earnings System: auto-generated earnings when QA approves reports; pay rates: standard $55, plus $70, premium $85, comprehensive $140
+  - Earnings API (/api/ridechecker/earnings) returns summary (totalEarned, pendingPayout, paidOut)
+  - Referral Engine: auto-generated codes (RC-[NAME4]-[RANDOM6]), 3-jobs-in-30-days qualification, $100 rewards
+  - Referral API (/api/ridechecker/referrals) returns code + stats
+  - RideChecker dashboard (/ridechecker/dashboard) with job stats, earnings widgets, referral section
+  - RideChecker portal routes: /ridechecker/dashboard, /ridechecker/jobs, /ridechecker/signup
+  - Middleware updated: /ridechecker routes protected for ridechecker/ridechecker_active roles, /ridechecker/signup is public

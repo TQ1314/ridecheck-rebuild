@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Eye, EyeOff, Wrench } from "lucide-react";
+import { Shield, Eye, EyeOff, Wrench, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RideCheckerSignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const supabase = createClient();
 
@@ -23,8 +24,14 @@ export default function RideCheckerSignupPage() {
   const [phone, setPhone] = useState("");
   const [serviceArea, setServiceArea] = useState("");
   const [experience, setExperience] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) setReferralCode(ref);
+  }, [searchParams]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +55,7 @@ export default function RideCheckerSignupPage() {
           phone: phone || null,
           serviceArea: serviceArea || null,
           experience: experience || null,
+          referralCode: referralCode || null,
         }),
       });
 
@@ -164,6 +172,22 @@ export default function RideCheckerSignupPage() {
                 className="resize-none"
                 rows={3}
                 data-testid="input-experience"
+              />
+            </div>
+            <div>
+              <Label htmlFor="referralCode">
+                <span className="flex items-center gap-1">
+                  <Gift className="h-3.5 w-3.5" />
+                  Referral Code (optional)
+                </span>
+              </Label>
+              <Input
+                id="referralCode"
+                placeholder="e.g. RC-JANE-ABC123"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+                className="font-mono"
+                data-testid="input-referral-code"
               />
             </div>
             <div>

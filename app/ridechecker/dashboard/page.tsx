@@ -8,13 +8,21 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ClipboardCheck,
   Clock,
   CheckCircle2,
   AlertCircle,
   Briefcase,
+  DollarSign,
+  Wallet,
+  CreditCard,
+  Users,
+  Copy,
+  Gift,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
   totalJobs: number;
@@ -23,8 +31,23 @@ interface DashboardStats {
   pendingUpload: number;
 }
 
+interface EarningsSummary {
+  totalEarned: number;
+  pendingPayout: number;
+  paidOut: number;
+  totalJobs: number;
+}
+
+interface ReferralStats {
+  totalReferred: number;
+  qualified: number;
+  pending: number;
+  totalRewardEarned: number;
+}
+
 export default function RideCheckerDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const supabase = createClient();
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState<DashboardStats>({
@@ -32,6 +55,19 @@ export default function RideCheckerDashboardPage() {
     activeJobs: 0,
     completedJobs: 0,
     pendingUpload: 0,
+  });
+  const [earnings, setEarnings] = useState<EarningsSummary>({
+    totalEarned: 0,
+    pendingPayout: 0,
+    paidOut: 0,
+    totalJobs: 0,
+  });
+  const [referralCode, setReferralCode] = useState("");
+  const [referralStats, setReferralStats] = useState<ReferralStats>({
+    totalReferred: 0,
+    qualified: 0,
+    pending: 0,
+    totalRewardEarned: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -53,18 +89,47 @@ export default function RideCheckerDashboardPage() {
 
       if (prof) setProfile(prof);
 
-      try {
-        const res = await fetch("/api/ridechecker/jobs");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.stats) setStats(data.stats);
-        }
-      } catch {}
+      const fetchJobs = fetch("/api/ridechecker/jobs").then((r) => r.ok ? r.json() : null);
+      const fetchEarnings = fetch("/api/ridechecker/earnings").then((r) => r.ok ? r.json() : null);
+      const fetchReferrals = fetch("/api/ridechecker/referrals").then((r) => r.ok ? r.json() : null);
+
+      const [jobsData, earningsData, referralsData] = await Promise.all([
+        fetchJobs.catch(() => null),
+        fetchEarnings.catch(() => null),
+        fetchReferrals.catch(() => null),
+      ]);
+
+      if (jobsData?.stats) setStats(jobsData.stats);
+      if (earningsData?.summary) setEarnings(earningsData.summary);
+      if (referralsData) {
+        if (referralsData.referralCode) setReferralCode(referralsData.referralCode);
+        if (referralsData.stats) setReferralStats(referralsData.stats);
+      }
 
       setLoading(false);
     }
     load();
   }, []);
+
+  const copyReferralCode = async () => {
+    try {
+      await navigator.clipboard.writeText(referralCode);
+      toast({ title: "Referral code copied!" });
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
+  const copyReferralLink = async () => {
+    const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const link = `${appUrl}/ridechecker/signup?ref=${referralCode}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast({ title: "Referral link copied!" });
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
 
   if (loading) {
     return (
@@ -172,6 +237,121 @@ export default function RideCheckerDashboardPage() {
               </Card>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Earned
+                  </CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-total-earned">
+                    ${earnings.totalEarned.toFixed(2)}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pending Payout
+                  </CardTitle>
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-pending-payout">
+                    ${earnings.pendingPayout.toFixed(2)}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Paid Out
+                  </CardTitle>
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-paid-out">
+                    ${earnings.paidOut.toFixed(2)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-muted-foreground" />
+                  Referral Program
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Refer a mechanic or technician. You both earn $100 when they complete 3 jobs within 30 days.
+                </p>
+                {referralCode && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">Your Code:</span>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          readOnly
+                          value={referralCode}
+                          className="w-48 font-mono text-sm"
+                          data-testid="input-referral-code-display"
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={copyReferralCode}
+                          data-testid="button-copy-referral-code"
+                          title="Copy code"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyReferralLink}
+                      data-testid="button-copy-referral-link"
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      Copy Referral Link
+                    </Button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div className="text-center">
+                    <div className="text-lg font-bold" data-testid="text-referral-total">
+                      {referralStats.totalReferred}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Referred</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold" data-testid="text-referral-pending">
+                      {referralStats.pending}
+                    </div>
+                    <div className="text-xs text-muted-foreground">In Progress</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold" data-testid="text-referral-qualified">
+                      {referralStats.qualified}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Qualified</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold" data-testid="text-referral-reward">
+                      ${referralStats.totalRewardEarned}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Reward Earned</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle>Quick Actions</CardTitle>
@@ -186,6 +366,39 @@ export default function RideCheckerDashboardPage() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {isPending && referralCode && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Gift className="h-4 w-4 text-muted-foreground" />
+                Your Referral Code
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                Share your referral code even while your account is pending. Once both of you are active and your referral completes 3 jobs in 30 days, you each earn $100.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  readOnly
+                  value={referralCode}
+                  className="w-48 font-mono text-sm"
+                  data-testid="input-referral-code-pending"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={copyReferralCode}
+                  data-testid="button-copy-referral-pending"
+                  title="Copy code"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </AppShell>
