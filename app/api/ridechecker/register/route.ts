@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { nanoid } from "nanoid";
+
+function generateReferralCode(name: string): string {
+  const prefix = name.replace(/[^a-zA-Z]/g, "").substring(0, 4).toUpperCase();
+  const suffix = nanoid(6).toUpperCase();
+  return `RC-${prefix}-${suffix}`;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, fullName, phone, serviceArea, experience } = body;
+    const { email, password, fullName, phone, serviceArea, experience, referralCode } = body;
 
     if (!email || !password || !fullName) {
       return NextResponse.json(
@@ -52,6 +59,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const myReferralCode = generateReferralCode(fullName);
+
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .upsert(
@@ -62,6 +71,9 @@ export async function POST(request: Request) {
           phone: phone?.trim() || null,
           role: "ridechecker",
           is_active: true,
+          service_area: serviceArea?.trim() || null,
+          experience: experience?.trim() || null,
+          referral_code: myReferralCode,
         },
         { onConflict: "id" }
       );
@@ -75,6 +87,34 @@ export async function POST(request: Request) {
       );
     }
 
+    await supabaseAdmin.from("referral_codes").insert({
+      user_id: authData.user.id,
+      code: myReferralCode,
+    });
+
+    if (referralCode) {
+      const { data: referrerCode } = await supabaseAdmin
+        .from("referral_codes")
+        .select("user_id")
+        .eq("code", referralCode.trim().toUpperCase())
+        .maybeSingle();
+
+      if (referrerCode) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
+        await supabaseAdmin.from("referrals").insert({
+          referrer_id: referrerCode.user_id,
+          referee_id: authData.user.id,
+          referral_code: referralCode.trim().toUpperCase(),
+          status: "pending",
+          referee_completed_jobs: 0,
+          reward_amount: 100.00,
+          expires_at: expiresAt.toISOString(),
+        });
+      }
+    }
+
     await supabaseAdmin.from("audit_log").insert({
       actor_id: authData.user.id,
       actor_email: email.toLowerCase().trim(),
@@ -86,6 +126,8 @@ export async function POST(request: Request) {
         email: email.toLowerCase().trim(),
         service_area: serviceArea || null,
         experience: experience || null,
+        referral_code_used: referralCode || null,
+        own_referral_code: myReferralCode,
       },
     });
 
