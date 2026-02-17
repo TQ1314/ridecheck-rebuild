@@ -52,6 +52,15 @@ export default function RideCheckerDashboardPage() {
         .maybeSingle();
 
       if (prof) setProfile(prof);
+
+      try {
+        const res = await fetch("/api/ridechecker/jobs");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.stats) setStats(data.stats);
+        }
+      } catch {}
+
       setLoading(false);
     }
     load();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Car,
@@ -72,6 +72,15 @@ export default function RideCheckerJobsPage() {
         .maybeSingle();
 
       if (prof) setProfile(prof);
+
+      try {
+        const res = await fetch("/api/ridechecker/jobs");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.jobs) setJobs(data.jobs);
+        }
+      } catch {}
+
       setLoading(false);
     }
     load();

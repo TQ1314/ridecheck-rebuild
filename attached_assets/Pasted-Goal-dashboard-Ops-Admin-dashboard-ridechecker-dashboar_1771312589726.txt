@@ -1,0 +1,100 @@
+Goal
+
+/dashboard = Ops/Admin dashboard
+
+/ridechecker/dashboard = RideChecker dashboard
+
+/ridechecker/jobs = RideChecker jobs list
+
+And routing should depend on the user’s role:
+
+role = operations / operations_lead → go to /dashboard
+
+role = ridechecker → go to /ridechecker/dashboard                               What’s causing the redirect
+
+One of these is happening:
+
+Your middleware is routing any “authenticated user” to /dashboard
+
+Your login success redirect is hardcoded to /dashboard
+
+Your /ridechecker/* routes are missing, and Next falls back to /dashboard                                                                                                  1) Create the RideChecker route group
+
+Make sure these files exist:
+
+app/(ridechecker)/ridechecker/dashboard/page.tsx
+
+app/(ridechecker)/ridechecker/jobs/page.tsx
+
+If you don’t want route groups, you can do:
+
+app/ridechecker/dashboard/page.tsx
+
+app/ridechecker/jobs/page.tsx
+
+(But route groups are cleaner.)
+
+2) Add a RideChecker layout
+
+Create:
+
+app/(ridechecker)/ridechecker/layout.tsx
+
+This should render a RideChecker sidebar (Jobs, Earnings, Ratings, Training, Referrals) — not the Ops sidebar.
+
+3) Update middleware role routing
+
+In middleware.ts, you likely have something like:
+
+“if logged in → allow /dashboard”
+
+or redirect to /dashboard
+
+Change it to:
+
+If route starts with /ridechecker → allow only if role is ridechecker
+
+If route starts with /admin or /dashboard → allow only ops roles
+
+Rule: role decides what section they can access.
+
+4) Fix post-login redirect
+
+Wherever you redirect after login (often in /auth/login page or server action), do:
+
+if role is ridechecker → /ridechecker/dashboard
+
+else → /dashboard
+
+5) Fix RideChecker signup submit action
+
+When a RideChecker signs up, make sure you:
+
+create Supabase user
+
+create profile row with role = ridechecker
+
+redirect them to /ridechecker/dashboard
+
+6) Add RideChecker “Jobs” data query (MVP)
+
+/ridechecker/jobs should query:
+
+jobs where assigned_inspector_id = auth.user.id
+or
+
+orders table where inspector_id = auth.user.id
+
+If you don’t have assignments yet, show an empty state.
+
+Quick test (takes 60 seconds)
+
+After changes:
+
+Sign in as an ops user → should land on /dashboard
+
+Sign in as a ridechecker user → should land on /ridechecker/dashboard
+
+Hit /dashboard while ridechecker → should redirect to /ridechecker/dashboard (or 403)
+
+Hit /ridechecker/dashboard while ops → should redirect to /dashboard (or 403)

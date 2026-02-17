@@ -108,9 +108,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  if (pathname.startsWith("/ridechecker/dashboard") || pathname.startsWith("/ridechecker/jobs")) {
+  if (pathname.startsWith("/ridechecker/") && pathname !== "/ridechecker/signup") {
     if (["ridechecker", "ridechecker_active", "owner"].includes(role)) return res;
     return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    if (["ridechecker", "ridechecker_active"].includes(role)) {
+      return NextResponse.redirect(new URL("/ridechecker/dashboard", req.url));
+    }
   }
 
   return res;
