@@ -96,7 +96,7 @@ END $$;
 -- ==============================================
 CREATE TABLE IF NOT EXISTS intelligence_reports (
   id BIGSERIAL PRIMARY KEY,
-  order_id TEXT REFERENCES orders(id),
+  order_id UUID REFERENCES orders(id),
   report_type TEXT NOT NULL DEFAULT 'standard',
   vin_consistency_check JSONB,
   fraud_screening JSONB,
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS intelligence_reports (
 -- ==============================================
 CREATE TABLE IF NOT EXISTS title_ownership_review (
   id BIGSERIAL PRIMARY KEY,
-  order_id TEXT REFERENCES orders(id),
+  order_id UUID REFERENCES orders(id),
   vin TEXT,
   title_status TEXT,
   ownership_history JSONB,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS title_ownership_review (
 -- ==============================================
 CREATE TABLE IF NOT EXISTS bill_of_sale_documents (
   id BIGSERIAL PRIMARY KEY,
-  order_id TEXT REFERENCES orders(id),
+  order_id UUID REFERENCES orders(id),
   language TEXT NOT NULL DEFAULT 'en',
   buyer_name TEXT,
   seller_name TEXT,
