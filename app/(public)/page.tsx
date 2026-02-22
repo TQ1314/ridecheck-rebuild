@@ -1,198 +1,247 @@
-"use client";
+// app/(public)/page.tsx
+import Image from "next/image";
+import type { Metadata } from "next";
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Shield,
-  Search,
-  FileText,
-  CheckCircle2,
-  ArrowRight,
-  Star,
-  Car,
-  Clock,
-  Wrench,
-} from "lucide-react";
+export const metadata: Metadata = {
+  title: "RideCheck — Do Not Buy Blind. RideCheck It.",
+  description:
+    "You inspect a house before you buy. Make used-car inspections a habit. Professional, documented pre-purchase inspections and buyer-ready reports.",
+};
 
-const STEPS = [
-  {
-    icon: Search,
-    title: "Book Online",
-    description:
-      "Select your package, enter vehicle details, and choose your preferred assessment date.",
-  },
-  {
-    icon: Wrench,
-    title: "We Inspect",
-    description:
-      "Our certified technician performs a thorough multi-point assessment at the vehicle location.",
-  },
-  {
-    icon: FileText,
-    title: "Get Your Report",
-    description:
-      "Receive a detailed digital report with photos, risk screening findings and observational data.",
-  },
-];
-
-const STATS = [
-  { value: "10,000+", label: "Assessments Completed" },
-  { value: "98%", label: "Customer Satisfaction" },
-  { value: "150+", label: "Assessment Points" },
-  { value: "24hr", label: "Report Turnaround" },
-];
-
-export default function LandingPage() {
+export default function PublicHomePage() {
   return (
-    <div>
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10 py-20 sm:py-28 lg:py-36">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-6">
-              <Shield className="h-4 w-4" />
-              Trusted by thousands of car buyers
+    <main className="bg-white text-gray-900">
+      {/* HERO */}
+      <section className="relative overflow-hidden border-b">
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-white" />
+        <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-2 md:py-16">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1 text-xs font-semibold text-gray-700">
+              <span className="h-2 w-2 rounded-full bg-blue-600" />
+              Buyer-first. Professional. Neutral.
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-              Buy with{" "}
-              <span className="text-primary">confidence.</span>
-              <br />
-              Not with worry.
+
+            <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
+              Do Not Buy Blind. <span className="text-blue-700">RideCheck It.</span>
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl">
-              RideCheck provides pre-car-purchase intelligence for used car buyers.
-              Get a detailed intelligence report with photos, diagnostics, and risk screening data.
+
+            <p className="mt-4 text-lg leading-relaxed text-gray-700">
+              You inspect a house before you buy. Used cars deserve the same due diligence.
+              RideCheck sends a qualified inspector and delivers a buyer-ready report so you can
+              make an informed decision — without guessing.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/book">
-                <Button size="lg" data-testid="button-hero-book">
-                  Book Your Assessment
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/how-it-works">
-                <Button variant="outline" size="lg" data-testid="button-hero-learn">
-                  How It Works
-                </Button>
-              </Link>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="/book"
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              >
+                Book an Inspection →
+              </a>
+              <a
+                href="#how-it-works"
+                className="inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-semibold hover:bg-gray-50"
+              >
+                How it Works
+              </a>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <Stat label="Starting at" value="$119" sub="Buyer-friendly due diligence" />
+              <Stat label="On-site time" value="~45 min" sub="Documented inspection" />
+              <Stat label="Report" value="Buyer-ready" sub="Photos + findings" />
+            </div>
+
+            <p className="mt-6 text-sm text-gray-600">
+              We’re not here to demonize sellers. Some cars are great. Our job is to make sure you
+              don’t buy blind.
+            </p>
+          </div>
+
+          {/* IMAGE */}
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-gray-100">
+              <Image
+                src="/images/hero-inspection.jpg"
+                alt="Professional used car inspection"
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <div className="text-xs font-semibold text-gray-600">What you get</div>
+                <ul className="mt-2 space-y-2 text-sm text-gray-700">
+                  <li>✓ Photos + documented findings</li>
+                  <li>✓ Mechanical + condition overview</li>
+                  <li>✓ Clear “next steps” recommendations</li>
+                </ul>
+              </div>
+
+              <div className="rounded-xl border bg-blue-50 p-4">
+                <div className="text-xs font-semibold text-blue-800">Why it matters</div>
+                <p className="mt-2 text-sm text-gray-700">
+                  One inspection can save you thousands — or confirm you found a clean car worth buying.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-48 -left-24 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
       </section>
 
-      <section className="border-y bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {STATS.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-3xl font-bold text-primary">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-12">
+        <h2 className="text-2xl font-extrabold md:text-3xl">How RideCheck works</h2>
+        <p className="mt-3 max-w-3xl text-gray-700">
+          Simple process. Professional output. You stay in control.
+        </p>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <Card
+            step="01"
+            title="Paste the listing link"
+            desc="Share the car listing (or VIN + location). We handle the rest."
+          />
+          <Card
+            step="02"
+            title="Choose how to schedule"
+            desc="Self-Arranged (you already have a time) or Concierge (we coordinate)."
+          />
+          <Card
+            step="03"
+            title="Get your report"
+            desc="You receive a buyer-ready report with photos and findings to make a smart decision."
+          />
+        </div>
+      </section>
+
+      {/* BOOKING TYPES (DON'T BREAK YOUR FLOW — JUST EXPLAIN IT) */}
+      <section className="border-t bg-gray-50">
+        <div className="mx-auto max-w-6xl px-4 py-12">
+          <h2 className="text-2xl font-extrabold md:text-3xl">Two ways to book</h2>
+          <p className="mt-3 max-w-3xl text-gray-700">
+            RideCheck supports your existing booking options. Pick what fits your situation.
+          </p>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="text-sm font-semibold text-gray-500">Self-Arranged</div>
+              <div className="mt-2 text-lg font-extrabold">You already have an appointment</div>
+              <p className="mt-2 text-sm text-gray-700">
+                If you have a time confirmed with the seller, choose Self-Arranged and we’ll show up and inspect.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="text-sm font-semibold text-gray-500">Concierge</div>
+              <div className="mt-2 text-lg font-extrabold">We coordinate with the seller</div>
+              <p className="mt-2 text-sm text-gray-700">
+                If you don’t want to chase the seller, choose Concierge and we handle scheduling and confirmation.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col items-start justify-between gap-4 rounded-2xl border bg-white p-6 md:flex-row md:items-center">
+            <div>
+              <div className="text-lg font-bold">Ready to inspect before you buy?</div>
+              <p className="mt-1 text-gray-700">
+                Make it a habit. Don’t guess. Don’t buy blind.
+              </p>
+            </div>
+            <a
+              href="/book"
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+            >
+              Book RideCheck →
+            </a>
           </div>
         </div>
       </section>
 
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold mb-3">How RideCheck Works</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              Three simple steps to peace of mind before your next car purchase.
+      {/* TRUST / PROFESSIONALISM */}
+      <section className="mx-auto max-w-6xl px-4 py-12">
+        <h2 className="text-2xl font-extrabold md:text-3xl">Professional. Neutral. Buyer-first.</h2>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <Callout
+            title="Structured inspection"
+            desc="Standardized checkpoints and documented findings — like a home inspection."
+          />
+          <Callout
+            title="Clear reporting"
+            desc="Photos + plain-English findings + what to do next."
+          />
+          <Callout
+            title="Buyer-friendly pricing"
+            desc="Due diligence that stays within reach — because smart buying should be normal."
+          />
+        </div>
+      </section>
+
+      {/* FOOTER CTA */}
+      <section className="border-t">
+        <div className="mx-auto max-w-6xl px-4 py-12">
+          <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-blue-700 p-8 text-white md:p-12">
+            <h2 className="text-2xl font-extrabold md:text-4xl">Do Not Buy Blind. RideCheck It.</h2>
+            <p className="mt-3 max-w-2xl text-white/90">
+              You don’t need fear-based marketing. You need a habit: inspect before you buy.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="/book"
+                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-blue-800 shadow-sm hover:bg-blue-50"
+              >
+                Book My Inspection →
+              </a>
+              <a
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-xl border border-white/25 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
+              >
+                View Pricing →
+              </a>
+            </div>
+
+            <p className="mt-5 text-xs text-white/70">
+              RideCheck provides a professional inspection and documented findings to support your decision.
+              It is not a warranty or guarantee of future condition.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {STEPS.map((step, i) => (
-              <Card key={step.title} className="relative">
-                <CardContent className="pt-8 pb-6 px-6">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-5">
-                    <step.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="absolute top-4 right-4 text-xs font-bold text-muted-foreground/50">
-                    {String(i + 1).padStart(2, "0")}
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {step.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
       </section>
+    </main>
+  );
+}
 
-      <section className="py-20 sm:py-24 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold mb-3">Why Choose RideCheck?</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: CheckCircle2,
-                title: "Certified Technicians",
-                desc: "Every inspector is ASE-certified with years of experience.",
-              },
-              {
-                icon: Car,
-                title: "On-Location Service",
-                desc: "We come to the car — dealership, private seller, or anywhere.",
-              },
-              {
-                icon: Clock,
-                title: "Fast Turnaround",
-                desc: "Get your detailed report in as little as 6 hours.",
-              },
-              {
-                icon: FileText,
-                title: "Detailed Reports",
-                desc: "Photo-documented findings with observational data and risk flags.",
-              },
-              {
-                icon: Shield,
-                title: "Unbiased Opinion",
-                desc: "We have no stake in the sale — just honest assessments.",
-              },
-              {
-                icon: Star,
-                title: "Satisfaction Focused",
-                desc: "If you're not satisfied, we'll review and work to resolve your concerns.",
-              },
-            ].map((item) => (
-              <Card key={item.title}>
-                <CardContent className="pt-6 pb-5 px-6">
-                  <item.icon className="h-8 w-8 text-primary mb-4" />
-                  <h3 className="font-semibold mb-1">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.desc}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+/* -------- components ---------- */
 
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to buy with confidence?
-          </h2>
-          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-            Don't let a bad deal cost you thousands. Book a professional
-            assessment today and know exactly what you're getting.
-          </p>
-          <Link href="/book">
-            <Button size="lg" data-testid="button-cta-book">
-              Book Your Assessment
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
+function Stat(props: { label: string; value: string; sub: string }) {
+  return (
+    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+      <div className="text-xs font-semibold text-gray-500">{props.label}</div>
+      <div className="mt-1 text-xl font-extrabold">{props.value}</div>
+      <div className="mt-1 text-xs text-gray-600">{props.sub}</div>
+    </div>
+  );
+}
+
+function Card(props: { step: string; title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="text-xs font-bold text-blue-700">{props.step}</div>
+      <div className="mt-2 text-lg font-extrabold">{props.title}</div>
+      <p className="mt-2 text-sm text-gray-700">{props.desc}</p>
+    </div>
+  );
+}
+
+function Callout(props: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="text-base font-bold">{props.title}</div>
+      <p className="mt-2 text-sm text-gray-700">{props.desc}</p>
     </div>
   );
 }
