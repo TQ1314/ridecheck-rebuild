@@ -1,0 +1,52 @@
+It will find the route conflict, delete the duplicate, update every link, and remove buyer access to /dashboard by swapping it for a Track link + Home link.
+
+You are working in a Next.js 14 App Router project.
+
+GOAL:
+1) Fix the Next.js dynamic route conflict under /track (both /app/track/[id] and /app/track/[orderId] exist).
+2) Standardize on ONE dynamic route folder (prefer the newer/more polished one).
+3) Update ALL internal links/router.push that point to the old route so they point to the kept route.
+4) Remove buyer-facing “Go to Dashboard” behavior after order confirmation. Buyers should not be sent to /dashboard.
+   Replace it with:
+   - Track Order (goes to /track/<orderId>)
+   - Home (goes to /)
+
+CONSTRAINTS:
+- Do NOT break admin/staff dashboards; only remove buyer navigation into them.
+- Keep the admin routes behind existing auth/middleware; do not weaken security.
+- After changes, the app must compile with `npm run build` (or `npm run dev` without route errors).
+
+STEPS:
+A) Scan the repository for dynamic routes under /app/track:
+   - Identify all folders matching /app/track/[...]
+   - If both [id] and [orderId] exist, keep ONLY one.
+   - Prefer keeping /app/track/[orderId] if it exists (assume it is newer). Otherwise keep /app/track/[id].
+   - Delete the other folder entirely (including page.tsx and any nested files).
+
+B) Update the remaining track page so params match the folder name:
+   - If folder is [orderId], page must read params.orderId (not params.id).
+   - If folder is [id], page must read params.id (not params.orderId).
+   - Ensure TypeScript types match.
+
+C) Search the entire codebase for references to the removed route:
+   - Find any `href="/track/..."`, template literals, and router.push calls.
+   - Replace them to use the kept route pattern: `/track/${orderId}` (or `/track/${id}` accordingly).
+   - Be careful not to change unrelated “track” strings.
+
+D) Update the order confirmation page:
+   - Locate the confirmation page (likely /app/orders/confirmation/page.tsx or similar).
+   - Remove the Link/Button that navigates to "/dashboard" for buyers.
+   - Replace with:
+     1) Track Order button that navigates to `/track/${orderId}` (only if orderId exists)
+     2) Home button that navigates to `/`
+   - Keep the “View Order” button if it is used for internal viewing; if it exposes internal pages, prefer Track Order instead.
+
+E) Verify:
+   - Run a quick build/dev check.
+   - Confirm there is no Next.js route conflict error.
+   - Confirm after submitting an order, buyer sees Order Received -> Track Order -> track page loads.
+   - Confirm buyer is not sent to /dashboard from confirmation screen.
+
+DELIVERABLE:
+- List each file changed and show diffs or the updated code for each.
+- Confirm the folder removed and why.

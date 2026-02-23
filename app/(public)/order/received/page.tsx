@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Home } from "lucide-react";
 
 export default function OrderReceivedPage() {
   const searchParams = useSearchParams();
@@ -30,16 +30,17 @@ export default function OrderReceivedPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {orderId && (
-                <Link href={`/orders/${orderId}`}>
-                  <Button data-testid="button-view-order">
-                    View Order
+                <Link href={`/track/${encodeURIComponent(orderId)}`}>
+                  <Button data-testid="button-track-order">
+                    Track Order
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
               )}
-              <Link href="/dashboard">
-                <Button variant="outline" data-testid="button-go-dashboard">
-                  Go to Dashboard
+              <Link href="/">
+                <Button variant="outline" data-testid="button-go-home">
+                  <Home className="mr-2 h-4 w-4" />
+                  Home
                 </Button>
               </Link>
             </div>
