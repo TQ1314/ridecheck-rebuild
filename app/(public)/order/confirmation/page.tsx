@@ -27,13 +27,7 @@ export default function OrderConfirmationPage() {
 
   const isBuyerArranged = method === "buyer_arranged";
 
-  // ✅ Buyer-safe tracking URL (Option 2)
-  // Priority:
-  // 1) explicit ?track=... (if you ever pass it)
-  // 2) fallback to /track/{orderId}
-  const trackUrl =
-    searchParams.get("track") ||
-    (orderId ? `/track/${encodeURIComponent(orderId)}` : null);
+  const trackUrl = searchParams.get("track") || null;
 
   const handleCopyScript = () => {
     const script = t("confirm.sellerScript.body", lang, {

@@ -14,13 +14,21 @@ export async function GET(req: NextRequest) {
     const pkg = url.searchParams.get("package");
     const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 200);
     const offset = parseInt(url.searchParams.get("offset") || "0");
+    const sort = url.searchParams.get("sort");
 
     let query = supabaseAdmin
       .from("orders")
-      .select("*", { count: "exact" })
-      .order("ops_priority", { ascending: false })
-      .order("created_at", { ascending: true })
-      .range(offset, offset + limit - 1);
+      .select("*", { count: "exact" });
+
+    if (sort === "recent") {
+      query = query.order("created_at", { ascending: false });
+    } else {
+      query = query
+        .order("ops_priority", { ascending: false })
+        .order("created_at", { ascending: true });
+    }
+
+    query = query.range(offset, offset + limit - 1);
 
     if (opsStatus && opsStatus !== "all") {
       query = query.eq("ops_status", opsStatus);

@@ -60,8 +60,8 @@ export async function POST(
         },
       ],
       metadata: { order_id: params.orderId },
-      success_url: `${appUrl}/order/received?orderId=${params.orderId}&status=paid`,
-      cancel_url: `${appUrl}/order/received?orderId=${params.orderId}&status=cancelled`,
+      success_url: `${appUrl}/order/received?orderId=${params.orderId}&status=paid${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
+      cancel_url: `${appUrl}/order/received?orderId=${params.orderId}&status=cancelled${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
     });
 
     const now = new Date().toISOString();

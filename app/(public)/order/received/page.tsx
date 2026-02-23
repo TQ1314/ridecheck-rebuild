@@ -9,6 +9,7 @@ import { CheckCircle2, ArrowRight, Home } from "lucide-react";
 export default function OrderReceivedPage() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
+  const trackUrl = searchParams.get("track");
 
   return (
     <div className="py-20 sm:py-28">
@@ -29,14 +30,18 @@ export default function OrderReceivedPage() {
               You&apos;ll receive a confirmation email shortly with the next steps.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {orderId && (
-                <Link href={`/track/${encodeURIComponent(orderId)}`}>
+              {trackUrl ? (
+                <Link href={trackUrl}>
                   <Button data-testid="button-track-order">
                     Track Order
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-              )}
+              ) : orderId ? (
+                <p className="text-sm text-muted-foreground">
+                  Use the tracking link in your confirmation email to follow your order.
+                </p>
+              ) : null}
               <Link href="/">
                 <Button variant="outline" data-testid="button-go-home">
                   <Home className="mr-2 h-4 w-4" />

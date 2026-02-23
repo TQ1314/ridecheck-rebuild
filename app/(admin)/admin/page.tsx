@@ -28,7 +28,7 @@ export default function AdminDashboard() {
     async function load() {
       try {
         const [ordersRaw, inspectorsRaw] = await Promise.all([
-          fetch("/api/admin/orders?limit=5"),
+          fetch("/api/admin/orders?limit=5&sort=recent"),
           fetch("/api/admin/inspectors"),
         ]);
         if (!ordersRaw.ok || !inspectorsRaw.ok) {
@@ -142,7 +142,7 @@ export default function AdminDashboard() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">Recent Orders (FIFO Queue)</h2>
+        <h2 className="text-lg font-semibold mb-3">Recent Orders</h2>
         {orders.length === 0 ? (
           <p className="text-sm text-muted-foreground">No orders yet.</p>
         ) : (
