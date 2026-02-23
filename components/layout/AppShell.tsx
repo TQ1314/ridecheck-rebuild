@@ -90,7 +90,6 @@ function getNavItems(role: Role): NavItem[] {
     return [{ href: "/dev", label: "Dev View", icon: Bug }];
   }
   return [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/orders", label: "My Orders", icon: Package },
     { href: "/profile", label: "Profile", icon: User },
   ];

@@ -1,0 +1,58 @@
+Next is “close the buyer loop” (track page works, emails go out, and buyers can’t wander into staff/admin). Here’s the single prompt to run in Replit that will make the remaining updates without breaking anything.
+
+You are working in a Next.js 14 App Router + Supabase project.
+
+MISSION: Close the buyer experience end-to-end WITHOUT exposing staff/admin dashboards and WITHOUT breaking current flows.
+
+CURRENT STATE (assume true):
+- /app/track/[orderId] is the canonical tracking route (duplicate removed).
+- Buyer-facing order received page now links to Track Order + Home.
+- Orders can be created successfully via /api/orders/create.
+
+DO THIS IN SAFE, SMALL CHANGES:
+
+1) BUYER TRACK PAGE SHOULD WORK WITHOUT LOGIN
+Goal: A buyer who just placed an order can open /track/<orderId> and see a basic status page.
+- Implement /app/track/[orderId]/page.tsx to fetch the order by id safely.
+- Display: vehicle (year/make/model), booking_type, package, status, preferred_date, created_at.
+- If not found: show “Order not found”.
+- If order exists but buyer is not logged in: show a “We found your order” page but redact buyer_email/phone.
+
+SECURITY RULE:
+- Never allow an unauthenticated user to view all orders.
+- Only allow lookup by the single orderId slug provided.
+- Do not expose internal fields (notes, internal assignment, inspector ids) unless explicitly whitelisted.
+
+2) PROTECT STAFF ROUTES STRICTLY
+Goal: If a buyer manually types /dashboard or /admin, they must be blocked/redirected.
+- In middleware, enforce:
+  - /admin and /dashboard require authenticated user AND role in ['admin','staff','inspector'] (use existing profile role if present).
+  - If not authorized, redirect to / (or /login) with a safe message param.
+- Confirm buyer-facing routes remain public:
+  - /, /pricing, /how-it-works, /book, /order/received, /track/[orderId], /api/orders/create
+
+3) FIX BUYER “DASHBOARD” CONFUSION
+Goal: If there is a buyer dashboard page at /dashboard that is meant for staff, rename it to /ops (or /staff/dashboard) and leave /dashboard for staff only OR remove buyer links entirely.
+- Audit app routes and navigation to ensure buyer UI never links to /dashboard.
+
+4) MAKE ORDER STATUS MEANINGFUL (MINIMUM VIABLE STATUSES)
+Goal: Track page should show friendly statuses.
+- Map DB statuses to labels:
+  - submitted -> “Order received”
+  - seller_confirmed -> “Seller confirmed”
+  - inspector_assigned -> “Inspector assigned”
+  - in_progress -> “Inspection in progress”
+  - report_ready -> “Report ready”
+  - completed -> “Completed”
+- If unknown, show raw status.
+
+5) BUILD VERIFICATION
+After edits:
+- Run `npm run build` (or equivalent) and fix any type errors.
+- Confirm routes compile and no Next.js dynamic route conflicts exist.
+- Provide a summary of files changed + what each change did.
+
+DELIVERABLE:
+- Output the changed file list.
+- Paste final code for each changed file.
+- Confirm buyer cannot access /dashboard or /admin while not logged in.

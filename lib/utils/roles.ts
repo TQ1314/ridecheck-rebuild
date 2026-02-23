@@ -82,5 +82,5 @@ export function getDashboardPath(role: Role): string {
   if (role === "platform") return "/platform";
   if (role === "qa") return "/qa/review";
   if (role === "developer") return "/dev";
-  return "/dashboard";
+  return "/orders";
 }

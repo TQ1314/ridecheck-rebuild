@@ -48,7 +48,7 @@ export default function LoginPage() {
         const role = (profile?.role || "customer") as Role;
         router.push(getDashboardPath(role));
       } else {
-        router.push("/dashboard");
+        router.push("/orders");
       }
       router.refresh();
     } catch (err: any) {

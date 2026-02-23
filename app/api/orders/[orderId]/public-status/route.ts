@@ -4,6 +4,22 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+const SAFE_FIELDS = [
+  "id",
+  "order_number",
+  "status",
+  "ops_status",
+  "created_at",
+  "preferred_date",
+  "package",
+  "booking_type",
+  "vehicle_year",
+  "vehicle_make",
+  "vehicle_model",
+  "vehicle_location",
+  "tracking_token",
+];
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { orderId: string } }
@@ -13,28 +29,15 @@ export async function GET(
     const t = searchParams.get("t");
 
     if (!t) {
-      return NextResponse.json({ error: "Missing token" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing tracking token. Please use the full tracking link from your confirmation email." },
+        { status: 400 }
+      );
     }
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
-      .select(
-        `
-        id,
-        order_number,
-        status,
-        ops_status,
-        created_at,
-        preferred_date,
-        package,
-        booking_type,
-        vehicle_year,
-        vehicle_make,
-        vehicle_model,
-        vehicle_location,
-        tracking_token
-      `
-      )
+      .select(SAFE_FIELDS.join(","))
       .eq("id", params.orderId)
       .maybeSingle();
 
@@ -42,15 +45,12 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Token check
     if (!order.tracking_token || order.tracking_token !== t) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Invalid tracking token" }, { status: 403 });
     }
 
-    // Never return tracking_token to the client
     const { tracking_token, ...safe } = order as any;
-
-    return NextResponse.json({ order: safe });
+    return NextResponse.json({ order: safe, verified: true });
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || "Internal server error" },

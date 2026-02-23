@@ -20,6 +20,8 @@ const PUBLIC_ROUTES = [
 
 const INVITE_PREFIX = "/invite/";
 
+const TRACK_PREFIX = "/track/";
+
 const SKIP_PREFIXES = ["/_next", "/api", "/favicon", "/images", "/fonts"];
 
 const STAFF_PREFIXES = ["/admin", "/dashboard", "/operations", "/qa", "/dev", "/platform"];
@@ -37,7 +39,7 @@ const STAFF_ROLES = [
 ];
 
 function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX);
+  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX);
 }
 
 function isStaticOrInternal(pathname: string) {
