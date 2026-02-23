@@ -1,0 +1,273 @@
+Goal: Implement and TEST the SMS-first payment-link notification flow
+(Twilio primary, Resend email fallback) without breaking admin/staff routes.
+Make SMALL contained changes only.
+
+----------------------------------------------------
+CONTEXT
+----------------------------------------------------
+We already have:
+
+- payment link routes implemented
+- Supabase migration for payment_link_* columns completed
+- Orders table includes:
+  payment_link_token
+  payment_link_sent_to
+  payment_link_sent_channel
+  payment_link_sent_at
+  payment_status
+  stripe_session_id
+  paid_at
+  base_price
+
+Replit Secrets MAY include:
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER
+RESEND_API_KEY
+RESEND_FROM_EMAIL
+
+Fraud requirement:
+✅ Payment links MUST be SMS-first
+✅ Email ONLY fallback
+
+----------------------------------------------------
+STEP 1 — LOCATE EXISTING IMPLEMENTATION
+----------------------------------------------------
+
+Find:
+
+- API route responsible for sending payment links:
+  app/api/**/send-payment-link/route.ts
+  OR similar
+
+Also locate:
+- Stripe webhook handler
+- pay/validate route
+- pay/create-session route
+
+Identify:
+- Which order fields are written
+- Where token is generated
+
+DO NOT rewrite architecture.
+Reuse existing logic.
+
+----------------------------------------------------
+STEP 2 — CREATE NOTIFICATION HELPERS
+----------------------------------------------------
+
+Create:
+
+lib/notifications/sms.ts
+lib/notifications/email.ts
+
+--------------------------------
+SMS HELPER (Twilio)
+--------------------------------
+
+Export function:
+
+sendSMS({ to, body })
+
+Behavior:
+
+IF
+  TWILIO_ACCOUNT_SID
+  TWILIO_AUTH_TOKEN
+  TWILIO_PHONE_NUMBER
+exist:
+
+→ send real Twilio SMS
+
+ELSE:
+
+console.log(
+  "[SMS-TEST]",
+  "to=", to,
+  "body=", body
+)
+
+Return:
+{ success: true }
+
+Never throw if credentials missing.
+
+--------------------------------
+EMAIL HELPER (Resend)
+--------------------------------
+
+Export:
+
+sendEmail({ to, subject, html })
+
+IF
+  RESEND_API_KEY
+  RESEND_FROM_EMAIL
+exist:
+
+→ send real email
+
+ELSE:
+
+console.log(
+  "[EMAIL-TEST]",
+  "to=", to,
+  "subject=", subject
+)
+
+Return success.
+
+----------------------------------------------------
+STEP 3 — SMS-FIRST FLOW
+----------------------------------------------------
+
+Update ONLY the send-payment-link API route.
+
+Flow:
+
+1. Load order
+2. Generate payment link URL
+3. Attempt SMS FIRST:
+
+IF buyer_phone exists:
+    try SMS
+        success → mark channel='sms'
+    catch error → fallback email
+
+IF phone missing OR SMS fails:
+    attempt email
+
+IF email also unavailable:
+    return error but DO NOT crash server
+
+----------------------------------------------------
+STEP 4 — UPDATE ORDER AFTER SEND
+----------------------------------------------------
+
+After successful notification:
+
+update orders:
+
+payment_link_sent_to = destination
+payment_link_sent_channel = 'sms' | 'email'
+payment_link_sent_at = now()
+
+Do NOT update token if already exists.
+
+----------------------------------------------------
+STEP 5 — DEBUG SAFETY MODE
+----------------------------------------------------
+
+Add support:
+
+DEBUG_PAYMENT_LINKS=true
+
+Rules:
+
+IF NODE_ENV !== 'production'
+OR DEBUG_PAYMENT_LINKS=true
+
+Return in API response:
+
+{
+  success: true,
+  channel,
+  payment_url
+}
+
+ELSE:
+DO NOT expose payment_url.
+
+NEVER log token in production logs.
+
+----------------------------------------------------
+STEP 6 — PAY ROUTES SAFETY CHECK
+----------------------------------------------------
+
+Verify middleware allows:
+
+/pay/*
+/api/pay/*
+/api/orders/*/send-payment-link
+
+without authentication.
+
+Do NOT modify admin/staff access rules.
+
+----------------------------------------------------
+STEP 7 — CREATE TEST DOCUMENTATION
+----------------------------------------------------
+
+Create file:
+
+docs/payment-link-test.md
+
+Include curl commands:
+
+--------------------------------
+1. SEND PAYMENT LINK
+--------------------------------
+
+POST /api/orders/{orderId}/send-payment-link
+
+Expected:
+
+- SMS sent OR
+- [SMS-TEST] console log
+
+DB changes:
+payment_link_sent_channel updated
+payment_link_sent_to populated
+payment_link_sent_at populated
+
+--------------------------------
+2. VALIDATE TOKEN
+--------------------------------
+
+GET /api/pay/validate?orderId=...&t=TOKEN
+
+Expected:
+{ valid: true }
+
+--------------------------------
+3. CREATE STRIPE SESSION
+--------------------------------
+
+POST /api/pay/create-session
+
+Expected:
+returns checkout URL
+
+--------------------------------
+4. WEBHOOK RESULT
+--------------------------------
+
+After Stripe test payment:
+
+payment_status = 'paid'
+stripe_session_id exists
+paid_at timestamp exists
+
+----------------------------------------------------
+STEP 8 — BUILD CHECK
+----------------------------------------------------
+
+Run:
+
+npx tsc --noEmit
+npm run build
+
+Fix ONLY issues introduced by these changes.
+
+Ignore unrelated legacy typing warnings.
+
+----------------------------------------------------
+DELIVERABLES
+----------------------------------------------------
+
+After finishing, output:
+
+1. Files changed (one line reason each)
+2. Exact API route path for sending payment link
+3. Example curl commands
+4. Confirmation SMS-first + email fallback works

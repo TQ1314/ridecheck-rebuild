@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     let paymentChannel: string | null = null;
     try {
       if (buyer_phone) {
-        const { sendSMS } = await import("@/lib/sms/twilio");
+        const { sendSMS } = await import("@/lib/notifications/sms");
         const smsResult = await sendSMS({
           to: buyer_phone,
           body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
         if (smsResult.success) {
           paymentChannel = "sms";
         } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
-          const { sendEmail } = await import("@/lib/email/resend");
+          const { sendEmail } = await import("@/lib/notifications/email");
           const emailResult = await sendEmail({
             to: buyer_email,
             subject: "RideCheck payment link for your inspection",
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
           if (emailResult.success) paymentChannel = "email";
         }
       } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
-        const { sendEmail } = await import("@/lib/email/resend");
+        const { sendEmail } = await import("@/lib/notifications/email");
         const emailResult = await sendEmail({
           to: buyer_email,
           subject: "RideCheck payment link for your inspection",

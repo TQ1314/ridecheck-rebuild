@@ -197,3 +197,5 @@ Migration SQL in /supabase/migrations/ (run manually):
   - 3 payment APIs: send-payment-link, pay/validate, pay/create-session
   - Stripe webhook handles checkout.session.completed (sets payment_status=paid, paid_at, ops_status=payment_received)
   - Middleware: /pay/ prefix added to public routes
+  - Notification helpers: lib/notifications/sms.ts (Twilio), lib/notifications/email.ts (Resend) — canonical wrappers with test-mode logging
+  - Test documentation: docs/payment-link-test.md with curl commands and expected DB state

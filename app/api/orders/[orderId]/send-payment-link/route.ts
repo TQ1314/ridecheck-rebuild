@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendSMS } from "@/lib/sms/twilio";
-import { sendEmail } from "@/lib/email/resend";
+import { sendSMS } from "@/lib/notifications/sms";
+import { sendEmail } from "@/lib/notifications/email";
 
 export const runtime = "nodejs";
 
@@ -31,13 +31,14 @@ export async function POST(
       return NextResponse.json({ error: "No contact method available" }, { status: 400 });
     }
 
+    const isNewToken = !order.payment_link_token;
     const token = order.payment_link_token || crypto.randomUUID();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const payUrl = `${appUrl}/pay/${order.id}?t=${token}`;
     const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
 
-    let channel: "sms" | "email" = "sms";
-    let sentTo = phone;
+    let channel: "sms" | "email" | null = null;
+    let sentTo: string | null = null;
 
     if (phone) {
       const smsResult = await sendSMS({
@@ -61,23 +62,34 @@ export async function POST(
       }
     } else if (email) {
       const price = Number(order.final_price || 0);
-      await sendEmail({
+      const emailResult = await sendEmail({
         to: email,
         subject: "RideCheck payment link for your inspection",
         html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${price}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
       });
-      channel = "email";
-      sentTo = email;
+      if (emailResult.success) {
+        channel = "email";
+        sentTo = email;
+      }
+    }
+
+    if (!channel || !sentTo) {
+      return NextResponse.json({ error: "Failed to send payment link via SMS or email" }, { status: 502 });
+    }
+
+    const updatePayload: Record<string, any> = {
+      payment_link_sent_to: sentTo,
+      payment_link_sent_channel: channel,
+      payment_link_sent_at: new Date().toISOString(),
+    };
+
+    if (isNewToken) {
+      updatePayload.payment_link_token = token;
     }
 
     await supabaseAdmin
       .from("orders")
-      .update({
-        payment_link_token: token,
-        payment_link_sent_to: sentTo,
-        payment_link_sent_channel: channel,
-        payment_link_sent_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", params.orderId);
 
     const isDebug =
