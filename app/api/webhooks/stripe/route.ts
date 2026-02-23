@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
           payment_intent_id: session.payment_intent,
           paid_at: new Date().toISOString(),
           status: "payment_received",
+          ops_status: "payment_received",
           updated_at: new Date().toISOString(),
         })
         .eq("id", orderId);
@@ -46,6 +47,20 @@ export async function POST(req: NextRequest) {
         action: "payment_received",
         details: { payment_intent: session.payment_intent },
       });
+    }
+  }
+
+  if (event.type === "payment_intent.payment_failed") {
+    const intent = event.data.object as any;
+    const orderId = intent.metadata?.order_id;
+    if (orderId) {
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "failed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
     }
   }
 

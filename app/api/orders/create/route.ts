@@ -18,6 +18,9 @@ export const createOrderSchema = z.object({
   seller_name: z.string().max(100).nullable().optional(),
   seller_phone: z.string().max(20).nullable().optional(),
 
+  buyer_phone: z.string().min(7).max(20),
+  buyer_email_input: z.string().email().nullable().optional(),
+
   booking_type: z.enum(["self_arrange", "concierge"]),
   package: z.enum(["standard", "premium", "comprehensive", "plus"]),
   preferred_date: z.string().nullable().optional(),
@@ -60,16 +63,16 @@ export async function POST(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    const buyer_email = safeString(session?.user?.email, "guest@ridecheck.com");
-    const buyer_phone: string | null = null;
+    const buyer_email = safeString(data.buyer_email_input || session?.user?.email, "guest@ridecheck.com");
+    const buyer_phone = data.buyer_phone;
 
     const { basePrice, finalPrice, discountAmount } = getPrice(
       data.package as PackageType,
       data.booking_type as BookingType
     );
 
-    // 🔐 Generate tracking token for public status page
     const tracking_token = crypto.randomUUID();
+    const payment_link_token = crypto.randomUUID();
 
     const insertPayload: Record<string, any> = {
       buyer_email,
@@ -77,6 +80,7 @@ export async function POST(req: NextRequest) {
 
       booking_type: data.booking_type,
       status: "submitted",
+      payment_status: "unpaid",
 
       vehicle_year: data.vehicle_year,
       vehicle_make: data.vehicle_make,
@@ -91,8 +95,12 @@ export async function POST(req: NextRequest) {
       package: data.package,
       preferred_date: data.preferred_date ?? null,
 
-      // 👇 NEW COLUMN (must exist in DB)
+      base_price: basePrice,
+      final_price: finalPrice,
+      discount_amount: discountAmount,
+
       tracking_token,
+      payment_link_token,
     };
 
     const { data: order, error } = await supabaseAdmin
@@ -119,6 +127,43 @@ export async function POST(req: NextRequest) {
 
     const track_url = `/track/${order.id}?t=${tracking_token}`;
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const payUrl = `${appUrl}/pay/${order.id}?t=${payment_link_token}`;
+    const vehicleLabel = `${data.vehicle_year} ${data.vehicle_make} ${data.vehicle_model}`;
+
+    let paymentChannel: string | null = null;
+    try {
+      if (buyer_phone) {
+        const { sendSMS } = await import("@/lib/sms/twilio");
+        await sendSMS({
+          to: buyer_phone,
+          body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
+        });
+        paymentChannel = "sms";
+      } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+        const { sendEmail } = await import("@/lib/email/resend");
+        await sendEmail({
+          to: buyer_email,
+          subject: "RideCheck payment link for your inspection",
+          html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${finalPrice}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
+        });
+        paymentChannel = "email";
+      }
+
+      if (paymentChannel) {
+        await supabaseAdmin
+          .from("orders")
+          .update({
+            payment_link_sent_to: paymentChannel === "sms" ? buyer_phone : buyer_email,
+            payment_link_sent_channel: paymentChannel,
+            payment_link_sent_at: new Date().toISOString(),
+          })
+          .eq("id", order.id);
+      }
+    } catch (linkErr) {
+      console.error("[Payment Link Send Error]", linkErr);
+    }
+
     return NextResponse.json({
       order,
       pricing: {
@@ -126,7 +171,8 @@ export async function POST(req: NextRequest) {
         finalPrice,
         discountAmount,
       },
-      track_url, // 👈 front-end will use this instead of dashboard
+      track_url,
+      payment_channel: paymentChannel,
     });
   } catch (err: any) {
     console.error("[Order Create Error]", err);

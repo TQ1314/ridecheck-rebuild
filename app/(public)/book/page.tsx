@@ -62,6 +62,8 @@ export default function BookPage() {
   const [sellerName, setSellerName] = useState("");
   const [sellerPhone, setSellerPhone] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const [buyerEmailInput, setBuyerEmailInput] = useState("");
 
   const [inspectionAddress, setInspectionAddress] = useState("");
   const [inspectionTimeWindow, setInspectionTimeWindow] = useState("");
@@ -98,6 +100,7 @@ export default function BookPage() {
         !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation
       );
     if (step === 2) {
+      if (!buyerPhone || buyerPhone.length < 7) return false;
       if (isBuyerArranged) {
         return !!inspectionAddress && !!inspectionTimeWindow && !!sellerPhone;
       }
@@ -128,6 +131,8 @@ export default function BookPage() {
         vehicle_location: vehicleLocation,
         seller_name: sellerName || null,
         seller_phone: sellerPhone || null,
+        buyer_phone: buyerPhone,
+        buyer_email_input: buyerEmailInput || null,
         booking_type: isBuyerArranged ? "self_arrange" : bookingType,
         package: pkg,
         preferred_date: preferredDate || null,
@@ -580,6 +585,32 @@ export default function BookPage() {
                 </div>
               </>
             )}
+            <div className="pt-4 border-t space-y-4">
+              <p className="text-sm font-medium text-muted-foreground">Your contact info (for payment link)</p>
+              <div>
+                <Label htmlFor="buyerPhone">Your Phone Number *</Label>
+                <Input
+                  id="buyerPhone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={buyerPhone}
+                  onChange={(e) => setBuyerPhone(e.target.value)}
+                  data-testid="input-buyer-phone"
+                />
+                <p className="text-xs text-muted-foreground mt-1">We&apos;ll text you a secure payment link</p>
+              </div>
+              <div>
+                <Label htmlFor="buyerEmail">Your Email (optional)</Label>
+                <Input
+                  id="buyerEmail"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={buyerEmailInput}
+                  onChange={(e) => setBuyerEmailInput(e.target.value)}
+                  data-testid="input-buyer-email"
+                />
+              </div>
+            </div>
             <div>
               <Label htmlFor="date">
                 {t("booking.preferredDate", lang)}
@@ -651,6 +682,16 @@ export default function BookPage() {
                     {t("booking.inspectionTimeWindow", lang)}
                   </span>
                   <span>{inspectionTimeWindow}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Your Phone</span>
+                <span data-testid="text-review-phone">{buyerPhone}</span>
+              </div>
+              {buyerEmailInput && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Your Email</span>
+                  <span data-testid="text-review-email">{buyerEmailInput}</span>
                 </div>
               )}
               {preferredDate && (
