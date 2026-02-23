@@ -1,0 +1,77 @@
+Goal: verify the SMS-first payment link flow end-to-end now that the Supabase migration ran successfully.
+
+Constraints:
+- Make SMALL, SAFE changes only if needed.
+- Do NOT break admin/staff routes or middleware protections.
+- Do NOT expose tokens in production logs or responses.
+- Prefer additive changes (guards, logging, debug flags) over refactors.
+
+Tasks (do in this order):
+
+1) Locate payment-link implementation
+   - Find and open the API routes:
+     - /app/api/**/send-payment-link/route.ts (or nearest match)
+     - /app/api/**/pay/validate/route.ts
+     - /app/api/**/pay/create-session/route.ts
+     - /app/api/**/stripe/webhook/route.ts (or /app/api/webhooks/stripe/route.ts)
+   - Identify exactly which `orders` columns are written/updated and where:
+     - payment_link_token
+     - payment_link_sent_to
+     - payment_link_sent_channel
+     - payment_link_sent_at
+     - stripe_session_id
+     - payment_status
+     - paid_at
+     - base_price
+   - Ensure the DB writes match those column names exactly.
+
+2) Add/confirm TEST mode switch for outbound messages
+   Implement a safe adapter in the code that sends SMS/email:
+   - If TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER exist:
+       send real SMS via Twilio
+     Else:
+       console.log(`[SMS-TEST] to=${to} body=${body}`)
+   - If RESEND_API_KEY and RESEND_FROM_EMAIL exist:
+       send real email via Resend
+     Else:
+       console.log(`[EMAIL-TEST] to=${to} subject=${subject} body=${body}`)
+   - IMPORTANT: If NODE_ENV === 'production', do NOT log tokenized URLs or bodies that include tokens.
+
+3) Enable local end-to-end testing without external services
+   In send-payment-link endpoint:
+   - Continue sending SMS/email normally.
+   - ALSO return the payment URL in JSON response ONLY when:
+       NODE_ENV !== 'production'
+       OR process.env.DEBUG_PAYMENT_LINKS === 'true'
+   - In production:
+       never return the token URL
+       never log it
+   - If returning in debug mode, include a field:
+       { ok: true, debug: { payment_url: "...", channel: "sms|email|test" } }
+     but keep the normal response minimal otherwise.
+
+4) Provide a single test script OR documented curl commands (prefer curl) to test end-to-end:
+   - Create order (POST /api/orders/create)
+   - Send payment link (POST /api/orders/{orderId}/send-payment-link OR correct route)
+   - Validate token (GET or POST /api/pay/validate?... or correct route)
+   - Create checkout session (POST /api/pay/create-session?... or correct route)
+   For each command:
+   - show the exact curl
+   - show expected JSON shape
+   - note what DB columns should change after each step
+   Use DEBUG_PAYMENT_LINKS=true in commands where helpful.
+
+5) Run:
+   - TypeScript check
+   - Next build
+   Fix only what is necessary for the build to pass.
+
+6) Output a concise summary:
+   - Files changed
+   - Why each change was made
+   - Confirm admin/staff routes unaffected
+
+Deliverables:
+- Updated code (only small safe patches)
+- Curl test plan
+- Build passes

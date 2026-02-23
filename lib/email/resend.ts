@@ -15,7 +15,8 @@ export async function sendEmail({
   html: string;
 }) {
   if (!resend) {
-    console.log(`[DEV EMAIL] To: ${to} | Subject: ${subject}`);
+    const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : html;
+    console.log(`[EMAIL-TEST] to=${to} subject=${subject} body=${safeBody}`);
     return { success: true, dev: true };
   }
 

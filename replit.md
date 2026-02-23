@@ -187,3 +187,13 @@ Migration SQL in /supabase/migrations/ (run manually):
   - RideChecker dashboard (/ridechecker/dashboard) with job stats, earnings widgets, referral section
   - RideChecker portal routes: /ridechecker/dashboard, /ridechecker/jobs, /ridechecker/signup
   - Middleware updated: /ridechecker routes protected for ridechecker/ridechecker_active roles, /ridechecker/signup is public
+- SMS-First Payment Link System (Feb 2026):
+  - Migration 005_payment_link_columns.sql: payment_link_token, payment_link_sent_to/channel/at, stripe_session_id, payment_status, paid_at, base_price, final_price, discount_amount, tracking_token, click tracking columns
+  - Order creation auto-sends payment link via SMS (primary) or email (fallback)
+  - SMS/email adapters: graceful fallback when SMS fails (tries email), test mode logging when credentials missing
+  - Production safety: token URLs never logged or returned in production (NODE_ENV check)
+  - DEBUG_PAYMENT_LINKS=true env var returns payment_url in API responses (dev only, guarded by NODE_ENV !== production)
+  - Token-gated /pay/[orderId] page with Stripe Checkout session creation
+  - 3 payment APIs: send-payment-link, pay/validate, pay/create-session
+  - Stripe webhook handles checkout.session.completed (sets payment_status=paid, paid_at, ops_status=payment_received)
+  - Middleware: /pay/ prefix added to public routes

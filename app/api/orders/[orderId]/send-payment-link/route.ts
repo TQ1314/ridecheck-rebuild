@@ -40,12 +40,25 @@ export async function POST(
     let sentTo = phone;
 
     if (phone) {
-      await sendSMS({
+      const smsResult = await sendSMS({
         to: phone,
         body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
       });
-      channel = "sms";
-      sentTo = phone;
+      if (smsResult.success) {
+        channel = "sms";
+        sentTo = phone;
+      } else if (email) {
+        const price = Number(order.final_price || 0);
+        const emailResult = await sendEmail({
+          to: email,
+          subject: "RideCheck payment link for your inspection",
+          html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${price}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
+        });
+        if (emailResult.success) {
+          channel = "email";
+          sentTo = email;
+        }
+      }
     } else if (email) {
       const price = Number(order.final_price || 0);
       await sendEmail({
@@ -66,6 +79,18 @@ export async function POST(
         payment_link_sent_at: new Date().toISOString(),
       })
       .eq("id", params.orderId);
+
+    const isDebug =
+      process.env.DEBUG_PAYMENT_LINKS === "true" &&
+      process.env.NODE_ENV !== "production";
+
+    if (isDebug) {
+      return NextResponse.json({
+        ok: true,
+        channel,
+        debug: { payment_url: payUrl, channel },
+      });
+    }
 
     return NextResponse.json({ ok: true, channel });
   } catch (err: any) {

@@ -135,19 +135,29 @@ export async function POST(req: NextRequest) {
     try {
       if (buyer_phone) {
         const { sendSMS } = await import("@/lib/sms/twilio");
-        await sendSMS({
+        const smsResult = await sendSMS({
           to: buyer_phone,
           body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
         });
-        paymentChannel = "sms";
+        if (smsResult.success) {
+          paymentChannel = "sms";
+        } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+          const { sendEmail } = await import("@/lib/email/resend");
+          const emailResult = await sendEmail({
+            to: buyer_email,
+            subject: "RideCheck payment link for your inspection",
+            html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${finalPrice}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
+          });
+          if (emailResult.success) paymentChannel = "email";
+        }
       } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
         const { sendEmail } = await import("@/lib/email/resend");
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: buyer_email,
           subject: "RideCheck payment link for your inspection",
           html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${finalPrice}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
         });
-        paymentChannel = "email";
+        if (emailResult.success) paymentChannel = "email";
       }
 
       if (paymentChannel) {
@@ -164,7 +174,11 @@ export async function POST(req: NextRequest) {
       console.error("[Payment Link Send Error]", linkErr);
     }
 
-    return NextResponse.json({
+    const isDebug =
+      process.env.DEBUG_PAYMENT_LINKS === "true" &&
+      process.env.NODE_ENV !== "production";
+
+    const response: Record<string, any> = {
       order,
       pricing: {
         basePrice,
@@ -173,7 +187,13 @@ export async function POST(req: NextRequest) {
       },
       track_url,
       payment_channel: paymentChannel,
-    });
+    };
+
+    if (isDebug) {
+      response.debug = { payment_url: payUrl, channel: paymentChannel || "none" };
+    }
+
+    return NextResponse.json(response);
   } catch (err: any) {
     console.error("[Order Create Error]", err);
     return NextResponse.json(

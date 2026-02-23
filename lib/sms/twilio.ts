@@ -24,7 +24,8 @@ export async function sendSMS({
   const client = getTwilioClient();
   const from = process.env.TWILIO_PHONE_NUMBER;
   if (!client || !from) {
-    console.log(`[DEV SMS] To: ${to} | Body: ${body}`);
+    const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : body;
+    console.log(`[SMS-TEST] to=${to} body=${safeBody}`);
     return { success: true, dev: true };
   }
   try {

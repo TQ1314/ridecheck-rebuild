@@ -49,3 +49,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_stripe:1.0.0"]
+
+[userenv]
+
+[userenv.development]
+DEBUG_PAYMENT_LINKS = "true"
