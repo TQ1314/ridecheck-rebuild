@@ -1,3 +1,16 @@
+What to add (SAFE, won’t break booking/order flow)
+1) Keep your helper EXACTLY as-is
+
+Do not change the file you pasted.
+
+2) Create a NEW file at project root: middleware.ts
+
+In Replit: click the file tree root → New file → name it exactly:
+
+middleware.ts (same level as app/, package.json)
+
+Paste this:
+
 // middleware.ts (ROOT)
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareSupabaseClient } from "@/lib/supabase/middleware";
@@ -12,13 +25,8 @@ const PUBLIC_ROUTES = [
   "/auth/login",
   "/auth/register",
   "/auth/callback",
-  "/auth/forgot-password",
-  "/auth/reset-password",
   "/before-you-buy",
-  "/ridechecker/signup",
 ];
-
-const INVITE_PREFIX = "/invite/";
 
 const SKIP_PREFIXES = ["/_next", "/api", "/favicon", "/images", "/fonts"];
 
@@ -37,11 +45,11 @@ const STAFF_ROLES = [
 ];
 
 function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX);
+  return PUBLIC_ROUTES.includes(pathname);
 }
 
 function isStaticOrInternal(pathname: string) {
-  if (pathname.includes(".")) return true;
+  if (pathname.includes(".")) return true; // robots.txt, sitemap.xml, etc.
   return SKIP_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
@@ -61,8 +69,10 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  // Public pages never require auth
   if (isPublic(pathname)) return res;
 
+  // Lock staff routes hard (prevents buyers clicking "Go to Dashboard")
   if (isStaffRoute(pathname)) {
     if (!session) {
       const url = new URL("/auth/login", req.url);
@@ -77,6 +87,7 @@ export async function middleware(req: NextRequest) {
       .eq("id", session.user.id)
       .maybeSingle();
 
+    // If profile can't be read OR missing, treat as not authorized for staff routes
     if (error || !profile || !profile.is_active) {
       return NextResponse.redirect(new URL("/", req.url));
     }
@@ -85,40 +96,12 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
-      if (["ridechecker", "ridechecker_active"].includes(profile.role)) {
-        return NextResponse.redirect(new URL("/ridechecker/dashboard", req.url));
-      }
-    }
-
     return res;
   }
 
-  if (pathname.startsWith("/ridechecker/") && pathname !== "/ridechecker/signup") {
-    if (!session) {
-      const url = new URL("/auth/login", req.url);
-      url.searchParams.set("redirect", `${pathname}${search || ""}`);
-      url.searchParams.set("error", "login_required");
-      return NextResponse.redirect(url);
-    }
-
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role, is_active")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (error || !profile || !profile.is_active) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    if (!["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    return res;
-  }
-
+  // Non-staff protected routes:
+  // If you want some authenticated buyer-only area later, you can handle it here.
+  // For now, keep it simple: require auth for anything not public.
   if (!session) {
     const url = new URL("/auth/login", req.url);
     url.searchParams.set("redirect", `${pathname}${search || ""}`);
@@ -131,3 +114,16 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
+What this fixes immediately
+
+✅ Buyers can’t access admin/staff backend by clicking “Go to Dashboard”
+✅ /admin and /dashboard require:
+
+a logged-in session
+
+an active profile
+
+a staff role
+
+✅ It does not touch your booking/order endpoints (/book, /api/...)
+✅ It won’t break paste-the-link flow because /book is in PUBLIC_ROUTES

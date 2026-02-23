@@ -22,13 +22,11 @@ export const createOrderSchema = z.object({
   package: z.enum(["standard", "premium", "comprehensive", "plus"]),
   preferred_date: z.string().nullable().optional(),
 
-  // optional extras (only used if your table has them later)
   inspection_address: z.string().optional(),
   inspection_time_window: z.string().optional(),
   notes_to_inspector: z.string().nullable().optional(),
   vehicle_trim: z.string().nullable().optional(),
 
-  // kept for API compatibility, but we DO NOT store it in DB right now
   booking_method: z.string().optional(),
   preferred_language: z.string().optional(),
   listing_platform: z.string().nullable().optional(),
@@ -57,65 +55,51 @@ export async function POST(req: NextRequest) {
 
     const data = parsed.data;
 
-    // Get logged-in session (if any)
     const supabase = createRouteHandlerSupabaseClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    // Buyer contact (matches your table: buyer_email, buyer_phone)
-    // If you have a separate auth flow, session.user.email will be populated.
     const buyer_email = safeString(session?.user?.email, "guest@ridecheck.com");
-    const buyer_phone: string | null = null; // set later if you actually collect it in UI
+    const buyer_phone: string | null = null;
 
-    // Price computed for UI only (NOT stored, because those columns don't exist yet)
     const { basePrice, finalPrice, discountAmount } = getPrice(
       data.package as PackageType,
       data.booking_type as BookingType
     );
 
-    /**
-     * IMPORTANT:
-     * Only include columns that exist in your Supabase `orders` table.
-     * From your screenshots we can safely rely on:
-     *  - buyer_email, buyer_phone
-     *  - booking_type, status
-     *  - listing_url, vehicle_year
-     * and your table likely has the rest of these order basics.
-     *
-     * If ANY of these are missing, Supabase will throw PGRST204 again.
-     * If that happens, remove the missing one and retry.
-     */
+    // 🔐 Generate tracking token for public status page
+    const tracking_token = crypto.randomUUID();
+
     const insertPayload: Record<string, any> = {
       buyer_email,
       buyer_phone,
 
-      booking_type: data.booking_type, // table shows booking_type
-      status: "submitted", // table shows status
+      booking_type: data.booking_type,
+      status: "submitted",
 
-      // vehicle
-      vehicle_year: data.vehicle_year, // table shows vehicle_year
+      vehicle_year: data.vehicle_year,
       vehicle_make: data.vehicle_make,
       vehicle_model: data.vehicle_model,
       vehicle_location: data.vehicle_location,
       vehicle_description: data.vehicle_description ?? null,
 
-      // listing + seller
-      listing_url: data.listing_url ?? null, // table shows listing_url
+      listing_url: data.listing_url ?? null,
       seller_name: data.seller_name ?? null,
       seller_phone: data.seller_phone ?? null,
 
-      // package / date (very likely in your table)
       package: data.package,
       preferred_date: data.preferred_date ?? null,
+
+      // 👇 NEW COLUMN (must exist in DB)
+      tracking_token,
     };
 
-    // Insert order
     const { data: order, error } = await supabaseAdmin
-    .from("orders")
-    .insert(payload)
-    .select("id, order_number, created_at")
-    .single();
+      .from("orders")
+      .insert(insertPayload)
+      .select("id, order_number, created_at")
+      .single();
 
     if (error) {
       console.error("[Order Create Error]", error);
@@ -133,7 +117,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return order + computed pricing (not stored)
+    const track_url = `/track/${order.id}?t=${tracking_token}`;
+
     return NextResponse.json({
       order,
       pricing: {
@@ -141,6 +126,7 @@ export async function POST(req: NextRequest) {
         finalPrice,
         discountAmount,
       },
+      track_url, // 👈 front-end will use this instead of dashboard
     });
   } catch (err: any) {
     console.error("[Order Create Error]", err);
@@ -150,4 +136,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

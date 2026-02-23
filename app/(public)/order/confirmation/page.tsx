@@ -17,6 +17,7 @@ import { t, type Language } from "@/lib/i18n/translations";
 
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
+
   const orderId = searchParams.get("order_id");
   const method = searchParams.get("method") || "concierge";
   const initialLang = (searchParams.get("lang") || "en") as Language;
@@ -26,12 +27,21 @@ export default function OrderConfirmationPage() {
 
   const isBuyerArranged = method === "buyer_arranged";
 
+  // ✅ Buyer-safe tracking URL (Option 2)
+  // Priority:
+  // 1) explicit ?track=... (if you ever pass it)
+  // 2) fallback to /track/{orderId}
+  const trackUrl =
+    searchParams.get("track") ||
+    (orderId ? `/track/${encodeURIComponent(orderId)}` : null);
+
   const handleCopyScript = () => {
     const script = t("confirm.sellerScript.body", lang, {
       sellerName: "the seller",
       address: "the scheduled location",
       timeWindow: "the agreed time",
     });
+
     navigator.clipboard.writeText(script).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -44,10 +54,7 @@ export default function OrderConfirmationPage() {
         <div className="flex justify-end mb-4">
           <div className="flex items-center gap-1">
             <Globe className="h-4 w-4 text-muted-foreground" />
-            <Select
-              value={lang}
-              onValueChange={(v) => setLang(v as Language)}
-            >
+            <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
               <SelectTrigger
                 className="w-20"
                 data-testid="select-language-confirm"
@@ -67,9 +74,11 @@ export default function OrderConfirmationPage() {
             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mx-auto mb-6">
               <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
+
             <h1 className="text-2xl font-bold mb-2">
               {t("confirm.title", lang)}
             </h1>
+
             {orderId && (
               <p
                 className="font-mono text-sm text-muted-foreground mb-4"
@@ -78,27 +87,32 @@ export default function OrderConfirmationPage() {
                 Order ID: {orderId}
               </p>
             )}
+
             <p className="text-muted-foreground mb-4">
               {t("confirm.subtitle", lang)}
             </p>
+
             <p className="text-sm text-muted-foreground mb-8">
               {t("confirm.email", lang)}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {orderId && (
-                <Link href={`/orders/${orderId}`}>
+                <Link href={`/orders/${encodeURIComponent(orderId)}`}>
                   <Button data-testid="button-view-order">
                     {t("confirm.viewOrder", lang)}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
               )}
-              <Link href="/dashboard">
-                <Button variant="outline" data-testid="button-go-dashboard">
-                  {t("confirm.dashboard", lang)}
-                </Button>
-              </Link>
+
+              {trackUrl && (
+                <Link href={trackUrl}>
+                  <Button variant="outline" data-testid="button-track-order">
+                    Track Order
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -111,6 +125,7 @@ export default function OrderConfirmationPage() {
                 : t("confirm.nextSteps.concierge.title", lang)}
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             <ol className="space-y-3 text-sm list-decimal list-inside">
               {isBuyerArranged ? (
@@ -152,6 +167,7 @@ export default function OrderConfirmationPage() {
                 {t("confirm.sellerScript.title", lang)}
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <div className="bg-muted/50 rounded-md p-4 text-sm text-muted-foreground mb-4">
                 {t("confirm.sellerScript.body", lang, {
@@ -160,6 +176,7 @@ export default function OrderConfirmationPage() {
                   timeWindow: "the agreed time",
                 })}
               </div>
+
               <Button
                 variant="outline"
                 size="sm"
