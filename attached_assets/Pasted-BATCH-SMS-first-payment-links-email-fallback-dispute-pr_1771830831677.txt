@@ -1,0 +1,111 @@
+BATCH: SMS-first payment links (email fallback) + dispute-proof logging
+
+Goal:
+- Order is created WITHOUT payment.
+- Buyer receives a unique Stripe payment link via SMS first; if SMS not possible, send via email.
+- Payment can ONLY be completed through that link (token-gated).
+- Webhook marks order paid and triggers ops readiness.
+
+Requirements:
+- Use Twilio for SMS, Resend for email.
+- Must not expose admin/dashboard links to buyers.
+- Must compile and pass basic end-to-end test.
+
+1) Database
+Check if these columns exist on `orders`. If missing, add them (Supabase migration SQL file or documented SQL to run):
+
+- buyer_phone text (if missing)
+- buyer_email text (if missing)
+- payment_status text default 'unpaid'
+- payment_link_token text
+- payment_link_sent_to text
+- payment_link_sent_channel text  (values: 'sms' | 'email')
+- payment_link_sent_at timestamptz
+- payment_link_click_ip text
+- payment_link_click_ua text
+- stripe_session_id text
+- paid_at timestamptz
+
+2) Ensure order creation captures buyer contact
+Update the buyer order create flow (booking UI + API) so we collect:
+- buyer_phone (required for SMS-first, validate basic format)
+- buyer_email (optional but recommended)
+Store them on the order record.
+
+3) Create API: POST /api/orders/[orderId]/send-payment-link
+Behavior:
+- Auth: buyer does not need auth; but request must include orderId and a server-side check that the order exists and is unpaid.
+- Generate secure random token (crypto.randomUUID() or 32+ bytes random).
+- Save token + sent_to + channel + sent_at into order.
+- Construct payment page URL:
+  ${NEXT_PUBLIC_APP_URL}/pay/${orderId}?t=${token}
+
+Channel logic:
+- If buyer_phone present -> send SMS via Twilio (primary)
+- Else if buyer_email present -> send email via Resend (fallback)
+- Else -> return 400 "No contact method"
+
+Message content (SMS):
+"RideCheck: Confirm your inspection for {YEAR} {MAKE} {MODEL}. Pay securely here: {URL}"
+
+Email content:
+Subject: "RideCheck payment link for your inspection"
+Body includes vehicle summary + price + link.
+
+Return JSON: { ok: true, channel: "sms"|"email" }
+
+4) Create page: app/(public)/pay/[orderId]/page.tsx
+Token-gated:
+- Read query param t
+- If missing: show “Payment link required. Please use the link we sent you.”
+- Call API GET /api/pay/validate?orderId=...&t=...
+- If valid: show button “Pay Now” that calls POST /api/pay/create-session
+- Log click IP/UA server-side when validating (store payment_link_click_ip/ua if empty)
+
+5) Create API: GET /api/pay/validate
+- Validate token matches orders.payment_link_token
+- Ensure payment_status is unpaid/pending
+- Return safe order summary + computed price (do not leak seller info)
+Return { valid: true, order: {id, vehicle_year, vehicle_make, vehicle_model, booking_type, package}, price }
+
+6) Create API: POST /api/pay/create-session
+- Input: { orderId, token }
+- Validate token matches orders.payment_link_token
+- Compute price using existing pricing util
+- Create Stripe Checkout Session
+  - client_reference_id = orderId
+  - metadata: { orderId, payment_link_token }
+  - success_url should redirect back to a public confirmation page and MUST preserve tracking/pay token info if needed.
+  - cancel_url returns to /pay/[orderId]?t=token
+- Save stripe_session_id on order
+- Set payment_status='pending'
+- Return { url: session.url }
+
+7) Stripe webhook: POST /api/webhooks/stripe
+- Verify STRIPE_WEBHOOK_SECRET
+- On checkout.session.completed:
+  - read metadata.orderId
+  - update orders:
+    payment_status='paid'
+    paid_at=now()
+    status='paid_confirmed' (or your existing paid state)
+- (Optional) On payment_intent.payment_failed set payment_status='failed'
+
+8) Admin UI
+- Admin dashboard “Recent Orders” must show newest first.
+- Order Queue keeps FIFO (ops priority).
+- Payment column reads payment_status (unpaid/pending/paid).
+- Revenue only sums payment_status='paid'.
+
+9) End-to-end test (must run and report results)
+- Create an order with buyer_phone + buyer_email
+- Call send-payment-link endpoint
+- Confirm token-gated pay page blocks without token and works with token
+- Create Stripe session and confirm redirect URL generated (no need to actually charge if in test mode)
+- Simulate webhook event if possible OR at least verify handler updates given a mock payload.
+
+Output:
+- List files changed
+- Any SQL needed
+- How to test manually in browser
+- Confirm no buyer path links to /dashboard or /admin

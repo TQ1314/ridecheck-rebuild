@@ -97,6 +97,13 @@ export interface Order {
   payment_link_url?: string;
   buyer_email?: string;
   buyer_phone?: string;
+  payment_link_token?: string;
+  payment_link_sent_to?: string;
+  payment_link_sent_channel?: string;
+  payment_link_sent_at?: string;
+  payment_link_click_ip?: string;
+  payment_link_click_ua?: string;
+  stripe_session_id?: string;
   report_status?: string;
   report_storage_path?: string;
   report_uploaded_at?: string;
