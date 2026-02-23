@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry, Inspector } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
+import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { Button } from "@/components/ui/button";
 import { formatOrderCode } from "@/lib/utils/format";
@@ -29,7 +30,6 @@ import {
   ArrowLeft,
   RefreshCw,
   UserPlus,
-  PhoneCall,
   CreditCard,
   Copy,
   Clock,
@@ -197,19 +197,6 @@ export default function AdminOrderDetailPage() {
     }
     toast({ title: "RideChecker assigned" });
     setAssignRcOpen(false);
-    loadData();
-  };
-
-  const handleContactSeller = async () => {
-    const res = await fetch(`/api/admin/orders/${orderId}/contact-seller`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      toast({ title: "Error", description: err.error, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Seller contact logged" });
     loadData();
   };
 
@@ -450,15 +437,6 @@ export default function AdminOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
-        <Button
-          variant="outline"
-          onClick={handleContactSeller}
-          data-testid="button-contact-seller"
-        >
-          <PhoneCall className="h-4 w-4 mr-2" />
-          Log Seller Contact
-        </Button>
-
         {order.booking_type === "concierge" && order.payment_status !== "paid" && (
           <Button
             variant="outline"
@@ -520,6 +498,8 @@ export default function AdminOrderDetailPage() {
       </div>
 
       <OrderDetailPanel order={order} activities={activities} />
+
+      <SellerContactPanel order={order} onRefresh={loadData} />
 
       {events.length > 0 && (
         <Card>

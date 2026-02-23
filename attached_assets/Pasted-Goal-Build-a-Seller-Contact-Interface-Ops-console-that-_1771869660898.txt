@@ -1,0 +1,125 @@
+Goal: Build a Seller Contact Interface (Ops console) that logs seller outreach, supports platform-specific realities (Craigslist vs Facebook Marketplace), and supports a discount flow when the BUYER contacts the seller and makes arrangements (“self-arranged”). Do NOT break admin/staff routes. Keep changes small and contained.
+
+Context:
+- Current timeline only shows “Seller Contacted” without message content, channel, attempts, or outcomes.
+- Ops needs visibility into exactly what was sent, on what channel, when, and what happened.
+- Facebook Marketplace messaging must be manual (copy/paste). No automated messaging APIs.
+- Craigslist can be email/text/call depending on listing.
+- Existing booking types include Concierge vs Self-Arranged (buyers who coordinate seller contact get a discount).
+- Payment link to buyer is separate and already exists.
+
+Core requirements:
+1) Seller Contact Interface (“Seller Console”) in Admin/ Ops:
+   - Location: in the Admin Order Detail page (admin/orders/[orderId]) add a panel named “Seller Contact”
+   - Must show:
+     a) Seller contact method / platform detected: 'facebook' | 'craigslist' | 'dealer' | 'other'
+     b) Attempt log: Attempt #, channel, destination, message preview, created_at, status, and who logged it
+     c) Outcome state: not_started | attempting | accepted | declined | no_response | invalid_contact
+
+2) Platform-safe behavior:
+   A) Facebook Marketplace:
+      - No auto sending. Provide scripts + Copy buttons.
+      - Channels allowed for FB:
+         - 'fb_message' (manual) [copy text]
+         - 'call' (manual) if phone exists
+         - 'sms' (manual) only if number exists (Ops sends from phone; system logs it)
+         - 'email' (manual) only if email exists
+      - For FB, system should default to 'fb_message' with a short human script.
+      - Provide “Open Listing” button to the listing_url so Ops can message in FB manually.
+   B) Craigslist:
+      - Often email relay exists; can be manual email or call/text if number exists.
+      - Allow channels: 'email', 'sms', 'call'
+      - Provide script templates per channel.
+
+3) Buyer Self-Arranged discount logic:
+   - If booking_type/self-arranged is selected:
+     a) Seller Contact panel should switch to “Buyer Coordination Mode”
+     b) Show the buyer instructions + a copyable message the BUYER can send to seller
+     c) Provide a field for Ops to log “Buyer confirmed seller agreed to inspection” (checkbox + notes)
+     d) Ops should not be required to do 3 attempts; instead log “Buyer Contacted Seller” events.
+   - If booking_type/concierge:
+     a) Ops must do at least 3 attempts before marking no_response
+     b) System should show “Attempt 1 / 2 / 3” buttons and enforce attempt_number increments
+     c) Attempt templates should include inspection date window + who pays (buyer) + what RideCheck needs (seller address + time)
+
+4) Data model changes (Supabase):
+   - Create table seller_contact_attempts with:
+     id uuid pk default gen_random_uuid()
+     order_id uuid fk -> orders.id on delete cascade
+     attempt_number int not null
+     channel text not null  -- 'fb_message'|'sms'|'call'|'email'|'buyer_message'
+     destination text null  -- phone/email or 'FB Messenger'
+     message_template_key text null
+     message_body text null
+     status text not null default 'sent'  -- 'draft'|'sent'|'failed'|'no_answer'|'replied'
+     error text null
+     created_by uuid null  -- profiles.id if available
+     created_at timestamptz default now()
+
+   - Add columns to orders if missing:
+     seller_platform text default 'other'  -- 'facebook'|'craigslist'|'dealer'|'other'
+     seller_contact_status text default 'not_started'
+     seller_contact_attempts_count int default 0
+     seller_last_contact_at timestamptz null
+     seller_outcome_notes text null
+
+   - Add/confirm contact fields (if not present):
+     seller_name text null
+     seller_phone text null
+     seller_email text null
+
+5) API routes (admin-protected):
+   - POST /api/admin/orders/[orderId]/seller-contact/attempt
+     Body: { channel, destination?, message_template_key?, message_body?, status? }
+     Behavior:
+       - validates order exists and caller is admin/ops role (reuse existing auth pattern)
+       - attempt_number = (max existing) + 1 automatically unless channel == 'buyer_message'
+       - inserts row, updates orders.seller_contact_attempts_count and seller_last_contact_at
+       - if status indicates sent, also add order event in timeline: “Seller contact attempt #X logged”
+   - POST /api/admin/orders/[orderId]/seller-contact/outcome
+     Body: { outcome: 'accepted'|'declined'|'no_response'|'invalid_contact', notes? }
+     Behavior:
+       - updates orders.seller_contact_status + notes
+       - adds order timeline event: “Seller outcome: accepted/declined/no_response/etc.”
+
+6) UI behavior details:
+   - “New Attempt” modal:
+     - choose channel (defaults based on platform)
+     - shows template (editable)
+     - includes Copy button (especially for FB)
+     - “Log Sent” button (writes attempt)
+     - “Log Failed” button (writes attempt with status failed + error)
+   - Buttons:
+     - “Attempt #1”, “Attempt #2”, “Attempt #3” quick actions
+     - “Mark Accepted”, “Mark Declined”, “Mark No Response”, “Invalid Contact”
+   - For concierge: after Attempt #3, show a helper note: “You can now mark No Response”
+   - Must NOT affect buyer-facing pages.
+
+7) Templates (simple, scripted, editable):
+   - FB message template (short, human, non-spammy)
+   - Craigslist email template (slightly longer)
+   - Call script bullet points
+   - Buyer self-arranged template (buyer sends)
+
+8) Migrations:
+   - Create a new migration SQL under supabase/migrations/006_seller_contact_attempts.sql
+   - Include CREATE TABLE + ALTER TABLE statements guarded with IF NOT EXISTS.
+   - Provide instructions in docs for running it manually (since Supabase migrations are manual here).
+
+9) Documentation:
+   - Add docs/seller-contact-workflow.md explaining:
+     - concierge vs self-arranged
+     - facebook manual messaging approach
+     - 3-attempt policy
+     - how Ops Lead reviews attempts and outcomes
+
+10) Safety:
+   - Do NOT implement automated Facebook messaging.
+   - Only logs and copy scripts.
+   - Do not change middleware except if needed to keep admin routes protected (prefer no changes).
+
+Deliverables:
+- List all files changed with 1-line reason each
+- Confirm exact admin page path where Seller Contact panel appears
+- Provide screenshots instructions: where to click to log attempt and mark outcome
+- Run TypeScript check and build; fix import/path issues if any

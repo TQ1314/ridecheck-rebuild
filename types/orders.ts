@@ -113,6 +113,28 @@ export interface Order {
   qa_reviewed_at?: string;
   inspector_status?: string;
   inspector_notes?: string;
+  seller_email?: string;
+  seller_platform?: string;
+  seller_contact_status?: string;
+  seller_outcome_notes?: string;
+}
+
+export type SellerContactChannel = 'fb_message' | 'call' | 'sms' | 'email' | 'buyer_message';
+export type SellerContactStatus = 'not_started' | 'attempting' | 'accepted' | 'declined' | 'no_response' | 'invalid_contact';
+export type SellerPlatform = 'facebook' | 'craigslist' | 'dealer' | 'other';
+
+export interface SellerContactAttempt {
+  id: string;
+  order_id: string;
+  attempt_number: number;
+  channel: SellerContactChannel;
+  destination: string | null;
+  message_template_key: string | null;
+  message_body: string | null;
+  status: string;
+  error: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Profile {
