@@ -94,6 +94,7 @@ The user prefers clear and concise communication. They value iterative developme
 - 004_ridechecker_features.sql: ridechecker_earnings, referral_codes, referrals tables + profile columns
 - 005_payment_link_columns.sql: payment_link_token, payment_link_sent_to/channel/at, stripe_session_id, payment_status, paid_at, base_price, final_price, discount_amount, tracking_token, click tracking columns
 - 006_seller_contact_attempts.sql: seller_contact_attempts table + order columns (seller_platform, seller_contact_status, seller_outcome_notes, seller_email)
+- 007_service_area.sql: service_zip, service_county, service_state columns on orders + indexes
 
 ## Feature Implementation History
 - Phase 1-4: Core booking, auth, admin, ops
@@ -119,3 +120,14 @@ The user prefers clear and concise communication. They value iterative developme
   - Facebook: manual messaging only (copy + paste), no automation
   - SellerContactPanel component in admin order detail page
   - Documentation: docs/seller-contact-workflow.md
+- Pilot ZIP Restriction (Feb 2026):
+  - Migration 007_service_area.sql: service_zip, service_county, service_state columns + indexes
+  - ZIP allowlist (lib/geo/lakeCountyZips.ts): Lake, McHenry, Cook county ZIPs
+  - County resolver (lib/geo/resolveCounty.ts): resolveCounty, getServiceAreaFromZip, checkPilotPhase
+  - Pilot config: lake_cap=50, mchenry_cap=50, pilot_total_cap=200
+  - Phase sequencing: Lake only → Lake+McHenry (after 50) → Lake+McHenry+Cook (after 100) → capacity (200)
+  - API enforcement: service_zip required on order creation, 409 for blocked ZIPs
+  - UI enforcement: ZIP field on booking step 1, disabled Next until valid Lake County ZIP
+  - Global pilot banner on all public pages: "Now serving: Lake County, IL only"
+  - Booking page banner: "Pilot Mode: Lake County, IL only"
+  - Test documentation: docs/pilot-zip-test.md

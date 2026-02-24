@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPrice, type PackageType, type BookingType } from "@/lib/utils/pricing";
+import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -34,6 +35,8 @@ export const createOrderSchema = z.object({
   preferred_language: z.string().optional(),
   listing_platform: z.string().nullable().optional(),
   package_tier: z.string().optional(),
+
+  service_zip: z.string().regex(/^\d{5}$/, "ZIP must be 5 digits"),
 });
 
 function safeString(v: unknown, fallback = "") {
@@ -57,6 +60,73 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+
+    if (PILOT_CONFIG.enabled) {
+      const county = resolveCounty(data.service_zip);
+
+      if (county === "unknown") {
+        return NextResponse.json(
+          {
+            error: "service_unavailable",
+            message: "RideCheck is currently available only in Lake County, IL during our pilot. We're expanding soon!",
+            allowed_counties: ["lake"],
+            state: "IL",
+          },
+          { status: 409 }
+        );
+      }
+
+      let totalOrders = 0;
+      const countsByCounty: Record<string, number> = {};
+
+      try {
+        const { count: totalCount } = await supabaseAdmin
+          .from("orders")
+          .select("*", { count: "exact", head: true })
+          .neq("status", "cancelled");
+
+        totalOrders = totalCount || 0;
+
+        const { data: countRows } = await supabaseAdmin
+          .from("orders")
+          .select("service_county")
+          .neq("status", "cancelled")
+          .not("service_county", "is", null);
+
+        if (countRows) {
+          for (const row of countRows) {
+            const c = row.service_county as string;
+            countsByCounty[c] = (countsByCounty[c] || 0) + 1;
+          }
+        }
+      } catch {
+        // service_county column may not exist yet — proceed with defaults
+      }
+
+      const phaseResult = checkPilotPhase(county, totalOrders, countsByCounty);
+
+      if (!phaseResult.allowed) {
+        const messages: Record<string, string> = {
+          pilot_capacity_reached: "RideCheck pilot has reached capacity. Join the waitlist for updates!",
+          county_locked: `RideCheck is not yet available in ${county} county. We're rolling out in phases: Lake → McHenry → Cook.`,
+          county_cap_reached: `RideCheck has reached capacity in ${county} county for now. Check back soon!`,
+        };
+
+        return NextResponse.json(
+          {
+            error: phaseResult.error || "service_unavailable",
+            message: messages[phaseResult.error || ""] || "Service unavailable in this area.",
+            allowed_counties: phaseResult.allowedCounties,
+            current_phase: phaseResult.currentPhase,
+            state: "IL",
+            ...(phaseResult.unlocks_after_total_orders !== undefined && {
+              unlocks_after_total_orders: phaseResult.unlocks_after_total_orders,
+            }),
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const supabase = createRouteHandlerSupabaseClient();
     const {
@@ -102,6 +172,20 @@ export async function POST(req: NextRequest) {
       tracking_token,
       payment_link_token,
     };
+
+    try {
+      const { data: colCheck } = await supabaseAdmin
+        .from("orders")
+        .select("service_zip")
+        .limit(0);
+      if (colCheck !== null) {
+        insertPayload.service_zip = data.service_zip;
+        insertPayload.service_county = resolveCounty(data.service_zip);
+        insertPayload.service_state = "IL";
+      }
+    } catch {
+      // service area columns not yet migrated — skip storing them
+    }
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")

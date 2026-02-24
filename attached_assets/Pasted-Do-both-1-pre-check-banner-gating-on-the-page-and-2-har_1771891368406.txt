@@ -1,0 +1,115 @@
+Do both: (1) pre-check banner + gating on the page and (2) hard enforcement on the API (so nobody can bypass it).
+
+Here’s the exact Replit prompt to run (copy/paste):
+
+Replit Prompt (Batch: Location restriction + ZIP input + banner)
+
+Goal: Add ZIP-based service area restriction with a clear “Lake County only” banner before buyers paste a link. Enforce the restriction both in the UI and in the server API. Do not break existing booking flows or admin/staff routes.
+
+1) UI: Add ZIP input + banner on Book page
+
+File: app/(public)/book/page.tsx (or wherever the booking UI lives)
+
+Add a required field Service ZIP Code before “Paste listing link”
+
+Place a banner at top of the page (above everything) that reads:
+
+Now serving: Lake County, IL only
+We’re in pilot mode. Enter your ZIP to confirm availability before booking.
+
+As user types ZIP, run a lightweight validation:
+
+ZIP must be 5 digits
+
+Show status under the field:
+
+✅ “Available in Lake County”
+
+❌ “Not available yet — we’re launching in phases (Lake → McHenry → Cook)”
+
+Disable the “Continue / Paste Link / Submit” action until ZIP validates as available.
+
+2) County detection logic (minimal, no external API)
+
+Implement a simple allowlist approach for pilot:
+
+Create file: lib/geo/lakeCountyZips.ts containing an array of allowed ZIP codes for Lake County IL.
+
+Create helper: lib/geo/resolveCounty.ts:
+
+getServiceAreaFromZip(zip) returns { state:"IL", county:"lake" | "unknown", isAllowed:boolean }
+
+isAllowed is true only if zip is in Lake list
+
+If zip isn’t in list → treat as unavailable.
+
+(We’ll expand to McHenry and Cook later by adding their ZIP lists and sequencing.)
+
+3) API enforcement: block non-allowed ZIPs (hard stop)
+
+File: app/api/orders/create/route.ts
+
+Require a new field in request body: service_zip
+
+On create order:
+
+Validate ZIP format (5 digits)
+
+Resolve county via helper
+
+If not allowed:
+
+return 409 JSON:
+
+{ "error":"service_unavailable", "message":"RideCheck is available only in Lake County, IL during pilot. Join the waitlist.", "allowed_counties":["lake"], "state":"IL" }
+
+Store service_zip and service_county into the orders table if those columns exist.
+
+If columns don’t exist, add migration 007_service_area.sql:
+
+service_zip text
+
+service_county text
+
+service_state text default 'IL'
+
+index on service_zip
+
+4) Show banner globally (optional but recommended)
+
+Add a lightweight banner component in the public layout:
+
+File: app/(public)/layout.tsx (or wherever public layout is)
+
+Banner shown on all public pages (home + book), linking to /book
+
+5) Do not impact admin/staff routes
+
+No middleware changes except: ensure /book remains public.
+
+6) Tests
+
+Add a small doc: docs/pilot-zip-test.md with:
+
+Example allowed ZIP (from the list)
+
+Example blocked ZIP (60000 or 60601)
+
+What UI should show and what API returns
+
+Deliverables:
+
+List files changed
+
+Confirm banner appears before paste-link
+
+Confirm API blocks non-allowed ZIPs with 409
+
+One key detail (so you don’t get burned)
+
+Even if the UI blocks it, the API must block it. Otherwise a user can bypass with curl/Postman and create orders outside Lake County.
+
+If you want the banner copy a bit more “RideCheck voice” (still neutral), use:
+
+Pilot Mode: Lake County, IL only
+We’re rolling out in phases. Confirm availability with your ZIP before booking

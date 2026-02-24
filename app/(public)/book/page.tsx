@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ArrowLeft, ArrowRight, Shield, Globe } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle } from "lucide-react";
 import {
   PACKAGE_INFO,
   PRICING,
@@ -27,6 +27,7 @@ import {
   type BookingType,
 } from "@/lib/utils/pricing";
 import { isBuyerArrangedEnabled } from "@/lib/utils/featureFlags";
+import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
 import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 
@@ -69,6 +70,9 @@ export default function BookPage() {
   const [inspectionTimeWindow, setInspectionTimeWindow] = useState("");
   const [notesToInspector, setNotesToInspector] = useState("");
 
+  const [serviceZip, setServiceZip] = useState("");
+  const [zipStatus, setZipStatus] = useState<"idle" | "valid" | "invalid">("idle");
+
   const [tierSuggestion, setTierSuggestion] = useState<string | null>(null);
 
   const isBuyerArranged = bookingType === "buyer_arranged";
@@ -80,6 +84,17 @@ export default function BookPage() {
     pkg,
     effectiveBookingType,
   );
+
+  const handleZipChange = (zip: string) => {
+    const cleaned = zip.replace(/\D/g, "").slice(0, 5);
+    setServiceZip(cleaned);
+    if (cleaned.length === 5) {
+      const result = getServiceAreaFromZip(cleaned);
+      setZipStatus(result.isAllowed ? "valid" : "invalid");
+    } else {
+      setZipStatus("idle");
+    }
+  };
 
   const handleVehicleChange = (make: string, model: string) => {
     if (make && model) {
@@ -97,7 +112,8 @@ export default function BookPage() {
     if (step === 0) return !!pkg && !!bookingType;
     if (step === 1)
       return (
-        !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation
+        !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation &&
+        zipStatus === "valid"
       );
     if (step === 2) {
       if (!buyerPhone || buyerPhone.length < 7) return false;
@@ -140,6 +156,7 @@ export default function BookPage() {
         preferred_language: lang,
         listing_platform: listingPlatform,
         package_tier: pkg,
+        service_zip: serviceZip,
       };
 
       if (isBuyerArranged) {
@@ -165,6 +182,9 @@ export default function BookPage() {
 
       if (!res.ok) {
         const err = await res.json();
+        if (err.error === "service_unavailable" || err.error === "county_locked" || err.error === "pilot_capacity_reached" || err.error === "county_cap_reached") {
+          throw new Error(err.message || "Service not available in this area");
+        }
         throw new Error(err.error || "Failed to create order");
       }
 
@@ -222,6 +242,19 @@ export default function BookPage() {
   return (
     <div className="py-12 sm:py-20">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 mb-8" data-testid="banner-pilot-mode">
+          <div className="flex items-start gap-3">
+            <MapPin className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
+                Pilot Mode: Lake County, IL only
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 text-xs mt-0.5">
+                We&apos;re rolling out in phases. Confirm availability with your ZIP before booking.
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="flex items-center justify-between mb-10">
           <div className="text-center flex-1">
             <h1 className="text-3xl font-bold mb-2">
@@ -446,6 +479,30 @@ export default function BookPage() {
                 onChange={(e) => setVehicleLocation(e.target.value)}
                 data-testid="input-location"
               />
+            </div>
+            <div>
+              <Label htmlFor="serviceZip">Service ZIP Code *</Label>
+              <Input
+                id="serviceZip"
+                placeholder="60045"
+                value={serviceZip}
+                onChange={(e) => handleZipChange(e.target.value)}
+                maxLength={5}
+                className="max-w-[200px]"
+                data-testid="input-service-zip"
+              />
+              {zipStatus === "valid" && (
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-valid">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Available in Lake County
+                </p>
+              )}
+              {zipStatus === "invalid" && (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-invalid">
+                  <XCircle className="h-4 w-4" />
+                  Not available yet — we&apos;re launching in phases (Lake → McHenry → Cook)
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="description">

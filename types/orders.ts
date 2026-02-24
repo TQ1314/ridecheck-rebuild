@@ -117,6 +117,9 @@ export interface Order {
   seller_platform?: string;
   seller_contact_status?: string;
   seller_outcome_notes?: string;
+  service_zip?: string;
+  service_county?: string;
+  service_state?: string;
 }
 
 export type SellerContactChannel = 'fb_message' | 'call' | 'sms' | 'email' | 'buyer_message';
