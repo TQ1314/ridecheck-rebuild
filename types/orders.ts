@@ -120,6 +120,12 @@ export interface Order {
   service_zip?: string;
   service_county?: string;
   service_state?: string;
+  ops_report_url?: string;
+  ops_summary?: string;
+  ops_severity_overall?: 'minor' | 'moderate' | 'major' | 'safety_critical' | null;
+  assigned_ridechecker_id?: string;
+  report_sent_at?: string;
+  ridechecker_pay?: number;
 }
 
 export type SellerContactChannel = 'fb_message' | 'call' | 'sms' | 'email' | 'buyer_message';
@@ -222,6 +228,69 @@ export interface UserInvite {
   created_by: string | null;
   used_at: string | null;
   created_at: string;
+}
+
+export type AssignmentStatus = 'assigned' | 'accepted' | 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'paid' | 'cancelled';
+export type PayoutStatus = 'pending' | 'released' | 'failed';
+export type BrakeCondition = 'good' | 'fair' | 'poor' | 'unknown';
+export type SeverityLevel = 'minor' | 'moderate' | 'major' | 'safety_critical';
+
+export interface RideCheckerAvailability {
+  id: string;
+  ridechecker_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  max_jobs: number;
+  created_at: string;
+}
+
+export interface RideCheckerJobAssignment {
+  id: string;
+  order_id: string;
+  ridechecker_id: string;
+  status: AssignmentStatus;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  accepted_at: string | null;
+  started_at: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  job_score: number | null;
+  payout_amount: number | null;
+  payout_status: string;
+  paid_at: string | null;
+  payout_method: string | null;
+  payout_notes: string | null;
+  created_at: string;
+}
+
+export interface RideCheckerRawSubmission {
+  id: string;
+  order_id: string;
+  ridechecker_id: string;
+  assignment_id: string | null;
+  checklist_complete: boolean;
+  vin_photo_url: string | null;
+  odometer_photo_url: string | null;
+  under_hood_photo_url: string | null;
+  undercarriage_photo_url: string | null;
+  tire_tread_mm_front_left: number | null;
+  tire_tread_mm_front_right: number | null;
+  tire_tread_mm_rear_left: number | null;
+  tire_tread_mm_rear_right: number | null;
+  brake_condition: BrakeCondition | null;
+  scan_codes: string[] | null;
+  cosmetic_exterior: string | null;
+  interior_condition: string | null;
+  mechanical_issues: string | null;
+  test_drive_notes: string | null;
+  immediate_concerns: string | null;
+  audio_note_url: string | null;
+  extra_photos: string[] | null;
+  submitted_at: string;
 }
 
 export interface BillOfSaleDocument {

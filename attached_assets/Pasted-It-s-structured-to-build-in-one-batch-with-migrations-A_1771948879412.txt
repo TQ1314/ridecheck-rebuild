@@ -1,0 +1,449 @@
+It’s structured to build in one batch, with migrations + API + UI, while keeping changes contained and not breaking admin/staff.
+
+✅ REPLIT PROMPT (COPY/PASTE)
+
+Goal: Build RideChecker structured raw-data submission + Ops report builder workflow + internal scoring + payout release automation, without exposing RideCheckers to buyers and without breaking existing admin/staff routes.
+
+Constraints:
+
+Keep changes small and modular.
+
+Do NOT break admin dashboard, order queue, seller contact workflow, or payment-link flow.
+
+RideCheckers never see buyer identity/contact details.
+
+Buyers never see RideChecker identity/contact details.
+
+Ops (role: ops/admin) sees everything.
+
+RideChecker max daily job capacity cannot exceed 5.
+
+Reports come from Ops; RideCheckers only submit structured raw data.
+
+Internal reviews only (no public ratings).
+
+A) DATABASE CHANGES (Migration 007)
+
+Create supabase/migrations/007_ridechecker_submission_and_scoring.sql and document it in replit.md.
+
+1) RideChecker profile fields (if not already present)
+
+Assume there is a profiles table with role, is_active.
+
+Add columns (if missing):
+
+ridechecker_max_daily_jobs int default 3 check (ridechecker_max_daily_jobs between 1 and 5)
+
+ridechecker_rating numeric default 0
+
+ridechecker_jobs_completed int default 0
+
+ridechecker_jobs_cancelled int default 0
+
+ridechecker_on_time_pct numeric default 0
+
+ridechecker_quality_score numeric default 0
+
+ridechecker_is_approved boolean default false
+
+2) New table: ridechecker_availability
+
+Fields:
+
+id uuid pk default gen_random_uuid()
+
+ridechecker_id uuid references profiles(id)
+
+date date not null
+
+start_time time not null
+
+end_time time not null
+
+max_jobs int not null check (max_jobs between 1 and 5)
+
+created_at timestamptz default now()
+
+Unique constraint: (ridechecker_id, date).
+
+3) New table: ridechecker_job_assignments
+
+This links orders to ridecheckers.
+
+Fields:
+
+id uuid pk default gen_random_uuid()
+
+order_id uuid references orders(id)
+
+ridechecker_id uuid references profiles(id)
+
+status text not null default 'assigned'
+Allowed: assigned | accepted | in_progress | submitted | approved | rejected | paid | cancelled
+
+scheduled_start timestamptz null
+
+scheduled_end timestamptz null
+
+accepted_at timestamptz null
+
+submitted_at timestamptz null
+
+approved_at timestamptz null
+
+rejected_at timestamptz null
+
+payout_amount numeric null
+
+payout_status text default 'pending' (pending|released|failed)
+
+created_at timestamptz default now()
+
+Index on (ridechecker_id, status).
+
+4) New table: ridechecker_raw_submissions
+
+Fields:
+
+id uuid pk default gen_random_uuid()
+
+order_id uuid references orders(id)
+
+ridechecker_id uuid references profiles(id)
+
+checklist_complete boolean default false
+
+vin_photo_url text null
+
+odometer_photo_url text null
+
+under_hood_photo_url text null
+
+undercarriage_photo_url text null
+
+tire_tread_mm_front_left numeric null
+
+tire_tread_mm_front_right numeric null
+
+tire_tread_mm_rear_left numeric null
+
+tire_tread_mm_rear_right numeric null
+
+brake_condition text null (good|fair|poor|unknown)
+
+scan_codes text[] null
+
+cosmetic_exterior text null
+
+interior_condition text null
+
+mechanical_issues text null
+
+test_drive_notes text null
+
+immediate_concerns text null
+
+audio_note_url text null
+
+extra_photos jsonb null (array of urls)
+
+submitted_at timestamptz default now()
+
+Add a CHECK constraint for checklist completeness:
+Checklist complete requires at minimum: vin_photo_url, odometer_photo_url, under_hood_photo_url, undercarriage_photo_url, cosmetic_exterior, interior_condition, mechanical_issues, test_drive_notes, immediate_concerns.
+
+5) Orders table additions
+
+Add (if missing):
+
+report_status text default 'not_started' (not_started|in_review|sent)
+
+report_sent_at timestamptz null
+
+ops_report_url text null
+
+ops_summary text null
+
+ops_severity_overall text null (minor|moderate|major|safety_critical)
+
+assigned_ridechecker_id uuid null
+
+B) ROLE & ACCESS RULES
+
+Implement server-side checks in API routes (do not rely only on UI):
+
+ops/admin can read/write everything.
+
+ridechecker can:
+
+view ONLY their own assignments + raw submission forms for those assignments
+
+update availability for themselves
+
+submit raw submissions ONLY for their own assigned orders
+
+cannot view buyer phone/email, payment details, or seller contact details
+
+If you use Supabase RLS, keep it minimal; enforce access in API routes for now.
+
+C) API ROUTES (Small + Secure)
+
+Create these routes:
+
+1) RideChecker availability
+
+GET /api/ridechecker/availability
+
+POST /api/ridechecker/availability (create/update for a date)
+
+2) RideChecker assignments
+
+GET /api/ridechecker/jobs
+Returns assigned jobs for that ridechecker only.
+Fields returned must exclude buyer info.
+
+POST /api/ridechecker/jobs/[assignmentId]/accept
+
+POST /api/ridechecker/jobs/[assignmentId]/start
+
+POST /api/ridechecker/jobs/[assignmentId]/submit
+This should:
+
+validate checklist
+
+write to ridechecker_raw_submissions
+
+set assignment status -> submitted
+
+record submitted_at
+
+3) Ops report builder
+
+GET /api/ops/orders/[orderId]/raw-submission
+
+POST /api/ops/orders/[orderId]/report/save
+Payload:
+
+ops_severity_overall
+
+ops_summary
+
+ops_report_url (optional, can be placeholder for now)
+
+issue list array (optional)
+
+POST /api/ops/orders/[orderId]/report/send
+Marks:
+
+orders.report_status = sent
+
+orders.report_sent_at = now()
+(Actual email sending can be stubbed if not implemented; but keep hooks ready.)
+
+4) Internal scoring + payout release (Ops only)
+
+POST /api/ops/orders/[orderId]/approve-submission
+This should:
+
+set assignment status -> approved
+
+set approved_at = now()
+
+compute score and update ridechecker stats
+
+trigger payout release logic (see section F)
+
+POST /api/ops/orders/[orderId]/reject-submission
+Sets status -> rejected and stores reason (add reason column if needed).
+
+D) UI
+1) RideChecker Web App Dashboard
+
+Create route: /ridechecker
+
+Tabs:
+
+Availability
+
+My Jobs (Assigned/Accepted/In progress/Submitted)
+
+Earnings (summary)
+
+Kudos (internal notes / placeholder)
+
+Training (static links / placeholder)
+
+Must be mobile-friendly.
+
+When clicking a job:
+
+Show job info that does NOT reveal buyer identity:
+
+vehicle year/make/model
+
+seller meeting location (ok)
+
+inspection type
+
+scheduled time
+
+“Start job”
+
+“Submit Raw Data” opens the structured submission form.
+
+2) Structured Raw Data Submission Form (Critical)
+
+Create route or component used in RideChecker job screen.
+Must include:
+
+Required photo uploads: VIN, odometer, under hood, undercarriage
+
+Tread depth inputs (4)
+
+Brake condition dropdown
+
+Scan codes list input
+
+5 structured text sections (required):
+
+Cosmetic exterior
+
+Interior condition
+
+Mechanical issues
+
+Test drive notes
+
+Immediate concerns
+
+Optional:
+
+Audio note upload
+
+Extra photo uploads
+
+Validation:
+
+If required fields missing, cannot submit.
+
+Show checklist completion indicator.
+
+3) Ops Admin Order Detail: Report Builder Panel
+
+Inside existing admin order detail page, add:
+
+“Raw Submission” viewer panel (photos + fields)
+
+“Ops Report Builder” panel:
+
+overall severity dropdown
+
+summary box
+
+upload/link report URL (can be later)
+
+approve / reject buttons
+
+Approve triggers:
+
+scoring
+
+payout release function
+
+E) INTERNAL SCORING ALGORITHM (Simple but real)
+
+Create lib/ridechecker/scoring.ts.
+
+Score per job (0–100):
+
+Checklist completeness: 40 points (all required present)
+
+Photo count & clarity proxy: 20 points (min 4 required + extras)
+
+Text completeness: 20 points (min length thresholds per section)
+
+Timeliness: 20 points
+
+if submitted within X hours of scheduled_end: full points
+
+else partial
+
+Store the score on the assignment and update ridechecker aggregates:
+
+avg_quality_score = rolling average
+
+jobs_completed++
+
+on_time_pct updated
+
+No public display. Ops can view.
+
+F) PAYOUT RELEASE AUTOMATION (Tied to Approval)
+
+We are NOT paying automatically via Stripe Connect yet unless already built.
+
+Implement payout automation as a safe internal step:
+
+On approval:
+
+Calculate payout_amount based on package and your internal rate (placeholder config).
+
+Set assignment.payout_status = 'pending'
+
+Create a record in a new table ridechecker_payouts OR store in assignments.
+
+If you already have a payments system, integrate; otherwise:
+
+Provide Ops button “Mark Paid” with audit trail.
+
+Create route: POST /api/ops/payouts/[assignmentId]/mark-paid
+
+Store:
+
+paid_at
+
+payout_method (manual)
+
+notes
+
+G) TYPECHECK + BUILD
+
+Run:
+
+npm run typecheck (or npx tsc --noEmit)
+
+npm run build
+
+Fix any path/import errors introduced by new files.
+
+H) DELIVERABLES IN OUTPUT
+
+After implementation, provide:
+
+List of files changed with 1-line reason each
+
+Exact URLs/routes:
+
+ridechecker dashboard route
+
+API paths for availability, jobs, submit, approve, payout
+
+Minimal test plan:
+
+how ops assigns job
+
+ridechecker accepts + submits
+
+ops approves + payout pending
+
+Confirm admin/staff routes unchanged and protected
+
+Proceed now.
+
+Notes (do NOT ignore)
+
+Keep RideChecker pages behind role gate.
+
+RideChecker must not see buyer phone/email/payment.
+
+Ops/admin can see everything.

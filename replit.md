@@ -40,6 +40,13 @@ app/
     inspector/profile/ - Inspector profile
     invites/[token]/  - Invite validation + acceptance
     qa/review/        - QA review queue + detail + approve/revision workflow
+    ridechecker/availability/ - RideChecker availability GET/POST
+    ridechecker/jobs/[assignmentId]/accept|start|submit - Job lifecycle actions
+    ops/orders/[orderId]/raw-submission - View raw submission data
+    ops/orders/[orderId]/report/save|send - Report builder save/send
+    ops/orders/[orderId]/approve-submission - Approve + score + payout
+    ops/orders/[orderId]/reject-submission - Reject with reason
+    ops/payouts/[assignmentId]/mark-paid - Manual payout release
 components/
   layout/             - Navbar, Footer, AppShell (with role-based nav for inspector/qa)
   orders/             - OrderTable, OrderDetailPanel, StatusUpdateDialog, AssignOpsDialog, SellerContactPanel
@@ -95,6 +102,7 @@ The user prefers clear and concise communication. They value iterative developme
 - 005_payment_link_columns.sql: payment_link_token, payment_link_sent_to/channel/at, stripe_session_id, payment_status, paid_at, base_price, final_price, discount_amount, tracking_token, click tracking columns
 - 006_seller_contact_attempts.sql: seller_contact_attempts table + order columns (seller_platform, seller_contact_status, seller_outcome_notes, seller_email)
 - 007_service_area.sql: service_zip, service_county, service_state columns on orders + indexes
+- 008_ridechecker_submission_and_scoring.sql: ridechecker_availability, ridechecker_job_assignments, ridechecker_raw_submissions tables + profile scoring columns + orders ops report columns
 
 ## Feature Implementation History
 - Phase 1-4: Core booking, auth, admin, ops
@@ -131,3 +139,17 @@ The user prefers clear and concise communication. They value iterative developme
   - Global pilot banner on all public pages: "Now serving: Lake County, IL only"
   - Booking page banner: "Pilot Mode: Lake County, IL only"
   - Test documentation: docs/pilot-zip-test.md
+- RideChecker Structured Submission & Ops Report Builder (Feb 2026):
+  - Migration 008: ridechecker_availability, ridechecker_job_assignments, ridechecker_raw_submissions tables
+  - Profile scoring columns: ridechecker_max_daily_jobs, ridechecker_rating, ridechecker_quality_score, ridechecker_on_time_pct, etc.
+  - Orders ops columns: ops_report_url, ops_summary, ops_severity_overall, assigned_ridechecker_id, report_sent_at
+  - RideChecker APIs: /api/ridechecker/availability (GET/POST), /api/ridechecker/jobs/[assignmentId]/accept|start|submit
+  - Ops APIs: /api/ops/orders/[orderId]/raw-submission, report/save, report/send, approve-submission, reject-submission
+  - Payout API: /api/ops/payouts/[assignmentId]/mark-paid
+  - Scoring algorithm (lib/ridechecker/scoring.ts): 0-100 score per job (checklist 40pt, photos 20pt, text 20pt, timeliness 20pt)
+  - Payout rates (lib/ridechecker/payouts.ts): standard=$50, plus=$65, premium=$80, comprehensive=$130
+  - Enhanced RideChecker dashboard with tabs: Availability, My Jobs, Earnings, Kudos, Training
+  - Structured raw data submission form: required photos, tread depth, brake condition, scan codes, 5 text sections
+  - OpsReportBuilderPanel in admin order detail: raw submission viewer, severity/summary report builder, approve/reject, payout management
+  - Privacy: RideCheckers never see buyer identity; buyers never see RideChecker identity
+  - RideChecker max daily capacity: 5 jobs

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry, Inspector } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
+import { OpsReportBuilderPanel } from "@/components/orders/OpsReportBuilderPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { Button } from "@/components/ui/button";
 import { formatOrderCode } from "@/lib/utils/format";
@@ -500,6 +501,8 @@ export default function AdminOrderDetailPage() {
       <OrderDetailPanel order={order} activities={activities} />
 
       <SellerContactPanel order={order} onRefresh={loadData} />
+
+      <OpsReportBuilderPanel order={order} onRefresh={loadData} />
 
       {events.length > 0 && (
         <Card>
