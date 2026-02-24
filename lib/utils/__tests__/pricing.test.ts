@@ -7,67 +7,53 @@ import {
 } from "../pricing";
 
 describe("getPrice", () => {
-  it("returns correct standard concierge price", () => {
+  it("returns correct standard price", () => {
     const result = getPrice("standard", "concierge");
-    expect(result.basePrice).toBe(119);
-    expect(result.finalPrice).toBe(119);
+    expect(result.basePrice).toBe(139);
+    expect(result.finalPrice).toBe(139);
     expect(result.discountAmount).toBe(0);
   });
 
-  it("returns correct standard self_arrange price with 5% discount", () => {
+  it("returns same price for self_arrange (no discount)", () => {
     const result = getPrice("standard", "self_arrange");
-    expect(result.basePrice).toBe(119);
-    expect(result.finalPrice).toBe(113);
-    expect(result.discountAmount).toBe(6);
-  });
-
-  it("returns correct standard buyer_arranged price (same as self_arrange)", () => {
-    const result = getPrice("standard", "buyer_arranged");
-    expect(result.basePrice).toBe(119);
-    expect(result.finalPrice).toBe(113);
-    expect(result.discountAmount).toBe(6);
-  });
-
-  it("returns correct plus concierge price", () => {
-    const result = getPrice("plus", "concierge");
-    expect(result.basePrice).toBe(149);
-    expect(result.finalPrice).toBe(149);
+    expect(result.basePrice).toBe(139);
+    expect(result.finalPrice).toBe(139);
     expect(result.discountAmount).toBe(0);
   });
 
-  it("returns correct plus buyer_arranged price", () => {
-    const result = getPrice("plus", "buyer_arranged");
-    expect(result.basePrice).toBe(149);
-    expect(result.finalPrice).toBe(142);
-    expect(result.discountAmount).toBe(7);
+  it("returns correct plus price", () => {
+    const result = getPrice("plus", "concierge");
+    expect(result.basePrice).toBe(169);
+    expect(result.finalPrice).toBe(169);
+    expect(result.discountAmount).toBe(0);
   });
 
-  it("returns correct comprehensive concierge price", () => {
-    const result = getPrice("comprehensive", "concierge");
+  it("returns correct premium price", () => {
+    const result = getPrice("premium", "concierge");
+    expect(result.basePrice).toBe(189);
+    expect(result.finalPrice).toBe(189);
+    expect(result.discountAmount).toBe(0);
+  });
+
+  it("returns correct exotic price", () => {
+    const result = getPrice("exotic", "concierge");
     expect(result.basePrice).toBe(299);
     expect(result.finalPrice).toBe(299);
     expect(result.discountAmount).toBe(0);
   });
-
-  it("returns correct comprehensive buyer_arranged price", () => {
-    const result = getPrice("comprehensive", "buyer_arranged");
-    expect(result.basePrice).toBe(299);
-    expect(result.finalPrice).toBe(284);
-    expect(result.discountAmount).toBe(15);
-  });
 });
 
 describe("getPriceCents", () => {
-  it("returns price in cents for standard concierge", () => {
-    expect(getPriceCents("standard", "concierge")).toBe(11900);
+  it("returns price in cents for standard", () => {
+    expect(getPriceCents("standard", "concierge")).toBe(13900);
   });
 
-  it("returns discounted cents for plus buyer_arranged", () => {
-    expect(getPriceCents("plus", "buyer_arranged")).toBe(14200);
+  it("returns price in cents for plus", () => {
+    expect(getPriceCents("plus", "concierge")).toBe(16900);
   });
 
-  it("returns cents for premium concierge", () => {
-    expect(getPriceCents("premium", "concierge")).toBe(17900);
+  it("returns price in cents for premium", () => {
+    expect(getPriceCents("premium", "concierge")).toBe(18900);
   });
 });
 
@@ -78,16 +64,16 @@ describe("getPackageTier", () => {
     expect(getPackageTier({ make: "Ford", model: "F-150" })).toBe("standard");
   });
 
-  it("returns plus for Mercedes-Benz GLE", () => {
-    expect(getPackageTier({ make: "Mercedes-Benz", model: "GLE" })).toBe("plus");
+  it("returns premium for Mercedes-Benz", () => {
+    expect(getPackageTier({ make: "Mercedes-Benz", model: "GLE" })).toBe("premium");
   });
 
-  it("returns plus for BMW", () => {
-    expect(getPackageTier({ make: "BMW", model: "X5" })).toBe("plus");
+  it("returns premium for BMW", () => {
+    expect(getPackageTier({ make: "BMW", model: "X5" })).toBe("premium");
   });
 
-  it("returns plus for Tesla", () => {
-    expect(getPackageTier({ make: "Tesla", model: "Model 3" })).toBe("plus");
+  it("returns premium for Tesla (luxury brand)", () => {
+    expect(getPackageTier({ make: "Tesla", model: "Model 3" })).toBe("premium");
   });
 
   it("returns plus for heavy duty trucks", () => {
@@ -95,15 +81,26 @@ describe("getPackageTier", () => {
     expect(getPackageTier({ make: "Ram", model: "2500" })).toBe("plus");
   });
 
-  it("returns premium for exotic makes", () => {
-    expect(getPackageTier({ make: "Ferrari", model: "488" })).toBe("premium");
-    expect(getPackageTier({ make: "Lamborghini", model: "Huracan" })).toBe("premium");
-    expect(getPackageTier({ make: "Rolls-Royce", model: "Ghost" })).toBe("premium");
+  it("returns exotic for exotic makes", () => {
+    expect(getPackageTier({ make: "Ferrari", model: "488" })).toBe("exotic");
+    expect(getPackageTier({ make: "Lamborghini", model: "Huracan" })).toBe("exotic");
+    expect(getPackageTier({ make: "Rolls-Royce", model: "Ghost" })).toBe("exotic");
   });
 
   it("returns standard when make/model are empty", () => {
     expect(getPackageTier({})).toBe("standard");
     expect(getPackageTier({ make: "", model: "" })).toBe("standard");
+  });
+
+  it("returns premium for flagship keywords", () => {
+    expect(getPackageTier({ make: "Cadillac", model: "Escalade" })).toBe("premium");
+    expect(getPackageTier({ make: "Lincoln", model: "Navigator" })).toBe("premium");
+  });
+
+  it("returns plus for 3-row SUVs", () => {
+    expect(getPackageTier({ make: "Toyota", model: "Highlander" })).toBe("plus");
+    expect(getPackageTier({ make: "Honda", model: "Pilot" })).toBe("plus");
+    expect(getPackageTier({ make: "Chevrolet", model: "Tahoe" })).toBe("plus");
   });
 });
 

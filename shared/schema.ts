@@ -27,7 +27,7 @@ export type Role = (typeof ROLES)[number];
 export const BOOKING_TYPES = ["self_arrange", "concierge"] as const;
 export type BookingType = (typeof BOOKING_TYPES)[number];
 
-export const PACKAGES = ["standard", "plus", "premium", "comprehensive"] as const;
+export const PACKAGES = ["standard", "plus", "premium", "exotic", "comprehensive"] as const;
 export type Package = (typeof PACKAGES)[number];
 
 export const ORDER_STATUSES = [

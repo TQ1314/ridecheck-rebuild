@@ -124,13 +124,26 @@ export function OrderDetailPanel({ order, activities = [] }: OrderDetailPanelPro
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Package</span>
-              <Badge
-                variant="outline"
-                className="no-default-hover-elevate no-default-active-elevate"
-              >
-                {packageLabel(order.package)}
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className="no-default-hover-elevate no-default-active-elevate"
+                >
+                  {packageLabel(order.package)}
+                </Badge>
+                {order.classification_modifier && (
+                  <Badge
+                    variant="outline"
+                    className="no-default-hover-elevate no-default-active-elevate text-amber-700 border-amber-400 text-[10px]"
+                  >
+                    {order.classification_modifier}
+                  </Badge>
+                )}
+              </div>
             </div>
+            {order.classification_reason && (
+              <p className="text-xs text-muted-foreground">{order.classification_reason}</p>
+            )}
 
             <div className="flex justify-between">
               <span className="text-muted-foreground">Booking Type</span>

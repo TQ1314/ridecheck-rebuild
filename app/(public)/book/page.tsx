@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,21 +15,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info } from "lucide-react";
 import {
   PACKAGE_INFO,
   PRICING,
-  getPrice,
-  getPackageTier,
-  detectListingPlatform,
   formatCurrency,
+  detectListingPlatform,
   type PackageType,
   type BookingType,
 } from "@/lib/utils/pricing";
+import { classifyVehicle, type ClassificationResult, TIER_PRICES } from "@/lib/vehicleClassification";
 import { isBuyerArrangedEnabled } from "@/lib/utils/featureFlags";
 import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
 import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function BookPage() {
   const router = useRouter();
@@ -44,20 +44,18 @@ export default function BookPage() {
   const [lang, setLang] = useState<Language>("en");
 
   const STEPS = [
-    t("booking.step.package", lang),
     t("booking.step.vehicle", lang),
     t("booking.step.details", lang),
     t("booking.step.review", lang),
   ];
 
   const [bookingType, setBookingType] = useState<BookingType>("concierge");
-  const [pkg, setPkg] = useState<PackageType>(
-    (searchParams.get("package") as PackageType) || "standard",
-  );
   const [vehicleYear, setVehicleYear] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleDescription, setVehicleDescription] = useState("");
+  const [vehicleMileage, setVehicleMileage] = useState("");
+  const [vehiclePrice, setVehiclePrice] = useState("");
   const [listingUrl, setListingUrl] = useState("");
   const [vehicleLocation, setVehicleLocation] = useState("");
   const [sellerName, setSellerName] = useState("");
@@ -73,17 +71,27 @@ export default function BookPage() {
   const [serviceZip, setServiceZip] = useState("");
   const [zipStatus, setZipStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
-  const [tierSuggestion, setTierSuggestion] = useState<string | null>(null);
+  const [classification, setClassification] = useState<ClassificationResult | null>(null);
 
   const isBuyerArranged = bookingType === "buyer_arranged";
-  const effectiveBookingType: BookingType = isBuyerArranged
-    ? "self_arrange"
-    : bookingType;
 
-  const { basePrice, finalPrice, discountAmount } = getPrice(
-    pkg,
-    effectiveBookingType,
-  );
+  const pkg: PackageType = (classification?.packageTier || "standard") as PackageType;
+  const finalPrice = classification?.basePrice || TIER_PRICES.standard;
+
+  useEffect(() => {
+    if (vehicleMake && vehicleModel && vehicleYear) {
+      const result = classifyVehicle({
+        make: vehicleMake,
+        model: vehicleModel,
+        year: parseInt(vehicleYear) || new Date().getFullYear(),
+        mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+        askingPrice: vehiclePrice ? parseFloat(vehiclePrice) : null,
+      });
+      setClassification(result);
+    } else {
+      setClassification(null);
+    }
+  }, [vehicleMake, vehicleModel, vehicleYear, vehicleMileage, vehiclePrice]);
 
   const handleZipChange = (zip: string) => {
     const cleaned = zip.replace(/\D/g, "").slice(0, 5);
@@ -96,26 +104,13 @@ export default function BookPage() {
     }
   };
 
-  const handleVehicleChange = (make: string, model: string) => {
-    if (make && model) {
-      const suggestedTier = getPackageTier({ make, model });
-      if (suggestedTier !== "standard") {
-        setTierSuggestion(suggestedTier);
-        setPkg(suggestedTier as PackageType);
-      } else {
-        setTierSuggestion(null);
-      }
-    }
-  };
-
   const canProceed = () => {
-    if (step === 0) return !!pkg && !!bookingType;
-    if (step === 1)
+    if (step === 0)
       return (
         !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation &&
-        zipStatus === "valid"
+        zipStatus === "valid" && !!bookingType
       );
-    if (step === 2) {
+    if (step === 1) {
       if (!buyerPhone || buyerPhone.length < 7) return false;
       if (isBuyerArranged) {
         return !!inspectionAddress && !!inspectionTimeWindow && !!sellerPhone;
@@ -150,13 +145,13 @@ export default function BookPage() {
         buyer_phone: buyerPhone,
         buyer_email_input: buyerEmailInput || null,
         booking_type: isBuyerArranged ? "self_arrange" : bookingType,
-        package: pkg,
         preferred_date: preferredDate || null,
         booking_method: isBuyerArranged ? "buyer_arranged" : "concierge",
         preferred_language: lang,
         listing_platform: listingPlatform,
-        package_tier: pkg,
         service_zip: serviceZip,
+        vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+        vehicle_price: vehiclePrice ? parseFloat(vehiclePrice) : null,
       };
 
       if (isBuyerArranged) {
@@ -208,13 +203,6 @@ export default function BookPage() {
       setLoading(false);
     }
   };
-
-  const availablePackages: PackageType[] = [
-    "standard",
-    "plus",
-    "premium",
-    "comprehensive",
-  ];
 
   const availableBookingTypes: { value: BookingType; label: string; desc: string }[] = [];
 
@@ -356,183 +344,174 @@ export default function BookPage() {
               </div>
             </div>
 
-            <div>
-              <Label className="text-base font-semibold mb-3 block">
-                {t("booking.package", lang)}
+            <div className="space-y-4">
+              <Label className="text-base font-semibold block">
+                Vehicle Information
               </Label>
-              <div className="grid grid-cols-1 gap-3">
-                {availablePackages.map((p) => {
-                  const info = PACKAGE_INFO[p];
-                  const price = getPrice(p, effectiveBookingType);
-                  return (
-                    <Card
-                      key={p}
-                      className={`cursor-pointer transition-colors hover-elevate ${
-                        pkg === p ? "border-primary" : ""
-                      }`}
-                      onClick={() => setPkg(p)}
-                      data-testid={`card-package-${p}`}
-                    >
-                      <CardContent className="pt-5 pb-4">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                              pkg === p
-                                ? "border-primary bg-primary"
-                                : "border-muted-foreground/30"
-                            }`}
-                          >
-                            {pkg === p && (
-                              <Check className="h-3 w-3 text-primary-foreground" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <h3 className="font-semibold text-sm">
-                                {info.name}
-                              </h3>
-                              <span className="font-bold">
-                                {p === "comprehensive"
-                                  ? `${formatCurrency(price.finalPrice)}+`
-                                  : formatCurrency(price.finalPrice)}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {info.tagline}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="year">
+                    {t("booking.vehicleYear", lang)} *
+                  </Label>
+                  <Input
+                    id="year"
+                    type="number"
+                    placeholder="2020"
+                    value={vehicleYear}
+                    onChange={(e) => setVehicleYear(e.target.value)}
+                    data-testid="input-year"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="make">
+                    {t("booking.vehicleMake", lang)} *
+                  </Label>
+                  <Input
+                    id="make"
+                    placeholder="Toyota"
+                    value={vehicleMake}
+                    onChange={(e) => setVehicleMake(e.target.value)}
+                    data-testid="input-make"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="model">
+                    {t("booking.vehicleModel", lang)} *
+                  </Label>
+                  <Input
+                    id="model"
+                    placeholder="Camry"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                    data-testid="input-model"
+                  />
+                </div>
               </div>
-              {tierSuggestion && (
-                <p
-                  className="text-sm text-primary mt-3"
-                  data-testid="text-tier-suggestion"
-                >
-                  {t("booking.tierSuggestion", lang, {
-                    tier: PACKAGE_INFO[tierSuggestion as PackageType]?.name || tierSuggestion,
-                  })}
-                </p>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="mileage">Mileage</Label>
+                  <Input
+                    id="mileage"
+                    type="number"
+                    placeholder="85000"
+                    value={vehicleMileage}
+                    onChange={(e) => setVehicleMileage(e.target.value)}
+                    data-testid="input-mileage"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Helps determine the best package for your vehicle</p>
+                </div>
+                <div>
+                  <Label htmlFor="askingPrice">Asking Price ($)</Label>
+                  <Input
+                    id="askingPrice"
+                    type="number"
+                    placeholder="15000"
+                    value={vehiclePrice}
+                    onChange={(e) => setVehiclePrice(e.target.value)}
+                    data-testid="input-asking-price"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Used for accurate package classification</p>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="location">
+                  {t("booking.vehicleLocation", lang)} *
+                </Label>
+                <Input
+                  id="location"
+                  placeholder="City, State or full address"
+                  value={vehicleLocation}
+                  onChange={(e) => setVehicleLocation(e.target.value)}
+                  data-testid="input-location"
+                />
+              </div>
+              <div>
+                <Label htmlFor="serviceZip">Service ZIP Code *</Label>
+                <Input
+                  id="serviceZip"
+                  placeholder="60045"
+                  value={serviceZip}
+                  onChange={(e) => handleZipChange(e.target.value)}
+                  maxLength={5}
+                  className="max-w-[200px]"
+                  data-testid="input-service-zip"
+                />
+                {zipStatus === "valid" && (
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-valid">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Available in Lake County
+                  </p>
+                )}
+                {zipStatus === "invalid" && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-invalid">
+                    <XCircle className="h-4 w-4" />
+                    Not available yet — we&apos;re launching in phases (Lake → McHenry → Cook)
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="description">
+                  {t("booking.vehicleDescription", lang)}
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Any details about the vehicle (color, trim, notable features, etc.)"
+                  value={vehicleDescription}
+                  onChange={(e) => setVehicleDescription(e.target.value)}
+                  data-testid="input-description"
+                />
+              </div>
+              <div>
+                <Label htmlFor="listing">
+                  {t("booking.listingUrl", lang)}
+                </Label>
+                <Input
+                  id="listing"
+                  type="url"
+                  placeholder="https://..."
+                  value={listingUrl}
+                  onChange={(e) => setListingUrl(e.target.value)}
+                  data-testid="input-listing-url"
+                />
+              </div>
             </div>
+
+            {classification && (
+              <Card className="border-primary/50 bg-primary/5" data-testid="card-vehicle-package">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Car className="h-5 w-5 text-primary flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            Vehicle Required Package: {PACKAGE_INFO[pkg]?.name || pkg}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {PACKAGE_INFO[pkg]?.tagline}
+                          </p>
+                        </div>
+                        <span className="text-lg font-bold" data-testid="text-determined-price">
+                          {formatCurrency(finalPrice)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {(!vehicleMileage || !vehiclePrice) && (
+                    <div className="flex items-start gap-2 mt-3 pt-3 border-t border-primary/20">
+                      <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-muted-foreground">
+                        Add mileage and asking price above for the most accurate package match.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
         {step === 1 && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="year">
-                  {t("booking.vehicleYear", lang)} *
-                </Label>
-                <Input
-                  id="year"
-                  type="number"
-                  placeholder="2020"
-                  value={vehicleYear}
-                  onChange={(e) => setVehicleYear(e.target.value)}
-                  data-testid="input-year"
-                />
-              </div>
-              <div>
-                <Label htmlFor="make">
-                  {t("booking.vehicleMake", lang)} *
-                </Label>
-                <Input
-                  id="make"
-                  placeholder="Toyota"
-                  value={vehicleMake}
-                  onChange={(e) => {
-                    setVehicleMake(e.target.value);
-                    handleVehicleChange(e.target.value, vehicleModel);
-                  }}
-                  data-testid="input-make"
-                />
-              </div>
-              <div>
-                <Label htmlFor="model">
-                  {t("booking.vehicleModel", lang)} *
-                </Label>
-                <Input
-                  id="model"
-                  placeholder="Camry"
-                  value={vehicleModel}
-                  onChange={(e) => {
-                    setVehicleModel(e.target.value);
-                    handleVehicleChange(vehicleMake, e.target.value);
-                  }}
-                  data-testid="input-model"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="location">
-                {t("booking.vehicleLocation", lang)} *
-              </Label>
-              <Input
-                id="location"
-                placeholder="City, State or full address"
-                value={vehicleLocation}
-                onChange={(e) => setVehicleLocation(e.target.value)}
-                data-testid="input-location"
-              />
-            </div>
-            <div>
-              <Label htmlFor="serviceZip">Service ZIP Code *</Label>
-              <Input
-                id="serviceZip"
-                placeholder="60045"
-                value={serviceZip}
-                onChange={(e) => handleZipChange(e.target.value)}
-                maxLength={5}
-                className="max-w-[200px]"
-                data-testid="input-service-zip"
-              />
-              {zipStatus === "valid" && (
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-valid">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Available in Lake County
-                </p>
-              )}
-              {zipStatus === "invalid" && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-invalid">
-                  <XCircle className="h-4 w-4" />
-                  Not available yet — we&apos;re launching in phases (Lake → McHenry → Cook)
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="description">
-                {t("booking.vehicleDescription", lang)}
-              </Label>
-              <Textarea
-                id="description"
-                placeholder="Any details about the vehicle (mileage, color, trim, etc.)"
-                value={vehicleDescription}
-                onChange={(e) => setVehicleDescription(e.target.value)}
-                data-testid="input-description"
-              />
-            </div>
-            <div>
-              <Label htmlFor="listing">
-                {t("booking.listingUrl", lang)}
-              </Label>
-              <Input
-                id="listing"
-                type="url"
-                placeholder="https://..."
-                value={listingUrl}
-                onChange={(e) => setListingUrl(e.target.value)}
-                data-testid="input-listing-url"
-              />
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
           <div className="space-y-4">
             {isBuyerArranged && (
               <>
@@ -626,22 +605,6 @@ export default function BookPage() {
                 </div>
               </>
             )}
-            {bookingType === "self_arrange" && (
-              <>
-                <div>
-                  <Label htmlFor="sellerPhone">
-                    {t("booking.sellerPhone", lang)}
-                  </Label>
-                  <Input
-                    id="sellerPhone"
-                    placeholder="(555) 123-4567"
-                    value={sellerPhone}
-                    onChange={(e) => setSellerPhone(e.target.value)}
-                    data-testid="input-seller-phone"
-                  />
-                </div>
-              </>
-            )}
             <div className="pt-4 border-t space-y-4">
               <p className="text-sm font-medium text-muted-foreground">Your contact info (for payment link)</p>
               <div>
@@ -683,7 +646,7 @@ export default function BookPage() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
@@ -693,10 +656,10 @@ export default function BookPage() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  {t("booking.package", lang)}
+                  Package
                 </span>
                 <span className="font-medium">
-                  {PACKAGE_INFO[pkg].name}
+                  {PACKAGE_INFO[pkg]?.name || pkg}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -719,6 +682,18 @@ export default function BookPage() {
                   {vehicleYear} {vehicleMake} {vehicleModel}
                 </span>
               </div>
+              {vehicleMileage && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mileage</span>
+                  <span>{parseInt(vehicleMileage).toLocaleString()} mi</span>
+                </div>
+              )}
+              {vehiclePrice && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Asking Price</span>
+                  <span>{formatCurrency(parseFloat(vehiclePrice))}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   {t("booking.vehicleLocation", lang)}
@@ -760,25 +735,9 @@ export default function BookPage() {
                 </div>
               )}
               <div className="border-t pt-3 mt-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {t("booking.basePrice", lang)}
-                  </span>
-                  <span>{formatCurrency(basePrice)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600 dark:text-green-400">
-                    <span>
-                      {isBuyerArranged
-                        ? t("booking.discount", lang)
-                        : t("booking.selfDiscount", lang)}
-                    </span>
-                    <span>-{formatCurrency(discountAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-base mt-2">
+                <div className="flex justify-between font-bold text-base">
                   <span>{t("booking.total", lang)}</span>
-                  <span>{formatCurrency(finalPrice)}</span>
+                  <span data-testid="text-review-total">{formatCurrency(finalPrice)}</span>
                 </div>
               </div>
               {bookingType === "concierge" && (

@@ -1,17 +1,20 @@
 import type { BookingType, Package } from "@shared/schema";
 
 export const PRICING: Record<Package, { full: number; self: number }> = {
-  standard: { full: 119, self: 113 },
-  premium: { full: 179, self: 170 },
-  comprehensive: { full: 299, self: 284 },
+  standard: { full: 139, self: 139 },
+  plus: { full: 169, self: 169 },
+  premium: { full: 189, self: 189 },
+  exotic: { full: 299, self: 299 },
+  comprehensive: { full: 299, self: 299 },
 };
 
 export function getPrice(pkg: Package, bookingType: BookingType): number {
-  return bookingType === "self_arrange" ? PRICING[pkg].self : PRICING[pkg].full;
+  const prices = PRICING[pkg];
+  return prices ? prices.full : 0;
 }
 
 export function getDiscount(pkg: Package): number {
-  return PRICING[pkg].full - PRICING[pkg].self;
+  return 0;
 }
 
 export function formatPrice(price: number | string): string {
@@ -36,9 +39,9 @@ export const PACKAGE_DETAILS: Record<
       "Digital report within 24hrs",
     ],
   },
-  premium: {
-    name: "Premium",
-    description: "Comprehensive check with detailed diagnostics",
+  plus: {
+    name: "Plus",
+    description: "Euro, EV & heavy-duty specialist screening",
     features: [
       "Everything in Standard",
       "OBD-II diagnostic scan",
@@ -46,8 +49,34 @@ export const PACKAGE_DETAILS: Record<
       "Paint depth measurement",
       "Fluid analysis",
       "Road test evaluation",
-      "Video walkthrough",
+      "Euro/EV/HD-specific checks",
       "Report within 12hrs",
+    ],
+  },
+  premium: {
+    name: "Premium",
+    description: "Luxury & flagship vehicle diagnostics",
+    features: [
+      "Everything in Plus",
+      "Frame & structural analysis",
+      "VIN consistency check",
+      "Fraud & red flag screening",
+      "Video walkthrough",
+      "Priority scheduling",
+      "Report within 12hrs",
+    ],
+  },
+  exotic: {
+    name: "Exotic",
+    description: "The ultimate pre-purchase inspection",
+    features: [
+      "Everything in Premium",
+      "Title & ownership review",
+      "Market value assessment",
+      "Negotiation support data",
+      "Dedicated inspector",
+      "Report within 6hrs",
+      "30-day follow-up support",
     ],
   },
   comprehensive: {
@@ -55,11 +84,9 @@ export const PACKAGE_DETAILS: Record<
     description: "The ultimate pre-purchase inspection",
     features: [
       "Everything in Premium",
-      "Frame & structural analysis",
-      "VIN history verification",
+      "Title & ownership review",
       "Market value assessment",
-      "Negotiation report",
-      "Priority scheduling",
+      "Negotiation support data",
       "Dedicated inspector",
       "Report within 6hrs",
       "30-day follow-up support",

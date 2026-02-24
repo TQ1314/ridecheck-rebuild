@@ -103,6 +103,7 @@ The user prefers clear and concise communication. They value iterative developme
 - 006_seller_contact_attempts.sql: seller_contact_attempts table + order columns (seller_platform, seller_contact_status, seller_outcome_notes, seller_email)
 - 007_service_area.sql: service_zip, service_county, service_state columns on orders + indexes
 - 008_ridechecker_submission_and_scoring.sql: ridechecker_availability, ridechecker_job_assignments, ridechecker_raw_submissions tables + profile scoring columns + orders ops report columns
+- 009_internal_test_flow.sql: is_internal_test + test_run_id on orders, is_internal_test on ridechecker_earnings + ridechecker_job_assignments
 
 ## Feature Implementation History
 - Phase 1-4: Core booking, auth, admin, ops
@@ -153,3 +154,12 @@ The user prefers clear and concise communication. They value iterative developme
   - OpsReportBuilderPanel in admin order detail: raw submission viewer, severity/summary report builder, approve/reject, payout management
   - Privacy: RideCheckers never see buyer identity; buyers never see RideChecker identity
   - RideChecker max daily capacity: 5 jobs
+- Internal $1 End-to-End Test Flow (Feb 2026):
+  - Migration 009_internal_test_flow.sql: is_internal_test + test_run_id columns on orders, earnings, assignments
+  - Admin-only "Run Internal $1 Test Flow" button on order detail page
+  - Creates $1 Stripe Checkout session with is_internal_test metadata
+  - Production blocked: API returns 403 if NODE_ENV === 'production'
+  - Webhook sets payment_status = "paid_test" for test payments
+  - Approve-submission forces payout_amount = $1.00 for test orders
+  - Report delivery email prefixed with "[INTERNAL TEST]"
+  - Documentation: docs/internal-test-flow.md

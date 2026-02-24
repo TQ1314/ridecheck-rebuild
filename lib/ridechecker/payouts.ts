@@ -2,6 +2,7 @@ export const PAYOUT_RATES: Record<string, number> = {
   standard: 50,
   plus: 65,
   premium: 80,
+  exotic: 130,
   comprehensive: 130,
 };
 

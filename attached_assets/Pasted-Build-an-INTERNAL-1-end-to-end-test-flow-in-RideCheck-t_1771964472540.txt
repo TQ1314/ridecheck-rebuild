@@ -1,0 +1,63 @@
+Build an INTERNAL $1 end-to-end test flow in RideCheck that simulates production without exposing it to real buyers.
+
+Requirements:
+
+Internal-only trigger:
+
+Add an admin/ops-only button in Admin Order Detail: “Run Internal $1 Test Flow”.
+
+This button sets orders.is_internal_test = true and creates a payment link for $1.00.
+
+Never show $1 option in buyer-facing UI.
+
+Stripe session behavior:
+
+If orders.is_internal_test = true AND NODE_ENV !== 'production':
+force amount = 100 cents
+line item name = “RideCheck Internal Test”
+set Stripe metadata: { is_internal_test: "true", order_id, test_run_id }
+
+In production, ignore internal test mode (do not allow forced $1).
+
+Webhook:
+
+On checkout/session success:
+if metadata.is_internal_test === "true":
+set payment_status = "paid_test"
+else:
+set payment_status = "paid"
+set paid_at and stripe_session_id as normal.
+
+Test payout simulation:
+
+Add/extend payouts/earnings table to support test payouts:
+fields: order_id, ridechecker_id, amount, status, is_internal_test, created_at, paid_at
+
+When ops approves the report for an internal test order:
+create payout record amount = 1.00, status="queued_test", is_internal_test=true
+
+Add admin/ops-only action: “Mark Test Payout Paid” → sets status="paid_test", paid_at=now()
+
+Report sending:
+
+When ops clicks “Approve & Send” for internal test orders:
+send the buyer the final report email (or link) with subject prefix “[INTERNAL TEST]”
+log email in database timeline/events.
+
+Safety:
+
+Never allow internal test flag to be set by buyers.
+
+All internal test actions must be role-protected (ops/admin).
+
+Add docs: docs/internal-test-flow.md explaining how to run the full test: $1 payment → report → payout.
+
+Keep changes small and contained; do not break admin/staff routes.
+
+What you’ll be able to test after this
+
+✅ Buyer receives link and pays $1
+✅ Webhook updates payment status
+✅ RideChecker workflow produces raw data
+✅ Ops builds report and sends to buyer
+✅ Payout record gets created and marked paid (test)

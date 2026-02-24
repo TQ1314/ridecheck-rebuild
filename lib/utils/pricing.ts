@@ -1,16 +1,14 @@
 export type BookingType = "self_arrange" | "concierge" | "buyer_arranged";
-export type PackageType = "standard" | "premium" | "comprehensive" | "plus";
+export type PackageType = "standard" | "plus" | "premium" | "exotic";
 
-export type PackageTier = "standard" | "plus" | "premium";
+export type PackageTier = "standard" | "plus" | "premium" | "exotic";
 
 export const PRICING: Record<PackageType, { full: number; self: number }> = {
-  standard: { full: 119, self: 113 },
-  plus: { full: 149, self: 142 },
-  premium: { full: 179, self: 170 },
-  comprehensive: { full: 299, self: 284 },
+  standard: { full: 139, self: 139 },
+  plus: { full: 169, self: 169 },
+  premium: { full: 189, self: 189 },
+  exotic: { full: 299, self: 299 },
 };
-
-const BUYER_ARRANGED_DISCOUNT = 0.05;
 
 export function getPrice(pkg: PackageType, bookingType: BookingType) {
   const prices = PRICING[pkg];
@@ -18,10 +16,8 @@ export function getPrice(pkg: PackageType, bookingType: BookingType) {
     return { basePrice: 0, finalPrice: 0, discountAmount: 0 };
   }
   const basePrice = prices.full;
-  const isSelfOrBuyer =
-    bookingType === "self_arrange" || bookingType === "buyer_arranged";
-  const finalPrice = isSelfOrBuyer ? prices.self : prices.full;
-  const discountAmount = basePrice - finalPrice;
+  const finalPrice = prices.full;
+  const discountAmount = 0;
   return { basePrice, finalPrice, discountAmount };
 }
 
@@ -41,79 +37,26 @@ export function getPackageTier(vehicle: {
   const make = (vehicle.make || "").toLowerCase();
   const model = (vehicle.model || "").toLowerCase();
 
-  const euroExoticMakes = [
-    "mercedes-benz",
-    "mercedes",
-    "bmw",
-    "audi",
-    "porsche",
-    "volkswagen",
-    "volvo",
-    "jaguar",
-    "land rover",
-    "range rover",
-    "mini",
-    "alfa romeo",
-    "fiat",
-    "maserati",
-    "bentley",
-    "rolls-royce",
-    "aston martin",
-    "mclaren",
-    "ferrari",
-    "lamborghini",
-    "bugatti",
-    "lotus",
-    "saab",
-    "peugeot",
-    "citroën",
-    "citroen",
-  ];
+  const exoticMakes = ["ferrari", "lamborghini", "mclaren", "bentley", "rolls-royce", "aston martin", "bugatti", "pagani", "koenigsegg", "lotus"];
+  if (exoticMakes.includes(make)) return "exotic";
 
-  const evModels = ["model s", "model 3", "model x", "model y", "cybertruck"];
+  const luxuryMakes = ["mercedes-benz", "mercedes", "bmw", "audi", "porsche", "lexus", "land rover", "range rover", "jaguar", "tesla", "maserati"];
+  if (luxuryMakes.includes(make)) return "premium";
+
+  const flagshipKeywords = ["s-class", "s class", "s550", "s500", "7 series", "7-series", "a8", "range rover", "escalade", "navigator", "maybach"];
+  if (flagshipKeywords.some((kw) => model.includes(kw))) return "premium";
+
   const evMakes = ["tesla", "rivian", "lucid", "polestar", "fisker"];
+  if (evMakes.includes(make)) return "plus";
 
-  const premiumExoticMakes = [
-    "ferrari",
-    "lamborghini",
-    "bugatti",
-    "mclaren",
-    "rolls-royce",
-    "bentley",
-    "aston martin",
-    "lotus",
-    "maserati",
-    "pagani",
-    "koenigsegg",
-  ];
+  const evKeywords = ["ev", "hybrid", "plug-in", "phev", "electric", "e-tron", "mach-e"];
+  if (evKeywords.some((kw) => model.includes(kw))) return "plus";
 
-  if (premiumExoticMakes.includes(make)) {
-    return "premium";
-  }
+  const threeRowKeywords = ["highlander", "pilot", "telluride", "palisade", "explorer", "traverse", "tahoe", "suburban", "expedition", "sequoia", "armada"];
+  if (threeRowKeywords.some((kw) => model.includes(kw))) return "plus";
 
-  if (euroExoticMakes.includes(make) || evMakes.includes(make)) {
-    return "plus";
-  }
-  if (evModels.includes(model)) {
-    return "plus";
-  }
-
-  const heavyDutyKeywords = [
-    "f-250",
-    "f-350",
-    "f250",
-    "f350",
-    "2500",
-    "3500",
-    "duramax",
-    "cummins",
-    "powerstroke",
-    "diesel",
-    "sprinter",
-  ];
-  if (heavyDutyKeywords.some((kw) => model.includes(kw))) {
-    return "plus";
-  }
+  const heavyDutyKeywords = ["f-250", "f-350", "f250", "f350", "2500", "3500", "duramax", "cummins", "powerstroke", "sprinter"];
+  if (heavyDutyKeywords.some((kw) => model.includes(kw))) return "plus";
 
   return "standard";
 }
@@ -182,7 +125,7 @@ export const PACKAGE_INFO: Record<
   },
   premium: {
     name: "Premium",
-    tagline: "Comprehensive diagnostics with detailed analysis",
+    tagline: "Luxury & flagship vehicle diagnostics",
     features: [
       "Everything in Plus",
       "Frame & structural analysis",
@@ -193,8 +136,8 @@ export const PACKAGE_INFO: Record<
       "Report within 12hrs",
     ],
   },
-  comprehensive: {
-    name: "Comprehensive",
+  exotic: {
+    name: "Exotic",
     tagline: "Full pre-car-purchase intelligence package",
     features: [
       "Everything in Premium",

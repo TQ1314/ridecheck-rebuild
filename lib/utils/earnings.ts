@@ -4,6 +4,7 @@ export const RIDECHECKER_PAY_RATES: Record<string, number> = {
   standard: 55,
   plus: 70,
   premium: 85,
+  exotic: 140,
   comprehensive: 140,
 };
 

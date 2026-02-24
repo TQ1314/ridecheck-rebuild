@@ -1,0 +1,266 @@
+Below is the final pricing + classification spec you can hand to Replit (and your team) that locks this down “once and for all.”
+
+It gives you:
+
+Only 4 public packages (Standard / Plus / Premium / Exotic) with your new prices
+
+No buyer-controlled tier selection (vehicle determines tier, server enforces)
+
+Plus+ and Standard+ are NOT public tiers — they are internal modifiers that Ops/QA can see and the system can price differently, but the buyer still sees Plus or Standard only
+
+A clean Aging Luxury and Aging Plus policy so older high-mileage luxury cars aren’t priced out
+
+DB fields + API contract + UI rules
+
+RideCheck Vehicle-Determined Pricing & Tier Enforcement (Final Spec)
+1) Public packages (ONLY what the buyer sees)
+Public Tier	Display Price
+Standard	$139
+Plus	$169
+Premium	$189
+Exotic	$299+
+
+Important: Buyers never “choose a tier.”
+They choose booking mode (Concierge vs Self-arranged) and optional add-ons (future).
+The vehicle determines the tier.
+
+2) Internal modifiers (this is where Plus+ and Standard+ live)
+These are NOT public tiers.
+
+They are internal modifiers applied to the public tiers.
+
+modifier = "aging_luxury"
+Means: “This is a luxury car, but old/high-mileage/cheap → don’t force Premium, price as Plus.”
+
+modifier = "aging_plus"
+Means: “This is Plus-class complexity, but old/high-mileage/cheap → don’t price out buyer, price as Standard.”
+
+✅ Buyer still sees Plus ($169) or Standard ($139).
+✅ Ops/QA can see the modifier + reason in admin.
+✅ Your pricing flexibility exists without confusing customers.
+
+3) Required vehicle inputs (no scraping)
+
+To classify accurately without violating platform rules, buyer must provide:
+
+ZIP code (service area gate)
+
+Year
+
+Make
+
+Model
+
+Mileage (required)
+
+Asking price (required)
+
+If they can’t provide mileage/price, classify as Plus by default (safer) and show:
+“Need mileage + price for best match.”
+
+4) Classification logic (vehicle determines tier)
+A) Exotic
+
+Assign Exotic ($299+) if:
+
+make ∈ exotic brands
+(Ferrari, Lamborghini, McLaren, Bentley, Rolls-Royce, Aston Martin, Bugatti, etc.)
+OR
+
+price >= $60,000
+
+Store:
+
+package_tier = exotic
+
+base_price = 299 (or 299+ logic if you want ranges later)
+
+modifier = null
+
+reason = “Exotic brand” or “High value vehicle (>=60k)”
+
+B) Premium (Luxury / flagship / high tech)
+
+Luxury brands default to Premium ($189):
+
+Luxury makes:
+
+Mercedes, BMW, Audi, Porsche, Lexus, Land Rover, Jaguar, Tesla
+
+Flagship keywords bump to Premium even if make isn’t on luxury list:
+
+“S-Class”, “7 Series”, “A8”, “Range Rover”, “Escalade”, “Navigator”
+
+✅ BUT Premium is subject to the Aging Luxury Modifier below.
+
+C) Aging Luxury Modifier (this is your “Plus+” concept, internally)
+
+If luxury-brand vehicle AND:
+
+age >= 15 years AND
+
+mileage >= 150,000 AND
+
+price <= $10,000
+
+Then:
+
+Assign Plus ($169) (not Premium)
+
+Store modifier = "aging_luxury"
+
+This is how you avoid pricing out someone buying an older Mercedes/BMW.
+
+Buyer sees: Plus $169
+Ops sees: Plus + aging_luxury modifier
+
+D) Plus (complexity categories)
+
+Assign Plus ($169) if ANY:
+
+EV / hybrid keywords (EV, Hybrid, Plug-in, PHEV, Model, etc.)
+
+3-row SUV list (Highlander, Pilot, Telluride, Palisade, Explorer, Traverse, Tahoe, Suburban, Expedition, Sequoia, Armada, QX80, etc.)
+
+Heavy duty trucks (2500/3500, F-250/F-350, etc.)
+
+✅ BUT Plus is subject to Aging Plus Modifier below.
+
+E) Aging Plus Modifier (this is your “Standard+” concept, internally)
+
+If Plus-class AND:
+
+age >= 15 years AND
+
+mileage >= 150,000 AND
+
+price <= $8,000
+
+Then:
+
+Assign Standard ($139)
+
+Store modifier = "aging_plus"
+
+Buyer sees: Standard $139
+Ops sees: Standard + aging_plus modifier
+
+F) Otherwise Standard
+
+Everything else:
+
+package_tier = standard
+
+base_price = 139
+
+modifier = null
+
+5) What the buyer can and cannot do
+Buyer can:
+
+input vehicle details
+
+choose booking mode (Concierge / Self-arranged)
+
+select add-ons (future)
+
+Buyer cannot:
+
+pick Standard/Plus/Premium/Exotic manually
+
+downgrade a luxury vehicle to Standard
+
+“upgrade” tiers — if car is Standard, they can’t buy Premium (they can add add-ons later)
+
+This matches your statement:
+
+“Packages are car specific… If your car is premium you get premium.”
+
+6) Database contract (must be stored on the order)
+
+On orders store:
+
+package_tier TEXT (standard|plus|premium|exotic)
+
+base_price NUMERIC
+
+modifier TEXT NULL (aging_luxury|aging_plus|null)
+
+classification_reason TEXT
+
+(optional) vehicle_price, vehicle_mileage if not already stored
+
+Do not expose modifier in public UI.
+
+Admin/ops UI should show:
+
+package_tier
+
+modifier
+
+classification_reason
+
+7) Server enforcement (critical)
+Server always recalculates
+
+Even if the frontend sends a tier, server ignores it.
+
+Server computes tier using the stored vehicle inputs.
+
+If frontend tries to force Standard:
+
+server overwrites it and stores correct tier + reason.
+
+8) Examples (so there is no ambiguity)
+Toyota Highlander for $18,000
+
+3-row SUV → Plus
+
+not old/high-mileage/cheap → stays Plus
+✅ Plus $169
+
+2015 Mercedes S550 for $20,600
+
+luxury + flagship keyword (S550/S-Class) → Premium
+
+age ~11, mileage unknown (likely <150k), price >10k → Premium
+✅ Premium $189
+
+2007 Mercedes S500, $6,500, 150k miles
+
+luxury brand triggers Premium, BUT:
+
+age >=15, mileage >=150k, price <=10k → Aging Luxury Modifier
+✅ Plus $169, modifier=aging_luxury
+(Not Premium, not Exotic)
+
+2006 Ford Explorer, $5,500, 170k miles
+
+3-row SUV normally Plus, BUT:
+
+age >=15, mileage >=150k, price <=8k → Aging Plus Modifier
+✅ Standard $139, modifier=aging_plus
+
+What you want Replit to implement (cleanly)
+
+If you want the actual Replit “one prompt” next, I’ll produce it — but first, this doc is the source of truth.
+
+It resolves:
+
+“Plus+ and Standard+” (as internal modifiers)
+
+no buyer-chosen tier
+
+consistent pricing
+
+older luxury not priced out
+
+future add-ons possible without tier confusion
+
+If you want, I’ll now convert this spec into:
+
+a Replit prompt that edits the codebase end-to-end (API + DB fields + UI lock)
+
+a single lib/vehicleClassification.ts implementation with unit tests
+
+the booking UI change so the tier is displayed as “Vehicle Required Package” and not selectable

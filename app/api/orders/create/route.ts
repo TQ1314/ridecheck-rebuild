@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPrice, type PackageType, type BookingType } from "@/lib/utils/pricing";
+import { classifyVehicle } from "@/lib/vehicleClassification";
 import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
 import { z } from "zod";
 
@@ -23,8 +24,10 @@ export const createOrderSchema = z.object({
   buyer_email_input: z.string().email().nullable().optional(),
 
   booking_type: z.enum(["self_arrange", "concierge"]),
-  package: z.enum(["standard", "premium", "comprehensive", "plus"]),
+  package: z.enum(["standard", "plus", "premium", "exotic", "comprehensive"]).optional(),
   preferred_date: z.string().nullable().optional(),
+  vehicle_mileage: z.number().int().min(0).nullable().optional(),
+  vehicle_price: z.number().min(0).nullable().optional(),
 
   inspection_address: z.string().optional(),
   inspection_time_window: z.string().optional(),
@@ -136,10 +139,18 @@ export async function POST(req: NextRequest) {
     const buyer_email = safeString(data.buyer_email_input || session?.user?.email, "guest@ridecheck.com");
     const buyer_phone = data.buyer_phone;
 
-    const { basePrice, finalPrice, discountAmount } = getPrice(
-      data.package as PackageType,
-      data.booking_type as BookingType
-    );
+    const classification = classifyVehicle({
+      make: data.vehicle_make,
+      model: data.vehicle_model,
+      year: data.vehicle_year,
+      mileage: data.vehicle_mileage ?? null,
+      askingPrice: data.vehicle_price ?? null,
+    });
+
+    const serverPackage = classification.packageTier;
+    const basePrice = classification.basePrice;
+    const finalPrice = classification.basePrice;
+    const discountAmount = 0;
 
     const tracking_token = crypto.randomUUID();
     const payment_link_token = crypto.randomUUID();
@@ -162,7 +173,7 @@ export async function POST(req: NextRequest) {
       seller_name: data.seller_name ?? null,
       seller_phone: data.seller_phone ?? null,
 
-      package: data.package,
+      package: serverPackage,
       preferred_date: data.preferred_date ?? null,
 
       base_price: basePrice,
@@ -172,6 +183,19 @@ export async function POST(req: NextRequest) {
       tracking_token,
       payment_link_token,
     };
+
+    if (classification.modifier) {
+      insertPayload.classification_modifier = classification.modifier;
+    }
+    if (classification.classificationReason) {
+      insertPayload.classification_reason = classification.classificationReason;
+    }
+    if (data.vehicle_mileage) {
+      insertPayload.vehicle_mileage = data.vehicle_mileage;
+    }
+    if (data.vehicle_price) {
+      insertPayload.vehicle_price = data.vehicle_price;
+    }
 
     try {
       const { data: colCheck } = await supabaseAdmin
