@@ -184,31 +184,41 @@ export async function POST(req: NextRequest) {
       payment_link_token,
     };
 
-    if (classification.modifier) {
-      insertPayload.classification_modifier = classification.modifier;
-    }
-    if (classification.classificationReason) {
-      insertPayload.classification_reason = classification.classificationReason;
-    }
-    if (data.vehicle_mileage) {
-      insertPayload.vehicle_mileage = data.vehicle_mileage;
-    }
-    if (data.vehicle_price) {
-      insertPayload.vehicle_price = data.vehicle_price;
+    try {
+      const { error: colErr } = await supabaseAdmin
+        .from("orders")
+        .select("classification_reason")
+        .limit(0);
+      if (!colErr) {
+        if (classification.modifier) {
+          insertPayload.classification_modifier = classification.modifier;
+        }
+        if (classification.classificationReason) {
+          insertPayload.classification_reason = classification.classificationReason;
+        }
+        if (data.vehicle_mileage) {
+          insertPayload.vehicle_mileage = data.vehicle_mileage;
+        }
+        if (data.vehicle_price) {
+          insertPayload.vehicle_price = data.vehicle_price;
+        }
+      }
+    } catch {
+      // classification columns not yet migrated (010) — skip storing them
     }
 
     try {
-      const { data: colCheck } = await supabaseAdmin
+      const { error: svcErr } = await supabaseAdmin
         .from("orders")
         .select("service_zip")
         .limit(0);
-      if (colCheck !== null) {
+      if (!svcErr) {
         insertPayload.service_zip = data.service_zip;
         insertPayload.service_county = resolveCounty(data.service_zip);
         insertPayload.service_state = "IL";
       }
     } catch {
-      // service area columns not yet migrated — skip storing them
+      // service area columns not yet migrated (007) — skip storing them
     }
 
     const { data: order, error } = await supabaseAdmin
