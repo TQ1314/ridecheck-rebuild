@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { getRoleLabel, type Role } from "@/lib/utils/roles";
-import { Eye, EyeOff, Shield } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import Link from "next/link";
 
 export default function InviteAcceptPage() {

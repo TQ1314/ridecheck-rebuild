@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { useState } from "react";
 
 const NAV_LINKS = [
@@ -24,7 +25,7 @@ export function Navbar() {
           className="flex items-center gap-2 font-bold text-lg"
           data-testid="link-home"
         >
-          <Shield className="h-6 w-6 text-primary" />
+          <Logo size={32} />
           <span>RideCheck</span>
         </Link>
 

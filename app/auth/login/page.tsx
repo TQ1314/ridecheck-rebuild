@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { getDashboardPath, type Role } from "@/lib/utils/roles";
 
@@ -70,7 +71,7 @@ export default function LoginPage() {
             href="/"
             className="flex items-center justify-center gap-2 mb-4"
           >
-            <Shield className="h-8 w-8 text-primary" />
+            <Logo size={36} />
             <span className="text-2xl font-bold">RideCheck</span>
           </Link>
           <CardTitle className="text-xl">Welcome back</CardTitle>

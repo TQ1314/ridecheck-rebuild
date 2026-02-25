@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ForgotPasswordPage() {
@@ -46,7 +47,7 @@ export default function ForgotPasswordPage() {
             href="/"
             className="flex items-center justify-center gap-2 mb-4"
           >
-            <Shield className="h-8 w-8 text-primary" />
+            <Logo size={36} />
             <span className="text-2xl font-bold">RideCheck</span>
           </Link>
           <CardTitle className="text-xl">Reset your password</CardTitle>

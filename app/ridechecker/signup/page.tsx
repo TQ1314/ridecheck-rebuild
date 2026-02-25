@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Eye, EyeOff, Wrench, Gift } from "lucide-react";
+import { Eye, EyeOff, Wrench, Gift } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RideCheckerSignupPage() {
@@ -105,7 +106,7 @@ export default function RideCheckerSignupPage() {
             className="flex items-center justify-center gap-2 mb-4"
             data-testid="link-home"
           >
-            <Shield className="h-8 w-8 text-primary" />
+            <Logo size={36} />
             <span className="text-2xl font-bold">RideCheck</span>
           </Link>
           <div className="flex items-center justify-center gap-2 mb-2">

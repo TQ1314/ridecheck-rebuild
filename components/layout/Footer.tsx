@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 
 export function Footer() {
   return (
@@ -11,7 +11,7 @@ export function Footer() {
               href="/"
               className="flex items-center gap-2 font-bold text-lg mb-3"
             >
-              <Shield className="h-5 w-5 text-primary" />
+              <Logo size={28} />
               <span>RideCheck</span>
             </Link>
             <p className="text-sm text-muted-foreground">
