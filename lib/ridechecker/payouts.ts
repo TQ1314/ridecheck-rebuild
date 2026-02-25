@@ -4,6 +4,7 @@ export const PAYOUT_RATES: Record<string, number> = {
   premium: 80,
   exotic: 130,
   comprehensive: 130,
+  test: 1,
 };
 
 export function getPayoutAmount(packageType: string): number {

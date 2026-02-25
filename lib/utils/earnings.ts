@@ -6,6 +6,7 @@ export const RIDECHECKER_PAY_RATES: Record<string, number> = {
   premium: 85,
   exotic: 140,
   comprehensive: 140,
+  test: 1,
 };
 
 export function getRidecheckerPay(pkg: string): number {

@@ -1,5 +1,5 @@
 export type BookingType = "self_arrange" | "concierge";
-export type PackageType = "standard" | "plus" | "premium" | "exotic";
+export type PackageType = "standard" | "plus" | "premium" | "exotic" | "test";
 
 export type OrderStatus =
   | "submitted"

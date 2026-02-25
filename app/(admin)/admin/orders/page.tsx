@@ -41,7 +41,7 @@ const OPS_STATUSES = [
 ];
 
 const BOOKING_TYPES = ["all", "self_arrange", "concierge"];
-const PACKAGES = ["all", "standard", "plus", "premium", "exotic"];
+const PACKAGES = ["all", "standard", "plus", "premium", "exotic", "test"];
 
 function getSlaFlags(order: Order): { label: string; variant: "destructive" | "default" }[] {
   const flags: { label: string; variant: "destructive" | "default" }[] = [];

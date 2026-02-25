@@ -72,11 +72,12 @@ middleware.ts         - Auth and role-based route protection
 - **Self-Arranged**: Customer arranges appointment with seller, pays immediately
 - **Buyer-Arranged** (feature flag): Customer coordinates with seller, gets 5% discount. Behind NEXT_PUBLIC_FEATURE_BUYER_ARRANGED flag.
 
-## Packages (Updated v2)
-- Standard: $119 concierge / $113 buyer-arranged (5% discount)
-- Plus (Euro/EV/HD): $149 concierge / $142 buyer-arranged
-- Premium: $179 concierge / $170 buyer-arranged
-- Comprehensive: $299+ concierge / $284 buyer-arranged
+## Packages (v3 — Vehicle-Determined, Flat Pricing)
+- Standard: $139
+- Plus (Euro/EV/HD): $169
+- Premium (Luxury/Flagship): $189
+- Exotic: $299
+- $1 Test: $1 (internal testing, visible on booking page, marks order as is_internal_test, $1 RideChecker payout)
 
 ## Feature Flags (default OFF)
 - NEXT_PUBLIC_FEATURE_BUYER_ARRANGED - Enables buyer-arranged booking option
