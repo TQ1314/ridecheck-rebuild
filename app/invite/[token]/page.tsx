@@ -102,7 +102,7 @@ export default function InviteAcceptPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
-            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="mx-auto mb-4 w-12 opacity-50"><Logo size={48} /></div>
             <h2 className="text-lg font-semibold mb-2">
               {status === "not_found" && "Invite Not Found"}
               {status === "expired" && "Invite Expired"}
@@ -131,7 +131,7 @@ export default function InviteAcceptPage() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10">
-              <Shield className="h-6 w-6 text-primary" />
+              <Logo size={28} />
             </div>
             <h2 className="text-lg font-semibold mb-2">Account Created</h2>
             <p className="text-sm text-muted-foreground mb-4">

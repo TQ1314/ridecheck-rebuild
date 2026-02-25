@@ -1,11 +1,11 @@
-import { Shield } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 
 export default function PrivacyPage() {
   return (
     <div className="py-12 sm:py-20">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <div className="flex items-center gap-3 mb-8">
-          <Shield className="h-8 w-8 text-primary" />
+          <Logo size={36} />
           <div>
             <h1 className="text-3xl font-bold" data-testid="heading-privacy">Privacy Policy</h1>
             <p className="text-sm text-muted-foreground">Last Updated: February 2026</p>

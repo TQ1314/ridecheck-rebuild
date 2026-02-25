@@ -5,7 +5,8 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/layout/Logo";
 import { formatCurrency } from "@/lib/utils/pricing";
 
 interface PayOrderSummary {
@@ -124,7 +125,7 @@ export default function PayPage() {
           <Card>
             <CardContent className="pt-8 pb-6">
               <div className="text-center mb-6">
-                <Shield className="h-10 w-10 text-emerald-600 mx-auto mb-3" />
+                <div className="mx-auto mb-3 w-10"><Logo size={40} /></div>
                 <h1 className="text-xl font-bold" data-testid="text-page-title">Confirm Your Inspection</h1>
                 <p className="text-sm text-gray-600 mt-1">Secure payment powered by Stripe</p>
               </div>

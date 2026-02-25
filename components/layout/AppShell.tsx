@@ -17,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Shield,
   LayoutDashboard,
   Package,
   User,
@@ -33,6 +32,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/layout/Logo";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -158,7 +158,7 @@ export function AppShell({ children }: AppShellProps) {
             className="flex items-center gap-2 font-bold text-lg"
             data-testid="link-home-sidebar"
           >
-            <Shield className="h-5 w-5 text-primary" />
+            <Logo size={24} />
             <span>RideCheck</span>
           </Link>
         </div>

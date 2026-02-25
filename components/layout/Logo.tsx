@@ -1,5 +1,4 @@
 import Image from "next/image";
-import logoSrc from "@assets/12496_1771993161726.jpg";
 
 interface LogoProps {
   size?: number;
@@ -9,7 +8,7 @@ interface LogoProps {
 export function Logo({ size = 32, className = "" }: LogoProps) {
   return (
     <Image
-      src={logoSrc}
+      src="/logo.jpg"
       alt="RideCheck"
       width={size}
       height={size}
