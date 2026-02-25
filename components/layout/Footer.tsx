@@ -59,8 +59,13 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-3">Support</h4>
+            <h4 className="font-semibold text-sm mb-3">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link href="/join" className="hover:text-foreground transition-colors">
+                  Join Our Team
+                </Link>
+              </li>
               <li>
                 <a href="mailto:support@ridecheck.com" className="hover:text-foreground transition-colors">
                   Contact Us
