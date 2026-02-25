@@ -13,16 +13,16 @@ export default function PublicHomePage() {
     <main className="bg-white text-gray-900">
       {/* HERO */}
       <section className="relative overflow-hidden border-b">
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-50 to-white" />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-50 to-white" />
         <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-2 md:py-16">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1 text-xs font-semibold text-gray-700">
-              <span className="h-2 w-2 rounded-full bg-blue-600" />
+              <span className="h-2 w-2 rounded-full bg-emerald-600" />
               Buyer-first. Professional. Neutral.
             </div>
 
             <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-              Do Not Buy Blind. <span className="text-blue-700">RideCheck It.</span>
+              Do Not Buy Blind. <span className="text-emerald-700">RideCheck It.</span>
             </h1>
 
             <p className="mt-4 text-lg leading-relaxed text-gray-700">
@@ -34,7 +34,7 @@ export default function PublicHomePage() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
                 href="/book"
-                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
               >
                 Book an Inspection →
               </a>
@@ -53,8 +53,8 @@ export default function PublicHomePage() {
             </div>
 
             <p className="mt-6 text-sm text-gray-600">
-              We’re not here to demonize sellers. Some cars are great. Our job is to make sure you
-              don’t buy blind.
+              We're not here to demonize sellers. Some cars are great. Our job is to make sure you
+              don't buy blind.
             </p>
           </div>
 
@@ -76,12 +76,12 @@ export default function PublicHomePage() {
                 <ul className="mt-2 space-y-2 text-sm text-gray-700">
                   <li>✓ Photos + documented findings</li>
                   <li>✓ Mechanical + condition overview</li>
-                  <li>✓ Clear “next steps” recommendations</li>
+                  <li>✓ Clear "next steps" recommendations</li>
                 </ul>
               </div>
 
-              <div className="rounded-xl border bg-blue-50 p-4">
-                <div className="text-xs font-semibold text-blue-800">Why it matters</div>
+              <div className="rounded-xl border bg-emerald-50 p-4">
+                <div className="text-xs font-semibold text-emerald-800">Why it matters</div>
                 <p className="mt-2 text-sm text-gray-700">
                   One inspection can save you thousands — or confirm you found a clean car worth buying.
                 </p>
@@ -117,7 +117,7 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      {/* BOOKING TYPES (DON'T BREAK YOUR FLOW — JUST EXPLAIN IT) */}
+      {/* BOOKING TYPES */}
       <section className="border-t bg-gray-50">
         <div className="mx-auto max-w-6xl px-4 py-12">
           <h2 className="text-2xl font-extrabold md:text-3xl">Two ways to book</h2>
@@ -130,7 +130,7 @@ export default function PublicHomePage() {
               <div className="text-sm font-semibold text-gray-500">Self-Arranged</div>
               <div className="mt-2 text-lg font-extrabold">You already have an appointment</div>
               <p className="mt-2 text-sm text-gray-700">
-                If you have a time confirmed with the seller, choose Self-Arranged and we’ll show up and inspect.
+                If you have a time confirmed with the seller, choose Self-Arranged and we'll show up and inspect.
               </p>
             </div>
 
@@ -138,7 +138,7 @@ export default function PublicHomePage() {
               <div className="text-sm font-semibold text-gray-500">Concierge</div>
               <div className="mt-2 text-lg font-extrabold">We coordinate with the seller</div>
               <p className="mt-2 text-sm text-gray-700">
-                If you don’t want to chase the seller, choose Concierge and we handle scheduling and confirmation.
+                If you don't want to chase the seller, choose Concierge and we handle scheduling and confirmation.
               </p>
             </div>
           </div>
@@ -147,12 +147,12 @@ export default function PublicHomePage() {
             <div>
               <div className="text-lg font-bold">Ready to inspect before you buy?</div>
               <p className="mt-1 text-gray-700">
-                Make it a habit. Don’t guess. Don’t buy blind.
+                Make it a habit. Don't guess. Don't buy blind.
               </p>
             </div>
             <a
               href="/book"
-              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
             >
               Book RideCheck →
             </a>
@@ -183,16 +183,16 @@ export default function PublicHomePage() {
       {/* FOOTER CTA */}
       <section className="border-t">
         <div className="mx-auto max-w-6xl px-4 py-12">
-          <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-blue-700 p-8 text-white md:p-12">
+          <div className="rounded-3xl bg-gradient-to-r from-emerald-600 to-emerald-700 p-8 text-white md:p-12">
             <h2 className="text-2xl font-extrabold md:text-4xl">Do Not Buy Blind. RideCheck It.</h2>
             <p className="mt-3 max-w-2xl text-white/90">
-              You don’t need fear-based marketing. You need a habit: inspect before you buy.
+              You don't need fear-based marketing. You need a habit: inspect before you buy.
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
                 href="/book"
-                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-blue-800 shadow-sm hover:bg-blue-50"
+                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-50"
               >
                 Book My Inspection →
               </a>
@@ -230,7 +230,7 @@ function Stat(props: { label: string; value: string; sub: string }) {
 function Card(props: { step: string; title: string; desc: string }) {
   return (
     <div className="rounded-2xl border bg-white p-6 shadow-sm">
-      <div className="text-xs font-bold text-blue-700">{props.step}</div>
+      <div className="text-xs font-bold text-emerald-700">{props.step}</div>
       <div className="mt-2 text-lg font-extrabold">{props.title}</div>
       <p className="mt-2 text-sm text-gray-700">{props.desc}</p>
     </div>
