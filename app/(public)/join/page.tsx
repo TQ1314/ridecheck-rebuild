@@ -94,7 +94,7 @@ export default function JoinPage() {
             Become a RideChecker
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Join our network of vehicle assessment professionals. Earn competitive pay on your own schedule by helping car buyers make informed decisions.
+            Earn money inspecting cars in your area. Set your own schedule and help buyers make informed decisions.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/ridechecker/signup">
