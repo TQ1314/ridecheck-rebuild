@@ -16,6 +16,7 @@ const PUBLIC_ROUTES = [
   "/auth/reset-password",
   "/before-you-buy",
   "/ridechecker/signup",
+  "/join",
 ];
 
 const INVITE_PREFIX = "/invite/";

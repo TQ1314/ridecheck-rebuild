@@ -9,6 +9,7 @@ import { useState } from "react";
 const NAV_LINKS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/join", label: "Become a RideChecker" },
 ];
 
 export function Navbar() {
