@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 interface LogoProps {
   size?: number;
   className?: string;
@@ -7,13 +5,12 @@ interface LogoProps {
 
 export function Logo({ size = 32, className = "" }: LogoProps) {
   return (
-    <Image
+    <img
       src="/logo.jpg"
       alt="RideCheck"
       width={size}
       height={size}
       className={`object-contain ${className}`}
-      priority
     />
   );
 }

@@ -31,29 +31,25 @@ export function Navbar() {
 
         <nav className="hidden md:flex items-center gap-1">
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={link.href}>
-              <Button
-                variant={pathname === link.href ? "secondary" : "ghost"}
-                size="sm"
-                data-testid={`link-nav-${link.label.toLowerCase().replace(/ /g, "-")}`}
-              >
-                {link.label}
-              </Button>
-            </Link>
+            <Button
+              key={link.href}
+              variant={pathname === link.href ? "secondary" : "ghost"}
+              size="sm"
+              asChild
+              data-testid={`link-nav-${link.label.toLowerCase().replace(/ /g, "-")}`}
+            >
+              <Link href={link.href}>{link.label}</Link>
+            </Button>
           ))}
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
-          <Link href="/auth/login">
-            <Button variant="ghost" size="sm" data-testid="link-login">
-              Log In
-            </Button>
-          </Link>
-          <Link href="/book">
-            <Button size="sm" data-testid="link-book-inspection">
-              Book Assessment
-            </Button>
-          </Link>
+          <Button variant="ghost" size="sm" asChild data-testid="link-login">
+            <Link href="/auth/login">Log In</Link>
+          </Button>
+          <Button size="sm" asChild data-testid="link-book-inspection">
+            <Link href="/book">Book Assessment</Link>
+          </Button>
         </div>
 
         <Button
@@ -70,25 +66,24 @@ export function Navbar() {
       {open && (
         <div className="md:hidden border-t bg-background px-4 pb-4 pt-2 space-y-2">
           {NAV_LINKS.map((link) => (
-            <Link
+            <Button
               key={link.href}
-              href={link.href}
-              onClick={() => setOpen(false)}
+              variant="ghost"
+              className="w-full justify-start"
+              asChild
             >
-              <Button variant="ghost" className="w-full justify-start">
+              <Link href={link.href} onClick={() => setOpen(false)}>
                 {link.label}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           ))}
           <div className="flex gap-2 pt-2">
-            <Link href="/auth/login" className="flex-1">
-              <Button variant="outline" className="w-full">
-                Log In
-              </Button>
-            </Link>
-            <Link href="/book" className="flex-1">
-              <Button className="w-full">Book Assessment</Button>
-            </Link>
+            <Button variant="outline" className="flex-1" asChild>
+              <Link href="/auth/login">Log In</Link>
+            </Button>
+            <Button className="flex-1" asChild>
+              <Link href="/book">Book Assessment</Link>
+            </Button>
           </div>
         </div>
       )}
