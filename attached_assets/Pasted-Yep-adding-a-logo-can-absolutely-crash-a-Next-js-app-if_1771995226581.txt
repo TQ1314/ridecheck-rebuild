@@ -1,0 +1,109 @@
+Yep — adding a logo can absolutely crash a Next.js app if it’s added the “wrong” way for App Router.
+
+Here are the most common reasons your site crashes right after adding a logo, and the fastest fixes (plus a Replit prompt you can paste).
+
+Why adding a logo crashes Next.js
+1) You used next/image but the props are wrong (most common)
+
+In Next 13/14, this will crash or error:
+
+using layout="fill" (deprecated)
+
+missing width and height (when not using fill)
+
+using fill without a parent container with position: relative + set dimensions
+
+✅ Correct patterns:
+
+Option A (simple):
+
+import Image from "next/image";
+
+<Image src="/logo.png" alt="RideCheck" width={140} height={40} priority />
+
+Option B (fill):
+
+<div className="relative h-10 w-36">
+  <Image src="/logo.png" alt="RideCheck" fill className="object-contain" priority />
+</div>
+2) You imported a file that isn’t inside /public
+
+If you did:
+
+<Image src="/assets/logo.png" ... />
+
+but the file is actually in /app/assets/ or /src/assets/, it can break depending on how you referenced it.
+
+✅ Easiest: put the logo in:
+
+/public/logo.png
+
+and reference:
+
+src="/logo.png"
+
+3) You used an external image URL but didn’t whitelist it
+
+If your logo is from a URL like:
+https://something.com/logo.png
+
+Next Image will crash unless it’s in next.config.js images.domains.
+
+✅ Fix: Use local /public logo or configure domains.
+
+4) You used an SVG incorrectly
+
+If you imported an SVG like a React component without SVGR configured:
+
+import Logo from "@/public/logo.svg";
+
+That can crash.
+
+✅ Fix: Treat it as an image:
+
+<Image src="/logo.svg" alt="RideCheck" width={140} height={40} />
+
+(or configure SVGR properly later)
+
+Quick test (fastest way to isolate)
+
+Replace your logo code temporarily with:
+
+<img src="/logo.png" alt="RideCheck" style={{ height: 40 }} />
+
+If that works, your issue is 100% Next/Image usage, not the file itself.
+
+Copy/paste Replit Prompt (fix the crash)
+The website crashes after adding the logo.
+
+Debug and fix Next.js App Router logo rendering.
+
+Likely causes:
+- next/image misused (missing width/height, fill without relative parent)
+- image path not inside /public
+- external image domain not whitelisted
+- svg import misconfigured
+
+Tasks:
+1) Find the exact file where the logo was added (search for "logo", "<Image", "next/image", ".png", ".svg").
+2) Ensure the logo file is in /public (e.g. /public/logo.png or /public/logo.svg).
+3) Update the logo render to a safe Next/Image pattern:
+   - If not using fill: provide width and height explicitly
+   - If using fill: wrap in a parent div with className="relative h-10 w-36"
+4) Add a fallback so logo rendering cannot crash the page:
+   - if image fails, render text "RideCheck"
+5) Confirm the homepage loads with no runtime error.
+
+After fix, report:
+- which file was changed
+- what the crash error was
+- final logo path and Image usage pattern
+One thing I need from you (to pinpoint in 10 seconds)
+
+Send me the actual console error line (the first red line), usually like:
+
+TypeError: Cannot read properties of undefined...
+
+Error: Image with src ... must use width and height
+
+Invalid src prop ...
