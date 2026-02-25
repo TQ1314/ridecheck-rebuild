@@ -39,26 +39,6 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-3">Account</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/auth/login" className="hover:text-foreground transition-colors">
-                  Log In
-                </Link>
-              </li>
-              <li>
-                <Link href="/auth/register" className="hover:text-foreground transition-colors">
-                  Register
-                </Link>
-              </li>
-              <li>
-                <Link href="/orders" className="hover:text-foreground transition-colors">
-                  My Orders
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
             <h4 className="font-semibold text-sm mb-3">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
@@ -67,9 +47,24 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="mailto:support@ridecheck.com" className="hover:text-foreground transition-colors">
+                <Link href="/contact" className="hover:text-foreground transition-colors">
                   Contact Us
-                </a>
+                </Link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-sm mb-3">Legal</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link href="/terms" className="hover:text-foreground transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
               </li>
             </ul>
           </div>

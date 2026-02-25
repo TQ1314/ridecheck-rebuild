@@ -1,0 +1,174 @@
+RideCheck – Privacy Policy
+
+Last Updated: February 2026
+
+1. Information We Collect
+
+When you use RideCheck, we may collect:
+
+Contact Information
+
+Name
+
+Phone number
+
+Email address
+
+Vehicle Information
+
+Year, make, model
+
+Mileage
+
+Asking price
+
+Listing URL (if provided)
+
+Seller contact details
+
+Payment Information
+
+All payment processing is handled by Stripe.
+RideCheck does not store full credit card numbers.
+
+Communication Data
+
+SMS messages
+
+Email communications
+
+Website chat
+
+Phone call logs
+
+Technical & Usage Data
+
+IP address
+
+Browser type
+
+Device information
+
+Pages visited
+
+Session duration
+
+2. How We Use Your Information
+
+We use collected data to:
+
+Classify vehicles into appropriate inspection tiers
+
+Contact sellers and coordinate inspections
+
+Assign inspectors
+
+Deliver reports
+
+Process payments
+
+Provide support
+
+Improve service quality
+
+Monitor fraud and abuse
+
+3. Information Sharing
+
+We share data only when necessary:
+
+With Inspectors
+
+Name and necessary coordination details.
+
+With Sellers
+
+Buyer name may be disclosed when scheduling inspections.
+
+With Service Providers
+
+Stripe (payment processing)
+
+Twilio (SMS delivery)
+
+Email service providers
+
+Hosting providers
+
+Legal Compliance
+
+If required by law or court order.
+
+RideCheck does not sell or rent personal information.
+
+4. Communication Channels
+
+RideCheck communicates via:
+
+SMS
+
+Email
+
+Website chat
+
+Phone
+
+Transactional communications cannot be opted out of while an active order exists.
+
+5. Data Retention
+
+We retain data as needed to:
+
+Provide services
+
+Comply with legal obligations
+
+Resolve disputes
+
+Inspection reports and media are retained for at least 2 years.
+
+You may request deletion of personal data, subject to legal retention requirements.
+
+6. Data Security
+
+RideCheck uses commercially reasonable safeguards including:
+
+Encrypted payment processing (Stripe)
+
+Secure hosting infrastructure
+
+Role-based internal access controls
+
+No online system is 100% secure.
+
+7. Your Rights
+
+You may:
+
+Request access to your data
+
+Request correction
+
+Request deletion (where legally permissible)
+
+Opt out of non-essential communications
+
+Contact: support@ridecheckauto.com
+
+8. Cookies & Tracking
+
+RideCheck uses cookies to:
+
+Maintain session state
+
+Improve performance
+
+Analyze traffic patterns
+
+Disabling cookies may limit functionality.
+
+9. Updates to This Policy
+
+RideCheck may update this policy at any time.
+
+Continued use of the platform after updates constitutes acceptance of the revised policy.

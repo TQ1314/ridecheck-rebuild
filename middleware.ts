@@ -17,6 +17,9 @@ const PUBLIC_ROUTES = [
   "/before-you-buy",
   "/ridechecker/signup",
   "/join",
+  "/terms",
+  "/privacy",
+  "/contact",
 ];
 
 const INVITE_PREFIX = "/invite/";

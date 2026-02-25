@@ -1,0 +1,214 @@
+RideCheck – Terms & Conditions
+
+Last Updated: February 2026
+
+1. What RideCheck Provides
+
+RideCheck is a pre-purchase vehicle intelligence platform.
+
+When you submit vehicle details and complete payment, RideCheck will:
+
+Review the vehicle details provided
+
+Contact the seller (Concierge mode) or coordinate based on buyer-arranged access (Self-Arranged mode)
+
+Assign a trained independent inspector (“RideChecker”)
+
+Conduct a visual, non-invasive multi-point inspection
+
+Deliver a structured intelligence report including:
+
+Photos and/or video
+
+Observational findings
+
+Risk indicators
+
+Market value assessment
+
+Negotiation guidance where applicable
+
+RideCheck inspections are visual assessments only. We do not perform mechanical disassembly, invasive diagnostics, component removal, or certified mechanical tear-downs.
+
+2. Vehicle-Based Package Classification
+
+RideCheck packages are determined by vehicle type, age, mileage, and market value.
+
+Customers do not select inspection tiers manually.
+
+RideCheck’s system classifies each vehicle into one of the following public service tiers:
+
+Standard
+
+Plus
+
+Premium
+
+Exotic
+
+RideCheck reserves the right to reclassify a vehicle if submitted information is inaccurate or incomplete.
+
+3. Not a Warranty or Guarantee
+
+RideCheck does not guarantee or certify:
+
+That the vehicle will pass future emissions or state inspections
+
+That the vehicle is free from hidden defects
+
+That the vehicle will perform reliably after purchase
+
+That all mechanical, structural, or electronic issues have been identified
+
+Inspection reports reflect the vehicle’s observable condition at the time of inspection only.
+
+All used vehicles carry inherent risk. The buyer retains full responsibility for the purchase decision.
+
+4. Market Value & Negotiation Guidance
+
+RideCheck reports may include:
+
+Market value comparisons
+
+Observed pricing discrepancies
+
+Negotiation recommendations
+
+These estimates are based on available data and professional judgment. They are not appraisals, guarantees of value, or financial advice.
+
+5. Seller Cooperation Required
+
+RideCheck cannot complete inspections without seller access.
+
+If a seller refuses access or becomes unresponsive:
+
+Before inspector assignment: Full refund
+
+After inspector assignment and travel has begun: No refund
+
+Labor, scheduling, and coordination costs are incurred once assignment occurs.
+
+6. Payment & Refund Policy
+
+All payments are processed securely via Stripe.
+
+Payment is required before seller contact and inspection scheduling.
+
+Refund Policy:
+
+Full refund if no inspector has been assigned
+
+No refund once inspector assignment or travel begins
+
+No refund for completed inspections, regardless of findings
+
+Chargebacks filed without prior contact may result in account restriction.
+
+7. Timing & Turnaround
+
+Most inspections are completed within 24–48 hours of payment, subject to:
+
+Seller availability
+
+Weather conditions
+
+Inspector scheduling
+
+Service area limitations
+
+RideCheck does not guarantee specific turnaround times.
+
+8. Road Tests & OBD-II Scans
+
+Road tests and OBD scans are performed when:
+
+Seller permission is granted
+
+Conditions are safe and legally permissible
+
+RideCheck is not responsible if:
+
+A seller refuses a road test
+
+An OBD port is inaccessible
+
+Weather conditions prevent certain checks
+
+9. Report Accuracy & Limitations
+
+RideCheck inspectors provide structured observational findings.
+
+However:
+
+Some issues are not visible without disassembly
+
+Intermittent problems may not appear during inspection
+
+Repair estimates are approximate
+
+Findings represent professional opinion, not certified mechanical verdicts
+
+10. Limitation of Liability
+
+RideCheck’s total liability for any claim is limited to the amount paid for that specific inspection.
+
+RideCheck is not liable for:
+
+Vehicle repair costs after purchase
+
+Consequential or incidental damages
+
+Lost opportunity costs
+
+Travel expenses
+
+Undetected issues not observable during inspection
+
+11. Independent Inspectors
+
+RideCheckers operate as independent contractors.
+
+RideCheck provides standards, structure, and report formatting but does not control the minute-by-minute execution methods of independent contractors.
+
+12. Service Area Limitations
+
+RideCheck currently operates in limited pilot service areas.
+
+Availability is restricted by ZIP code and county. RideCheck reserves the right to decline service outside active areas.
+
+13. User Responsibilities
+
+By using RideCheck, you agree to:
+
+Provide accurate vehicle information
+
+Make your own independent buying decision
+
+Conduct additional due diligence if desired
+
+Not hold RideCheck responsible for post-purchase outcomes
+
+14. Prohibited Uses
+
+You may not use RideCheck to:
+
+Harass or intimidate sellers
+
+Misrepresent your identity
+
+Reverse engineer inspection processes
+
+Resell inspection data commercially without permission
+
+15. Governing Law
+
+These Terms are governed by the laws of the State of Illinois.
+
+Any disputes shall be resolved in Lake County, Illinois.
+
+16. Contact Information
+
+RideCheck
+33 N County St
+Waukegan, IL 60085
+Email: support@ridecheckauto.com
