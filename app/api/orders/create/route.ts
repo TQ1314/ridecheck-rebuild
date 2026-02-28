@@ -9,7 +9,7 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-export const createOrderSchema = z.object({
+const createOrderSchema = z.object({
   vehicle_year: z.number().int().min(1900).max(2030),
   vehicle_make: z.string().min(1).max(100),
   vehicle_model: z.string().min(1).max(100),
