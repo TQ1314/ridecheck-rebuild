@@ -45,7 +45,7 @@ export async function GET(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (!order.tracking_token || order.tracking_token !== t) {
+    if (!(order as any).tracking_token || (order as any).tracking_token !== t) {
       return NextResponse.json({ error: "Invalid tracking token" }, { status: 403 });
     }
 

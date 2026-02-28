@@ -67,7 +67,6 @@ export async function PATCH(
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "order.assigned",
-        resourceType: "order",
         resourceId: params.orderId,
         newValue: eventDetails,
       }),

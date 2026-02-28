@@ -107,7 +107,6 @@ export async function POST(
       actorEmail: actor.email,
       actorRole: actor.role,
       action: "report.uploaded",
-      resourceType: "order",
       resourceId: order.order_id,
       newValue: { storage_path: storagePath, file_name: file.name },
     });

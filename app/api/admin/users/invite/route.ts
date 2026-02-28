@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
       actorEmail: actor.email,
       actorRole: actor.role,
       action: "user.invited",
-      resourceType: "user_invite",
       resourceId: invite?.id,
+      metadata: { resourceType: "user_invite" },
       newValue: { email: parsed.data.email, role: parsed.data.role },
     });
 

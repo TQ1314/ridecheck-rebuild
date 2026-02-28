@@ -111,7 +111,6 @@ export async function POST(
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "order.payment_requested",
-        resourceType: "order",
         resourceId: params.orderId,
         newValue: {
           payment_status: "requested",

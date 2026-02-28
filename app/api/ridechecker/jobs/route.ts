@@ -63,7 +63,7 @@ export async function GET() {
 
           const orderMap: Record<string, any> = {};
           if (orderData) {
-            for (const o of orderData) {
+            for (const o of orderData as any[]) {
               orderMap[o.id] = o;
             }
           }

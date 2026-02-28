@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
       actorEmail: actor.email,
       actorRole: actor.role,
       action: "inspector.created",
-      resourceType: "inspector",
       resourceId: inspector.id,
+      metadata: { resourceType: "inspector" },
       newValue: { full_name: parsed.data.full_name, region: parsed.data.region },
     });
 

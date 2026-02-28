@@ -76,8 +76,8 @@ export async function PATCH(
       actorEmail: actor.email,
       actorRole: actor.role,
       action: "inspector.updated",
-      resourceType: "inspector",
       resourceId: params.inspectorId,
+      metadata: { resourceType: "inspector" },
       newValue: parsed.data,
     });
 

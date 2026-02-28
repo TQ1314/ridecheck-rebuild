@@ -83,7 +83,6 @@ export async function PATCH(
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "order.status_changed",
-        resourceType: "order",
         resourceId: params.orderId,
         oldValue: { status: oldStatus },
         newValue: { status: parsed.data.status },

@@ -70,7 +70,6 @@ export async function POST(
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "order.ops_status_changed",
-        resourceType: "order",
         resourceId: params.orderId,
         oldValue: { ops_status: oldOpsStatus },
         newValue: { ops_status: parsed.data.ops_status },

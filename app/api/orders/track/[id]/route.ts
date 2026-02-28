@@ -40,24 +40,24 @@ export async function GET(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  // Security gate: token must match
-  if (order.tracking_token !== t) {
+  const o = order as any;
+
+  if (o.tracking_token !== t) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Return ONLY what buyers should see
   return NextResponse.json({
-    id: order.id,
-    order_number: order.order_number,
-    created_at: order.created_at,
-    status: order.status,
-    ops_status: order.ops_status,
-    payment_status: order.payment_status,
-    vehicle: `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`,
-    vehicle_location: order.vehicle_location,
-    preferred_date: order.preferred_date,
-    booking_type: order.booking_type,
-    package: order.package,
-    report_url: order.report_url ?? null,
+    id: o.id,
+    order_number: o.order_number,
+    created_at: o.created_at,
+    status: o.status,
+    ops_status: o.ops_status,
+    payment_status: o.payment_status,
+    vehicle: `${o.vehicle_year} ${o.vehicle_make} ${o.vehicle_model}`,
+    vehicle_location: o.vehicle_location,
+    preferred_date: o.preferred_date,
+    booking_type: o.booking_type,
+    package: o.package,
+    report_url: o.report_url ?? null,
   });
 }

@@ -100,8 +100,7 @@ export async function POST(
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "order.report_delivered",
-        resourceType: "order",
-        resourceId: order.id, // UUID (THIS must match your GET route filter)
+        resourceId: order.id,
         newValue: { delivered_to: buyerEmail || null },
       }),
     ]);

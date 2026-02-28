@@ -136,7 +136,6 @@ export async function PATCH(
       actorEmail: actor.email,
       actorRole: actor.role,
       action: "inspector.status_update",
-      resourceType: "order",
       resourceId: order.order_id,
       oldValue: { inspector_status: order.inspector_status },
       newValue: updates,
