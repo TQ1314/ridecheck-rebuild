@@ -47,8 +47,8 @@ export default function PublicHomePage() {
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <Stat label="Starting at" value="$119" sub="Buyer-friendly due diligence" />
-              <Stat label="On-site time" value="~45 min" sub="Documented inspection" />
+              <Stat label="Starting at" value="$139" sub="Buyer-friendly due diligence" />
+              <Stat label="Report turnaround" value="4–6 hrs" sub="After on-site inspection" />
               <Stat label="Report" value="Buyer-ready" sub="Photos + findings" />
             </div>
 
