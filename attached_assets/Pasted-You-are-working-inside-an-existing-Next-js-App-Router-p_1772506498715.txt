@@ -1,0 +1,107 @@
+You are working inside an existing Next.js (App Router) project called RideCheck running in Replit and deploying to Vercel. 
+
+GOAL:
+Implement a RideChecker Dashboard that is controlled by Ops assignments in Supabase, with Accept/Decline, ETA updates, Guided Inspection (photos + quick checks), and Report Preview — based on the provided HTML prototype behavior — but implemented correctly in Next.js and WITHOUT breaking existing build/deploy.
+
+CRITICAL RULES:
+- First scan the repo before editing anything.
+- Do NOT overwrite existing working routes/pages. Only add missing files or patch minimal diffs.
+- If a file already exists and functionally matches requirements, leave it alone.
+- Fix build blockers only with minimal changes (don’t refactor unrelated areas).
+- Keep API routes exporting ONLY HTTP handlers (GET/POST/etc). Never export schemas/constants from route.ts.
+- Ensure `npm run build` passes locally.
+
+STEP 0 — REPO AUDIT
+1) Identify the Next.js version, whether App Router is used (app/ directory).
+2) Identify existing Supabase helpers (lib/supabase/*). Reuse them.
+3) Locate existing tables referenced in code: orders, inspectors/ridecheckers, assignments, inspection_items, audit_logs, etc.
+4) Locate current RideChecker routes/pages (app/ridechecker/*).
+5) Locate any existing API routes for orders, inspectors, assignments.
+
+STEP 1 — FIX KNOWN BUILD ISSUES (ONLY IF PRESENT)
+A) If any app/api/**/route.ts exports anything besides GET/POST/etc, move those exports into a separate file:
+   - e.g. move zod schema to `app/api/.../schema.ts` or `lib/validators/...`
+   - keep route.ts exporting only handlers.
+B) If build fails because `useSearchParams()` isn’t wrapped in Suspense:
+   - For each listed page, wrap the component using `useSearchParams` in `<Suspense fallback={null}>...</Suspense>`
+   - OR split into a client component and wrap it from a server component page.tsx.
+   - Keep minimal diff, no redesign.
+C) Ensure server runtime is correct for Vercel:
+   - Remove any Replit-specific run command like `node ./dist/index.cjs` if it exists.
+   - Ensure package scripts include: `"build": "next build"` and `"start": "next start"`.
+D) If Next tries to static render pages that depend on cookies/session and errors:
+   - Add `export const dynamic = "force-dynamic";` to affected route handlers or pages ONLY when necessary.
+   - Do not blanket-force dynamic everywhere.
+
+STEP 2 — ADD RIDE-CHECKER DASHBOARD ROUTE (ONLY IF MISSING)
+Create `app/ridechecker/dashboard/page.tsx` (or update if already exists) with:
+- A clean UI that matches the prototype structure:
+  - Bottom nav: Jobs, Bookings (Inspection), Chat, Account (NO Shifts)
+  - Jobs screen: assigned job card with Accept/Decline and acceptance timer
+  - Bookings screen: guided photos list + quick checks (Pass/Concern/Fail + note) + Preview report + Complete inspection
+  - Chat screen: basic Ops chat UI (can be stubbed if chat backend not built)
+  - Account screen: list items (Earnings, Payout, Notifications, Documents)
+- Must be `"use client"` for interactivity.
+- Use minimal dependencies (plain React + existing UI components if present).
+- The dashboard should load “current active assignment” from API.
+
+STEP 3 — OPS-CONTROLLED ASSIGNMENTS API (ONLY ADD IF MISSING)
+Implement these API routes using existing Supabase server client helper:
+1) GET current assignment:
+   - `app/api/ridechecker/assignments/route.ts`
+   - Returns the latest assignment for the logged-in RideChecker where status in ["assigned","accepted","enroute"].
+2) POST accept:
+   - `app/api/ridechecker/assignments/[assignmentId]/accept/route.ts`
+   - Updates status to "accepted", sets accepted_at timestamp, logs audit.
+3) POST decline:
+   - `app/api/ridechecker/assignments/[assignmentId]/decline/route.ts`
+   - Requires reason + optional note, updates status to "declined" or "reassigned", logs audit.
+4) POST update ETA:
+   - `app/api/ridechecker/assignments/[assignmentId]/eta/route.ts`
+   - Accepts delay_mins, updates eta_delay_mins, logs audit.
+
+IMPORTANT:
+- Enforce that assignment belongs to the logged-in RideChecker (inspector_id = user.id).
+- Use RLS-safe patterns and handle unauthorized properly.
+- If writeAuditLog exists, use its accepted signature. Do NOT add unsupported fields like resourceType. If you need “type”, store it inside metadata.
+
+STEP 4 — GUIDED INSPECTION STORAGE (ONLY ADD IF MISSING)
+Add an API endpoint:
+- `app/api/ridechecker/inspections/update/route.ts` (POST)
+Payload:
+- assignmentId
+- itemType: "photo" | "check"
+- key (e.g. "vin", "warnings")
+- status: for checks: "ok" | "warn" | "bad", for photos: "captured"
+- note (optional)
+Store in `inspection_items` table if it exists; otherwise create a minimal table migration file in `/supabase/migrations/` and document it.
+
+STEP 5 — COMPLETE INSPECTION (ONLY ADD IF MISSING)
+Add:
+- `app/api/ridechecker/inspections/complete/route.ts` (POST)
+Behavior:
+- Validate required photos captured AND all checks answered AND notes present when warn/bad.
+- Update assignment status -> "completed"
+- Optionally mark order status -> "report_ready" if order linkage exists.
+- Log audit.
+
+STEP 6 — DYNAMIC PAYOUT MODEL (SAFE & OPTIONAL)
+Implement payout calculation in a single place without breaking UI:
+- Create `lib/payout/calcPayout.ts`
+- Function: `calcPayout({ base, distanceMiles, urgencyAddon, agencyMultiplier })`
+- Default behavior should match current flat payouts if new fields are absent.
+- Dashboard should show calculated payout for the assignment.
+- Store payout fields on assignment if columns exist; otherwise compute on read and return via API.
+
+STEP 7 — AUTH / ROLE GATING (ONLY IF ALREADY PRESENT)
+If middleware role gates exist, ensure `/ridechecker/dashboard` requires ridechecker role.
+Do NOT introduce complex auth changes; only hook into what is already there.
+
+STEP 8 — FINAL CHECKS
+- Run `npm run build` and fix remaining type errors minimally.
+- Ensure all new API route files export only handlers.
+- Ensure no pages are broken.
+- Provide a short summary of what was created/changed and where.
+
+DELIVERABLE:
+A working RideChecker Dashboard route and supporting APIs that build successfully and are safe to deploy to Vercel.

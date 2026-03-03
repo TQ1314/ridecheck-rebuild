@@ -145,12 +145,14 @@ The user prefers clear and concise communication. They value iterative developme
   - Migration 008: ridechecker_availability, ridechecker_job_assignments, ridechecker_raw_submissions tables
   - Profile scoring columns: ridechecker_max_daily_jobs, ridechecker_rating, ridechecker_quality_score, ridechecker_on_time_pct, etc.
   - Orders ops columns: ops_report_url, ops_summary, ops_severity_overall, assigned_ridechecker_id, report_sent_at
-  - RideChecker APIs: /api/ridechecker/availability (GET/POST), /api/ridechecker/jobs/[assignmentId]/accept|start|submit
+  - RideChecker APIs: /api/ridechecker/availability (GET/POST), /api/ridechecker/jobs/[assignmentId]/accept|start|submit|decline|eta
   - Ops APIs: /api/ops/orders/[orderId]/raw-submission, report/save, report/send, approve-submission, reject-submission
   - Payout API: /api/ops/payouts/[assignmentId]/mark-paid
   - Scoring algorithm (lib/ridechecker/scoring.ts): 0-100 score per job (checklist 40pt, photos 20pt, text 20pt, timeliness 20pt)
   - Payout rates (lib/ridechecker/payouts.ts): standard=$50, plus=$65, premium=$80, comprehensive=$130
+  - Dynamic payout calculator (lib/payout/calcPayout.ts): base + distance addon + urgency + multiplier
   - Enhanced RideChecker dashboard with tabs: Availability, My Jobs, Earnings, Kudos, Training
+  - Dashboard features: Accept/Decline buttons, payout amount display, declined status badge
   - Structured raw data submission form: required photos, tread depth, brake condition, scan codes, 5 text sections
   - OpsReportBuilderPanel in admin order detail: raw submission viewer, severity/summary report builder, approve/reject, payout management
   - Privacy: RideCheckers never see buyer identity; buyers never see RideChecker identity

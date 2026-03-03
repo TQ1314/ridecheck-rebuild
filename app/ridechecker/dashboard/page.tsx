@@ -73,6 +73,7 @@ interface Assignment {
   order_id: string;
   status: string;
   score?: number;
+  payout_amount?: number;
   vehicle_year?: string;
   vehicle_make?: string;
   vehicle_model?: string;
@@ -268,6 +269,29 @@ export default function RideCheckerDashboardPage() {
     setActionLoading(null);
   };
 
+  const handleDeclineJob = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "declined_by_ridechecker" }),
+      });
+      if (res.ok) {
+        toast({ title: "Job declined" });
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === assignmentId ? { ...a, status: "declined" } : a))
+        );
+      } else {
+        const data = await res.json();
+        toast({ title: data.error || "Failed to decline job", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to decline job", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
   const handleAddAvailability = async () => {
     if (!availForm.date) {
       toast({ title: "Please select a date", variant: "destructive" });
@@ -348,14 +372,25 @@ export default function RideCheckerDashboardPage() {
     switch (assignmentStatus) {
       case "assigned":
         return (
-          <Button
-            size="sm"
-            onClick={() => handleAcceptJob(assignmentId)}
-            disabled={isLoading}
-            data-testid={`button-accept-job-${assignmentId}`}
-          >
-            {isLoading ? "..." : "Accept Job"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => handleAcceptJob(assignmentId)}
+              disabled={isLoading}
+              data-testid={`button-accept-job-${assignmentId}`}
+            >
+              {isLoading ? "..." : "Accept"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleDeclineJob(assignmentId)}
+              disabled={isLoading}
+              data-testid={`button-decline-job-${assignmentId}`}
+            >
+              Decline
+            </Button>
+          </div>
         );
       case "accepted":
         return (
@@ -386,6 +421,12 @@ export default function RideCheckerDashboardPage() {
         return (
           <Badge variant="default" data-testid={`badge-completed-${assignmentId}`}>
             Completed{score != null ? ` (${score})` : ""}
+          </Badge>
+        );
+      case "declined":
+        return (
+          <Badge variant="destructive" data-testid={`badge-declined-${assignmentId}`}>
+            Declined
           </Badge>
         );
       default:
@@ -620,6 +661,12 @@ export default function RideCheckerDashboardPage() {
                                     <Calendar className="h-3.5 w-3.5" />
                                     {a.scheduled_date}
                                     {a.scheduled_time ? ` at ${a.scheduled_time}` : ""}
+                                  </span>
+                                )}
+                                {a.payout_amount != null && a.payout_amount > 0 && (
+                                  <span className="flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400" data-testid={`text-payout-${a.id}`}>
+                                    <DollarSign className="h-3.5 w-3.5" />
+                                    ${a.payout_amount.toFixed(2)}
                                   </span>
                                 )}
                               </div>
