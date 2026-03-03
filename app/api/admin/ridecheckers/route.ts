@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/resend";
+
+export const dynamic = "force-dynamic";
 import {
   ridecheckerApprovedHtml,
   ridecheckerRejectedHtml,

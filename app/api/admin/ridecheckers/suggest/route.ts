@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const result = await requireRole(["owner", "operations_lead", "operations"]);
   if (!isAuthorized(result)) return result.error;
