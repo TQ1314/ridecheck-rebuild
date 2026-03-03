@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,14 @@ import {
 import { t, type Language } from "@/lib/i18n/translations";
 
 export default function OrderConfirmationPage() {
+  return (
+    <Suspense fallback={<div className="py-20 flex justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+      <OrderConfirmationInner />
+    </Suspense>
+  );
+}
+
+function OrderConfirmationInner() {
   const searchParams = useSearchParams();
 
   const orderId = searchParams.get("order_id");

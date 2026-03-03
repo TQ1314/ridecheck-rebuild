@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ArrowRight, Home, MessageSquare, RefreshCw } from "lucide-react";
 
 export default function OrderReceivedPage() {
+  return (
+    <Suspense fallback={<div className="py-20 flex justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+      <OrderReceivedInner />
+    </Suspense>
+  );
+}
+
+function OrderReceivedInner() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
   const trackUrl = searchParams.get("track");

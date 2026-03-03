@@ -1,7 +1,7 @@
 // app/track/[orderId]/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -60,6 +60,14 @@ function friendlyBookingType(raw?: string | null): string {
 }
 
 export default function TrackOrderPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+      <TrackOrderInner />
+    </Suspense>
+  );
+}
+
+function TrackOrderInner() {
   const params = useParams();
   const search = useSearchParams();
 

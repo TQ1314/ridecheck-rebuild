@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,14 @@ interface PayOrderSummary {
 }
 
 export default function PayPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+      <PayInner />
+    </Suspense>
+  );
+}
+
+function PayInner() {
   const params = useParams();
   const search = useSearchParams();
   const orderId = params.orderId as string;

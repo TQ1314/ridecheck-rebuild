@@ -1,0 +1,156 @@
+You’re not wasting credits. These are 3 separate, very fixable build killers and we can solve them without breaking flows:
+
+useSearchParams must be inside a <Suspense> boundary (App Router rule)
+
+Pages are being treated as static when they need dynamic (cookies/request.url usage)
+
+Wrong run command (node ./dist/index.cjs) — that’s not how Next runs
+
+Below is the exact patch plan + copy/paste code.
+
+1) Fix useSearchParams() build errors (wrap in Suspense)
+
+Problem: Any page/component using useSearchParams() must be rendered inside <Suspense>.
+
+Clean pattern (safe, minimal):
+
+Keep the existing page UI
+
+Move the useSearchParams() usage into a child component
+
+Wrap that child component in <Suspense fallback={...}>
+
+Example patch (do this for each failing page)
+
+Failing pages:
+
+/app/book/page.tsx
+
+/app/order/received/page.tsx
+
+/app/order/confirmation/page.tsx
+
+/app/auth/login/page.tsx
+
+/app/ridechecker/signup/page.tsx
+
+✅ Template you can copy/paste
+
+In each of those pages, change to:
+
+// app/book/page.tsx
+import { Suspense } from "react";
+import BookInner from "./BookInner";
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading…</div>}>
+      <BookInner />
+    </Suspense>
+  );
+}
+
+Then create BookInner.tsx in same folder:
+
+// app/book/BookInner.tsx
+"use client";
+
+import { useSearchParams } from "next/navigation";
+
+export default function BookInner() {
+  const searchParams = useSearchParams();
+  // keep your existing logic here
+  const listing = searchParams.get("listing");
+
+  return (
+    <div className="p-6">
+      {/* paste your existing JSX here */}
+      <div>Listing: {listing}</div>
+    </div>
+  );
+}
+
+Do the same pattern for the other pages:
+
+ReceivedInner.tsx
+
+ConfirmationInner.tsx
+
+LoginInner.tsx
+
+SignupInner.tsx
+
+This will not break functionality. It only fixes build rules.
+
+2) Stop Next from trying to pre-render pages that depend on cookies / request.url
+
+If a page (or route handler) depends on dynamic data, force it to be dynamic.
+
+For affected pages (safe fix)
+
+At the top of each affected page file (server component pages), add:
+
+export const dynamic = "force-dynamic";
+
+Add this to:
+
+app/book/page.tsx
+
+app/order/received/page.tsx
+
+app/order/confirmation/page.tsx
+
+app/auth/login/page.tsx
+
+app/ridechecker/signup/page.tsx
+
+For API routes using cookies / request.url
+
+In route handlers that read cookies, headers, request.url, etc., add:
+
+export const dynamic = "force-dynamic";
+
+Example:
+
+// app/api/orders/create/route.ts
+export const dynamic = "force-dynamic";
+
+export async function POST(req: Request) {
+  // ...
+}
+
+This tells Next: “don’t try to statically analyze this.”
+
+3) Fix the “run command” issue (must use next start)
+
+Problem: Your deployment is trying to run node ./dist/index.cjs which is for a different build system.
+
+Correct setup
+
+In package.json, ensure you have:
+
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+
+Then in Replit deployment settings:
+
+Build command: npm run build
+
+Run command: npm run start
+
+That’s it.
+
+The fastest “don’t break anything” path (do this in order)
+
+Add dynamic = "force-dynamic" to the 5 pages
+
+Wrap useSearchParams with Suspense using the “Inner component” pattern
+
+Add dynamic = "force-dynamic" to any API route that reads cookies/request.url
+
+Fix run command to npm run start
