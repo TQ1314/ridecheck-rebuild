@@ -32,6 +32,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/what-we-check" className="hover:text-foreground transition-colors">
+                  What We Check
+                </Link>
+              </li>
+              <li>
                 <Link href="/book" className="hover:text-foreground transition-colors">
                   Book Assessment
                 </Link>
@@ -41,6 +46,11 @@ export function Footer() {
           <div>
             <h4 className="font-semibold text-sm mb-3">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link href="/faq" className="hover:text-foreground transition-colors">
+                  FAQ
+                </Link>
+              </li>
               <li>
                 <Link href="/join" className="hover:text-foreground transition-colors">
                   Join Our Team

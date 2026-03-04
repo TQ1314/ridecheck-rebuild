@@ -20,6 +20,8 @@ const PUBLIC_ROUTES = [
   "/terms",
   "/privacy",
   "/contact",
+  "/faq",
+  "/what-we-check",
 ];
 
 const INVITE_PREFIX = "/invite/";
