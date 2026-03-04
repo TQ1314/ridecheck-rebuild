@@ -1,5 +1,6 @@
 // app/(public)/page.tsx
 import Image from "next/image";
+import { HeroSlideshow } from "@/components/ui/hero-slideshow";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -60,15 +61,7 @@ export default function PublicHomePage() {
 
           {/* IMAGE */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-gray-100">
-              <Image
-                src="/images/hero-inspection.jpg"
-                alt="Professional used car inspection"
-                fill
-                className="object-cover"
-                priority
-              />
-            </div>
+            <HeroSlideshow />
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border bg-gray-50 p-4">
