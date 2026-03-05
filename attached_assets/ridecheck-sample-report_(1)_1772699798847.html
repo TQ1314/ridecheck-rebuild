@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RideCheck Inspection Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background: #f9fafb;
+            padding: 20px;
+        }
+        
+        .report-container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 40px 40px 30px;
+        }
+        
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .logo-circle {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            color: #059669;
+        }
+        
+        .company-name {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .report-title {
+            font-size: 18px;
+            opacity: 0.95;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+        
+        .report-meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .meta-item {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .meta-label {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .condition-banner {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 35px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .condition-icon {
+            width: 70px;
+            height: 70px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            flex-shrink: 0;
+        }
+        
+        .condition-text h2 {
+            font-size: 24px;
+            color: #065f46;
+            margin-bottom: 5px;
+        }
+        
+        .condition-text p {
+            color: #047857;
+            font-size: 15px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #059669;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-icon {
+            font-size: 24px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #059669;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+        }
+        
+        .insights-box {
+            background: #fffbeb;
+            border: 2px solid #fbbf24;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 35px;
+        }
+        
+        .insights-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .insights-icon {
+            font-size: 28px;
+        }
+        
+        .insights-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #78350f;
+        }
+        
+        .insight-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #fde68a;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .insight-item:last-child {
+            border-bottom: none;
+        }
+        
+        .insight-bullet {
+            color: #f59e0b;
+            font-size: 20px;
+            margin-top: 2px;
+        }
+        
+        .insight-text {
+            flex: 1;
+            color: #92400e;
+            font-size: 15px;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .status-good {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-monitor {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-risk {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .dot-green { background: #10b981; }
+        .dot-yellow { background: #f59e0b; }
+        .dot-red { background: #ef4444; }
+        
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .photo-placeholder {
+            background: #f3f4f6;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            aspect-ratio: 4/3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+            font-size: 14px;
+            gap: 8px;
+        }
+        
+        .photo-icon {
+            font-size: 32px;
+        }
+        
+        .observation-card {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #6b7280;
+        }
+        
+        .observation-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #111827;
+            margin-bottom: 10px;
+        }
+        
+        .observation-text {
+            color: #4b5563;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+        
+        .negotiation-box {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .negotiation-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .negotiation-icon {
+            font-size: 28px;
+        }
+        
+        .negotiation-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #14532d;
+        }
+        
+        .negotiation-text {
+            color: #166534;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+        
+        .cost-estimate {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #047857;
+        }
+        
+        .summary-box {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .summary-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .summary-text {
+            color: #4b5563;
+            font-size: 15px;
+            line-height: 1.8;
+        }
+        
+        .disclaimer {
+            background: #f3f4f6;
+            border-left: 4px solid #6b7280;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+        
+        .disclaimer-title {
+            font-weight: 700;
+            color: #374151;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        
+        .footer {
+            background: #111827;
+            color: #9ca3af;
+            padding: 25px 40px;
+            text-align: center;
+            font-size: 13px;
+        }
+        
+        .footer-links {
+            margin-top: 10px;
+        }
+        
+        .footer-link {
+            color: #10b981;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .report-container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-area">
+                <div class="logo-circle">R</div>
+                <div>
+                    <div class="company-name">RideCheck</div>
+                    <div class="report-title">Pre-Purchase Inspection Report</div>
+                </div>
+            </div>
+            
+            <div class="report-meta">
+                <div class="meta-item">
+                    <div class="meta-label">Report ID</div>
+                    <div>RC-2026-03456</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Inspection Date</div>
+                    <div>March 5, 2026</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Inspector</div>
+                    <div>RideCheck Certified Inspector</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <!-- Overall Condition Banner -->
+            <div class="condition-banner">
+                <div class="condition-icon">🟢</div>
+                <div class="condition-text">
+                    <h2>RideCheck Condition Indicator: Good</h2>
+                    <p>This vehicle shows normal wear appropriate for its age and mileage. Minor items noted for buyer awareness.</p>
+                </div>
+            </div>
+            
+            <!-- Report Generation Info -->
+            <div style="background: #f0f9ff; border: 1px solid #0284c7; border-radius: 8px; padding: 20px; margin-bottom: 35px; font-size: 14px; color: #0c4a6e;">
+                <div style="font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <span>ℹ️</span>
+                    Report Generation Process
+                </div>
+                <div style="line-height: 1.6;">
+                    This report was compiled from field inspection data submitted by a RideCheck-certified inspector. All findings were reviewed by RideCheck operations and formatted into this buyer-ready report. Buyers and inspectors do not communicate directly—RideCheck coordinates all aspects of the inspection process.
+                </div>
+            </div>
+            
+            <!-- Top 3 Buyer Insights -->
+            <div class="insights-box">
+                <div class="insights-header">
+                    <div class="insights-icon">💡</div>
+                    <div class="insights-title">Top 3 Buyer Insights</div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-bullet">1.</div>
+                    <div class="insight-text">Minor oil seep detected at valve cover gasket — not urgent, but plan repair within 6–12 months ($350–$500)</div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-bullet">2.</div>
+                    <div class="insight-text">Front tires at 4/32" tread depth — legal but recommend replacement within 8–12 months for safety ($600–$800)</div>
+                </div>
+                <div class="insight-item">
+                    <div class="insight-bullet">3.</div>
+                    <div class="insight-text">No structural damage, frame issues, or title concerns observed — vehicle appears well-maintained</div>
+                </div>
+            </div>
+            
+            <!-- Vehicle Information -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">🚗</span>
+                    Vehicle Information
+                </h2>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Year, Make, Model</div>
+                        <div class="info-value">2019 Honda Accord Sport</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">VIN</div>
+                        <div class="info-value">1HGCV1F39KA123456</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Odometer Reading</div>
+                        <div class="info-value">47,235 miles</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Exterior Color</div>
+                        <div class="info-value">Modern Steel Metallic</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Engine</div>
+                        <div class="info-value">1.5L Turbo 4-Cylinder</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Transmission</div>
+                        <div class="info-value">CVT Automatic</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VIN & Title Documentation -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">🔍</span>
+                    VIN & Title Documentation
+                </h2>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">VIN Verification</div>
+                        <div class="info-value">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Verified
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">VIN Match (Dash/Door)</div>
+                        <div class="info-value">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Match Confirmed
+                            </span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Title Status (as presented)</div>
+                        <div class="info-value">Clean Title Indicated</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Ownership Documentation</div>
+                        <div class="info-value">Single Owner Listed</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Title Review</div>
+                        <div class="info-value">Documentation Reviewed</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Odometer Declaration</div>
+                        <div class="info-value">Consistent with Title</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 14px; color: #92400e;">
+                    <strong>Important:</strong> This section documents the title and ownership information as presented by the seller. Buyers should verify title status, lien holder information, and ownership records directly with their state DMV before completing purchase.
+                </div>
+            </div>
+            
+            <!-- OBD-II Diagnostic Scan -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">💻</span>
+                    OBD-II Diagnostic Scan
+                </h2>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Computer Diagnostics</div>
+                    <div class="observation-text">
+                        <strong>Stored Codes:</strong> None detected<br>
+                        <strong>Pending Codes:</strong> None detected<br>
+                        <strong>Readiness Monitors:</strong> All systems ready<br>
+                        <strong>Check Engine Light:</strong> Not illuminated<br>
+                        <strong>Battery Voltage:</strong> 12.6V (healthy)<br>
+                        <strong>Emissions Status:</strong> Pass — all readiness monitors complete
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <span class="status-indicator status-good">
+                        <span class="status-dot dot-green"></span>
+                        No Issues Detected
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Mechanical Observations -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">🔧</span>
+                    Mechanical Observations
+                </h2>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Engine</div>
+                    <div class="observation-text">
+                        Engine starts smoothly and idles steady. Minor oil seep observed at valve cover gasket (common for this model). Oil level full, color acceptable. Coolant level good, no leaks detected. Belts and hoses in good condition. No abnormal noises during operation.
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-monitor">
+                                <span class="status-dot dot-yellow"></span>
+                                Monitor — Minor seep noted
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Transmission</div>
+                    <div class="observation-text">
+                        CVT transmission shifts smoothly with no hesitation or slipping. Fluid level appears adequate (CVT systems do not have dipstick on this model). No leaks detected at pan or seals. Test drive showed normal acceleration and deceleration.
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Good Condition
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Brakes</div>
+                    <div class="observation-text">
+                        Front brake pads: 6mm remaining (50% life)<br>
+                        Rear brake pads: 7mm remaining (60% life)<br>
+                        Rotors: Light surface rust (normal), no scoring or warping<br>
+                        Brake fluid: Clean, proper level<br>
+                        Parking brake: Holds properly<br>
+                        Brake pedal feel: Firm, responsive
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Good Condition
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Suspension & Steering</div>
+                    <div class="observation-text">
+                        Suspension components visually inspected — no excessive play or worn bushings detected. Steering responsive with no unusual noises. Vehicle tracks straight on test drive. No visible leaks from shock absorbers. Ball joints and tie rods appear secure.
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Good Condition
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tires -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">🛞</span>
+                    Tires & Wheels
+                </h2>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Tire Condition</div>
+                    <div class="observation-text">
+                        <strong>Brand:</strong> Michelin Defender<br>
+                        <strong>Size:</strong> 235/40R18<br><br>
+                        
+                        <strong>Tread Depth:</strong><br>
+                        • Front Left: 4/32" — approaching replacement threshold<br>
+                        • Front Right: 4/32" — approaching replacement threshold<br>
+                        • Rear Left: 6/32" — acceptable<br>
+                        • Rear Right: 6/32" — acceptable<br><br>
+                        
+                        <strong>Tire Age:</strong> DOT date code indicates 4 years old (acceptable)<br>
+                        <strong>Wear Pattern:</strong> Even wear, proper inflation maintained<br>
+                        <strong>Wheels:</strong> No curb rash or damage observed
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-monitor">
+                                <span class="status-dot dot-yellow"></span>
+                                Monitor — Front tires need replacement soon
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Exterior & Interior -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">✨</span>
+                    Exterior & Interior Condition
+                </h2>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Exterior</div>
+                    <div class="observation-text">
+                        Paint in good overall condition with normal wear. Minor scratches on rear bumper (cosmetic only). No evidence of major collision repair or repainting. Panel gaps appear factory-consistent. Glass in good condition with no cracks. All lights functional. Windshield wipers in good condition.
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Good Condition
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="observation-card">
+                    <div class="observation-title">Interior</div>
+                    <div class="observation-text">
+                        Interior clean and well-maintained. Driver seat shows light wear consistent with mileage. All electronics tested and functional (radio, climate control, power windows, power locks). No warning lights on dashboard. Cabin air filter appears recently replaced. No unusual odors detected.
+                        <div style="margin-top: 10px;">
+                            <span class="status-indicator status-good">
+                                <span class="status-dot dot-green"></span>
+                                Good Condition
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inspection Photos -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-icon">📸</span>
+                    Inspection Photos
+                </h2>
+                
+                <div class="photo-grid">
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>VIN Plate Photo</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Engine Bay Overview</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Valve Cover Oil Seep</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Front Tire Tread Depth</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Exterior Front View</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Exterior Rear View</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Interior Dashboard</div>
+                    </div>
+                    <div class="photo-placeholder">
+                        <div class="photo-icon">📷</div>
+                        <div>Odometer Reading</div>
+                    </div>
+                </div>
+                
+                <p style="margin-top: 15px; color: #6b7280; font-size: 13px; font-style: italic;">
+                    Note: Actual inspection reports include 20-45 high-resolution photos documenting all findings.
+                </p>
+            </div>
+            
+            <!-- Negotiation Insight -->
+            <div class="negotiation-box">
+                <div class="negotiation-header">
+                    <div class="negotiation-icon">💰</div>
+                    <div class="negotiation-title">Negotiation Insight</div>
+                </div>
+                <div class="negotiation-text">
+                    Based on the findings in this inspection, here are the estimated repair considerations for near-term maintenance:
+                    
+                    <div class="cost-estimate">
+                        Estimated Repair Considerations: $950 – $1,300
+                    </div>
+                    
+                    <div style="margin-top: 15px; line-height: 1.8;">
+                        <strong>Breakdown:</strong><br>
+                        • Valve cover gasket replacement: $350 – $500<br>
+                        • Front tire replacement (pair): $600 – $800<br><br>
+                        
+                        <strong>Negotiation Strategy:</strong> These are maintenance items, not urgent repairs. You could negotiate $800-$1,000 off the asking price to account for these items, or request the seller complete the repairs before purchase.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inspector Summary -->
+            <div class="summary-box">
+                <div class="summary-header">
+                    <span>📝</span>
+                    Inspector Summary
+                </div>
+                <div class="summary-text">
+                    <strong>Overall Assessment:</strong> This 2019 Honda Accord Sport presents as a well-maintained vehicle with normal wear appropriate for its age and mileage. The minor oil seep at the valve cover gasket is a common issue for this model and year, and is not urgent but should be addressed within the next 6-12 months. Front tires are approaching the replacement threshold and should be budgeted for within the next 8-12 months for optimal safety and performance.<br><br>
+                    
+                    <strong>No major mechanical concerns, frame damage, or title issues were identified during this inspection.</strong> The vehicle's maintenance history appears consistent with proper care. The clean OBD-II scan and absence of warning lights support the overall positive condition assessment.<br><br>
+                    
+                    <strong>Recommendation:</strong> This vehicle is suitable for purchase. Budget for the identified maintenance items, or use these findings to negotiate a fair adjustment to the purchase price. A pre-purchase agreement should include verification that all representations made by the seller are accurate.
+                </div>
+            </div>
+            
+            <!-- Disclaimer -->
+            <div class="disclaimer">
+                <div class="disclaimer-title">IMPORTANT DISCLAIMER</div>
+                This inspection report represents the findings of a visual and diagnostic inspection performed at the time and location specified. This report is NOT a warranty or guarantee of the vehicle's future condition or fitness for use. RideCheck's liability is limited to the amount paid for this inspection service. Vehicle condition may change after the inspection date. This report is prepared for the named client only and may not be transferred or relied upon by third parties. Buyers are responsible for completing official title transfer at their state DMV. For complete terms and conditions, visit ridecheckauto.com/terms
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div><strong>RideCheck</strong> — Pre-Purchase Due Diligence for Used Cars</div>
+            <div class="footer-links">
+                <a href="#" class="footer-link">ridecheckauto.com</a> | 
+                <a href="#" class="footer-link"><span class="__cf_email__" data-cfemail="a0d3d5d0d0cfd2d4e0d2c9c4c5c3c8c5c3cbc1d5d4cf8ec3cfcd">[email&#160;protected]</span></a> | 
+                <a href="#" class="footer-link">(XXX) XXX-XXXX</a>
+            </div>
+            <div style="margin-top: 10px; font-size: 11px;">
+                Report generated on Marc
