@@ -135,7 +135,7 @@ export default function PublicHomePage() {
           />
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <Link
             href="/what-we-check"
             data-testid="link-what-we-check"
@@ -143,6 +143,16 @@ export default function PublicHomePage() {
           >
             See everything we check <ArrowRight className="h-4 w-4" />
           </Link>
+          <span className="hidden text-gray-300 sm:inline">|</span>
+          <a
+            href="/ridecheck-sample-report.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="link-sample-report"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline"
+          >
+            <FileText className="h-4 w-4" /> View a Sample Report
+          </a>
         </div>
       </section>
 
