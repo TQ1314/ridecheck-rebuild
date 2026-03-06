@@ -166,3 +166,10 @@ The user prefers clear and concise communication. They value iterative developme
   - Approve-submission forces payout_amount = $1.00 for test orders
   - Report delivery email prefixed with "[INTERNAL TEST]"
   - Documentation: docs/internal-test-flow.md
+- Buyer Ownership & Payment Reconciliation Fix (Mar 2026):
+  - Order creation now saves customer_id = authenticated user's Supabase ID (was always NULL)
+  - Stripe webhook (app/api/webhooks/stripe/route.ts) backfills customer_id from profile if missing
+  - Webhook logs: order_id, payment_intent, customer_email, update success/failure
+  - Buyer dashboard queries by customer_id — now works for logged-in buyers
+  - Stripe webhook URL is /api/webhooks/stripe (NOT /api/stripe/webhook)
+  - activity_log tracks customer_id_backfilled boolean

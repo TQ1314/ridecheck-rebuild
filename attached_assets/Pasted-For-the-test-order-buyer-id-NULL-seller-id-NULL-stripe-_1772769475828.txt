@@ -1,0 +1,605 @@
+For the test order:
+
+buyer_id = NULL
+
+seller_id = NULL
+
+stripe_session_id is populated for some rows
+
+stripe_payment_intent_id = NULL
+
+paid = NULL
+
+paid_at = NULL
+
+ops_status includes values like new, payment_pending
+
+order_status = created
+
+payment_link_sent_to is filled on some rows
+
+What that means
+
+RideCheck is doing this:
+
+Creating the order row
+
+Creating or saving a Stripe session
+
+Sending buyer to payment
+
+Showing a success page
+
+But it is not completing payment reconciliation back into the order row.
+
+So the real issue is:
+
+The post-payment update step is failing
+
+Specifically, your system is not updating:
+
+buyer_id
+
+stripe_payment_intent_id
+
+paid
+
+paid_at
+
+probably ops_status from payment_pending to the next state
+
+The biggest problem
+
+This one matters most:
+
+buyer_id is NULL
+
+That explains why the buyer may not see the order in their dashboard.
+
+If the buyer dashboard query is based on the logged-in user’s id, and the order row has no buyer_id, then the system has no ownership link.
+
+So even though the order exists, the buyer account cannot “see” it as theirs.
+
+So there are actually 2 bugs
+Bug 1: payment success is not updating the order
+
+Evidence:
+
+paid = NULL
+
+paid_at = NULL
+
+stripe_payment_intent_id = NULL
+
+Bug 2: buyer ownership is not attached to the order
+
+Evidence:
+
+buyer_id = NULL
+
+That is why:
+
+customer says “no orders”
+
+DB has an order row
+
+payment success screen appears
+
+ops flow is inconsistent
+
+What likely happened
+
+Your flow probably creates the order using:
+
+email
+
+phone
+
+booking info
+
+But does not attach the authenticated Supabase user id to buyer_id.
+
+Then later, Stripe success does not update the order with payment confirmation fields.
+
+
+
+What to fix
+Fix 1 — attach buyer_id when order is created
+
+When a logged-in buyer creates an order, save:
+
+buyer_id = auth.user.id
+
+Not just:
+
+buyer_email
+
+Fix 2 — on Stripe success/webhook, update the order row
+
+Your payment completion logic should update at least:
+
+stripe_payment_intent_id
+
+paid = true
+
+paid_at = now()
+
+ops_status = 'new' or 'seller_outreach' depending on your flow
+
+maybe order_status = 'payment_received' or whatever your app expects
+
+Right now that update is not happening.
+
+Why the success page is misleading
+
+The UI is treating:
+
+“Stripe returned success”
+
+as the same thing as:
+
+“Order is fully paid and recorded”
+
+Those are not the same.
+
+Your success page should only show true confirmation after the order row is updated.
+
+What to check next in code
+
+You need to inspect the route that handles one of these:
+
+Stripe webhook
+
+payment success callback
+
+checkout session completion handler
+You opened:
+
+https://www.ridecheckauto.com/api/stripe/webhook
+
+and got 404 – page not found.
+
+That means the webhook route does not exist in your deployed code.
+
+So Stripe has nowhere to send the payment confirmation.
+
+What is happening right now
+
+RideCheck flow today:
+
+Buyer creates order ✅
+
+Stripe checkout session created ✅
+
+Buyer pays on Stripe ✅
+
+Stripe redirects to success page ✅
+
+Your backend never receives confirmation ❌
+
+Because:
+
+/api/stripe/webhook
+
+does not exist.
+
+That is why the database fields remain:
+
+paid = NULL
+paid_at = NULL
+stripe_payment_intent_id = NULL
+buyer_id = NULL
+This is actually good news
+
+This is not a complicated bug.
+
+It simply means the Stripe webhook handler was never implemented or deployed.
+
+You just need to add the webhook endpoint.
+The order should update:
+
+paid = true
+paid_at = timestamp
+stripe_payment_intent_id = value
+ops_status = new
+
+Then:
+
+buyer will see the order
+
+ops will see the job
+
+RideChecker assignment can begin
+
+fix buyer ownership properly, not just patch the webhook.
+
+Right now RideCheck has two separate issues:
+
+payment finalization is missing
+
+buyer identity is not being attached correctly to the order
+
+If you only fix the webhook, you may still end up with paid orders that the buyer cannot see.
+
+What “configure the buyer correctly” should mean
+
+For every signed-in buyer order, the system should save all 3:
+
+buyer_id = Supabase auth user id
+
+buyer_email = buyer’s email
+
+customer_email = optional duplicate only if your current schema uses it
+
+The most important is:
+
+buyer_id must never be null for logged-in buyers.
+
+That is what lets:
+
+/orders show the right records
+
+ownership remain stable even if email changes later
+
+Ops know exactly which account owns the order
+
+The correct flow
+
+When a logged-in buyer starts checkout:
+
+user is authenticated
+
+order row is created
+
+order row stores:
+
+buyer_id
+
+buyer_email
+
+Stripe session is created
+
+stripe_session_id is saved on that order
+
+after Stripe success/webhook:
+
+paid = true
+
+paid_at = timestamp
+
+stripe_payment_intent_id = ...
+
+That is the clean setup.
+
+What to ask Replit to fix
+
+Use this updated request instead of the earlier one:
+
+Fix the missing Stripe webhook flow for RideCheck production, and use this opportunity to configure buyer ownership correctly.
+
+Current problems:
+- /api/stripe/webhook returns 404 in production
+- Stripe checkout succeeds, but paid orders are not finalized
+- orders rows are being created, but these fields are not reliably populated:
+  - buyer_id
+  - paid
+  - paid_at
+  - stripe_payment_intent_id
+- buyer dashboard cannot reliably show the buyer’s own orders because buyer_id is often NULL
+
+Goal:
+Implement a working webhook and make buyer ownership correct for all signed-in buyer orders.
+
+Requirements:
+
+1. Create the missing webhook route at:
+   app/api/stripe/webhook/route.ts
+
+2. The webhook must:
+   - accept POST only
+   - verify Stripe signature using STRIPE_WEBHOOK_SECRET
+   - handle checkout.session.completed
+   - update the matching order by stripe_session_id
+   - set:
+     - paid = true
+     - paid_at = current timestamp
+     - stripe_payment_intent_id = session.payment_intent
+     - ops_status = correct next state for this codebase after payment
+     - order_status = correct next state for this codebase after payment
+
+3. Inspect the order creation path and fix buyer ownership:
+   - when a signed-in buyer creates an order, save:
+     - buyer_id = authenticated Supabase user id
+     - buyer_email = authenticated user email or checkout email
+   - do not leave buyer_id NULL for authenticated users
+   - preserve current guest/email logic only if the app intentionally supports guest flows, but signed-in buyers must always get buyer_id set
+
+4. Inspect checkout session creation and ensure:
+   - stripe_session_id is written back to the correct order before redirecting to Stripe
+   - include order_id and buyer_id in Stripe metadata if helpful for reconciliation
+
+5. Update buyer-facing order queries if needed:
+   - /orders should load orders by buyer_id for authenticated users
+   - if there is fallback email logic, keep it secondary, not primary
+
+6. Add safe debug logging:
+   - webhook hit
+   - Stripe event type
+   - matching order found / not found
+   - buyer_id present / missing
+   - order update success / failure
+
+7. Keep changes minimal and compatible with current Next.js App Router + Supabase structure.
+
+8. After changes, confirm:
+   - GET /api/stripe/webhook returns 405, not 404
+   - paid orders get updated properly
+   - buyer_id is saved on new signed-in orders
+   - buyer can see their own order in /orders
+   - ops can see the same order in admin queue
+
+9. Tell me exactly:
+   - which files were changed
+   - which env vars must exist
+   - what Stripe webhook URL to configure
+   - what tests to run next
+Why this matters
+
+You are about to do:
+
+role testing
+
+$1 test
+
+real $139 live test
+
+Before any live payment, RideCheck must be able to answer:
+
+Who owns this order?
+
+Was this order paid?
+
+Can buyer see it?
+
+Can ops act on it?
+
+That all starts with buyer_id being set correctly.
+
+One more thing I recommend
+
+Ask Replit to also make the buyer success page and /orders page show:
+
+vehicle
+
+order id
+
+status
+
+payment state
+
+That way the buyer can immediately confirm the order exists.
+
+The buyer is buying one car, i doubt they need a buyer's portal. 
+They should get a a link or portal that opens up to their 
+hat’s actually the cleanest early-stage workflow for RideCheck. It also solves several problems you’ve already run into.
+
+You can support two access methods for buyers:
+
+1️⃣ Account access (logged-in buyer)
+2️⃣ Magic link / email access (no login required)
+
+For your pilot, the email link method is extremely valuable because many buyers will order quickly and not want to create accounts.
+
+Recommended Buyer Flow for RideCheck
+Step 1 — Buyer submits inspection request
+
+Buyer enters:
+
+listing link
+
+vehicle info
+
+name
+
+email
+
+phone
+
+System creates an order:
+
+orders:
+order_id
+buyer_id (if logged in)
+buyer_email
+tracking_token
+payment_link_token
+order_status = created
+ops_status = new
+Step 2 — Buyer receives email
+
+Email example:
+
+Subject
+
+Your RideCheck Inspection Request
+
+Body:
+
+Thanks for using RideCheck.
+
+Your order has been created.
+
+Order ID:
+RC-10324
+
+Vehicle:
+2017 Mercedes S550
+
+You can view your order here:
+https://ridecheckauto.com/track/282f6726-1a31-4e3d-9eb9-9ebb3783d2c6
+
+To complete your inspection request, please submit payment:
+
+Pay securely here:
+https://ridecheckauto.com/pay/2d1247a0-9b4b-46d3-9cd6-e4b1da37f01d
+
+Notice two links:
+
+1️⃣ Track order link
+/track/{tracking_token}
+
+Buyer can view:
+
+inspection status
+
+vehicle
+
+assigned RideChecker
+
+report download later
+
+No login required.
+
+2️⃣ Payment link
+/pay/{payment_link_token}
+
+This launches Stripe checkout.
+
+After payment, webhook finalizes the order.
+
+Why this works very well for RideCheck
+
+Because your marketplace has 3 different actors:
+
+Buyer
+
+Seller
+
+RideChecker
+
+Ops
+
+You want buyers simple.
+
+Many will:
+
+order once
+
+get report
+
+never return
+
+Forcing accounts creates friction.
+
+What your database already shows
+
+From your screenshots I saw:
+
+tracking_token
+payment_link_token
+payment_link_sent_to
+
+That means your system already started implementing this architecture.
+
+You just need to connect it properly.
+
+After payment completes
+
+Webhook should update:
+
+paid = true
+paid_at = timestamp
+ops_status = seller_outreach
+order_status = paid
+
+Buyer can then view:
+
+/track/{tracking_token}
+
+Which shows:
+
+Status: Seller Contact in Progress
+What Ops sees
+
+Ops dashboard:
+
+/admin/orders
+
+Shows queue:
+
+NEW
+PAID
+SELLER CONTACT
+SELLER CONFIRMED
+RIDE CHECKER ASSIGNED
+INSPECTION COMPLETE
+REPORT SENT
+What RideChecker sees
+
+RideChecker dashboard:
+
+/ridechecker/dashboard
+
+They only see jobs after:
+
+seller_confirmed
+Why email access is powerful
+
+It also protects your “independent intelligence” model.
+
+Buyers never directly see RideChecker contact details.
+
+All communication flows through RideCheck.
+
+Example buyer experience
+
+Buyer journey becomes:
+
+Facebook Marketplace
+        ↓
+RideCheck order page
+        ↓
+Email received
+        ↓
+Payment link
+        ↓
+Inspection scheduled
+        ↓
+Inspection report delivered
+
+Very clean.
+
+What must still be fixed in your system
+
+1️⃣ Stripe webhook (missing now)
+2️⃣ buyer_id saving when user logged in
+3️⃣ payment status updating orders
+4️⃣ buyer email notification after order creation
+5️⃣ buyer tracking page
+
+My honest opinion
+
+For a Lake County pilot, the best approach is:
+
+Email-first buyer access with optional accounts.
+
+It is:
+
+faster
+
+lower friction
+
+easier to debug
+
+easier to support manually
+
+One last improvement I strongly recommend
+
+Add a "Track Your Inspection" button on the homepage.
+
+Enter your order email → receive tracking link
+
+That eliminates support emails like:
+
+"Where is my inspection?"
+

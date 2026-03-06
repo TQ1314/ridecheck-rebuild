@@ -30,20 +30,54 @@ export async function POST(req: NextRequest) {
     const orderId = session.metadata?.order_id;
     const isInternalTest = session.metadata?.is_internal_test === "true";
 
+    console.log("[Stripe Webhook] checkout.session.completed", {
+      orderId,
+      paymentIntent: session.payment_intent,
+      customerEmail: session.customer_details?.email,
+      isInternalTest,
+    });
+
     if (orderId) {
       const paymentStatus = isInternalTest ? "paid_test" : "paid";
 
-      await supabaseAdmin
+      const updatePayload: Record<string, any> = {
+        payment_status: paymentStatus,
+        payment_intent_id: session.payment_intent,
+        paid_at: new Date().toISOString(),
+        status: "payment_received",
+        ops_status: "payment_received",
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: existingOrder } = await supabaseAdmin
         .from("orders")
-        .update({
-          payment_status: paymentStatus,
-          payment_intent_id: session.payment_intent,
-          paid_at: new Date().toISOString(),
-          status: "payment_received",
-          ops_status: "payment_received",
-          updated_at: new Date().toISOString(),
-        })
+        .select("customer_id, buyer_email")
+        .eq("id", orderId)
+        .single();
+
+      if (existingOrder && !existingOrder.customer_id && session.customer_details?.email) {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("email", session.customer_details.email.toLowerCase().trim())
+          .single();
+
+        if (profile) {
+          updatePayload.customer_id = profile.id;
+          console.log("[Stripe Webhook] Backfilling customer_id", { orderId, customerId: profile.id });
+        }
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from("orders")
+        .update(updatePayload)
         .eq("id", orderId);
+
+      if (updateError) {
+        console.error("[Stripe Webhook] Order update failed", { orderId, error: updateError });
+      } else {
+        console.log("[Stripe Webhook] Order updated successfully", { orderId, paymentStatus });
+      }
 
       await supabaseAdmin.from("activity_log").insert({
         order_id: orderId,
@@ -51,8 +85,11 @@ export async function POST(req: NextRequest) {
         details: {
           payment_intent: session.payment_intent,
           ...(isInternalTest && { is_internal_test: true, test_run_id: session.metadata?.test_run_id }),
+          customer_id_backfilled: !existingOrder?.customer_id && !!updatePayload.customer_id,
         },
       });
+    } else {
+      console.warn("[Stripe Webhook] checkout.session.completed missing order_id in metadata");
     }
   }
 

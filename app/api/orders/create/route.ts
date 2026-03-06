@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
 
     const buyer_email = safeString(data.buyer_email_input || session?.user?.email, "guest@ridecheck.com");
     const buyer_phone = data.buyer_phone;
+    const customer_id = session?.user?.id ?? null;
 
     const isTestPackage = data.package === "test";
 
@@ -160,6 +161,7 @@ export async function POST(req: NextRequest) {
     const insertPayload: Record<string, any> = {
       buyer_email,
       buyer_phone,
+      ...(customer_id && { customer_id }),
 
       booking_type: data.booking_type,
       status: "submitted",
