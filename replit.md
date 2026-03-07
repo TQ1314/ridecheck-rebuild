@@ -173,3 +173,13 @@ The user prefers clear and concise communication. They value iterative developme
   - Buyer dashboard queries by customer_id — now works for logged-in buyers
   - Stripe webhook URL is /api/webhooks/stripe (NOT /api/stripe/webhook)
   - activity_log tracks customer_id_backfilled boolean
+- Operations Role Expansion & RideChecker Naming (Mar 2026):
+  - Expanded operations role: can now assign RideCheckers (canAssignOps) and upload reports (canUploadReport)
+  - Operations sidebar now includes: Dashboard, Order Queue, RideCheckers
+  - Removed "Inspectors" nav item from all admin roles — consolidated to "RideCheckers" (points to /admin/inspectors page)
+  - All admin UI text renamed from "Inspector" to "RideChecker": badges, toasts, table headers, management page
+  - Removed duplicate "Assign Inspector" dialog — only "Assign RideChecker" dialog remains on order detail
+  - Enhanced assignment modal: shows Active badge, phone, email, region, rating, jobs/capacity for each RideChecker
+  - Suggest API returns max_daily_jobs for capacity display
+  - Role permissions: operations can run full order lifecycle; operations_lead/owner for user mgmt, audit, settings
+  - Backend tables still use inspectors/assigned_inspector_id internally — UI is fully rebranded

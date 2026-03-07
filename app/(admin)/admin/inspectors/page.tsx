@@ -132,7 +132,7 @@ export default function InspectorsPage() {
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: editingId ? "Inspector updated" : "Inspector created" });
+    toast({ title: editingId ? "RideChecker updated" : "RideChecker created" });
     setDialogOpen(false);
     loadInspectors();
   };
@@ -148,7 +148,7 @@ export default function InspectorsPage() {
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: `Inspector ${inspector.is_active ? "deactivated" : "activated"}` });
+    toast({ title: `RideChecker ${inspector.is_active ? "deactivated" : "activated"}` });
     loadInspectors();
   };
 
@@ -165,7 +165,7 @@ export default function InspectorsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Inspector Management
+            RideChecker Management
           </h1>
           <p className="text-sm text-muted-foreground">
             Manage your inspection team
@@ -175,13 +175,13 @@ export default function InspectorsPage() {
           <DialogTrigger asChild>
             <Button onClick={openAdd} data-testid="button-add-inspector">
               <Plus className="h-4 w-4 mr-2" />
-              Add Inspector
+              Add RideChecker
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingId ? "Edit Inspector" : "Add Inspector"}
+                {editingId ? "Edit RideChecker" : "Add RideChecker"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -265,7 +265,7 @@ export default function InspectorsPage() {
           {error}
         </div>
       ) : inspectors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No inspectors yet. Add one to get started.</p>
+        <p className="text-sm text-muted-foreground">No RideCheckers yet. Add one to get started.</p>
       ) : (
         <Card>
           <Table>

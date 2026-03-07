@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const { data: activeRidecheckers, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, email, phone, service_area, rating, referral_code")
+    .select("id, full_name, email, phone, service_area, rating, referral_code, ridechecker_max_daily_jobs")
     .eq("role", "ridechecker_active")
     .eq("is_active", true)
     .order("rating", { ascending: false });
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
       service_area: rc.service_area,
       rating,
       active_jobs: currentLoad,
+      max_daily_jobs: rc.ridechecker_max_daily_jobs ?? 5,
       score,
     };
   });

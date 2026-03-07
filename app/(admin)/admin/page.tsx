@@ -133,8 +133,8 @@ export default function AdminDashboard() {
                 <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold" data-testid="stat-active-inspectors">{activeInspectors}</p>
-                <p className="text-xs text-muted-foreground">Active Inspectors</p>
+                <p className="text-2xl font-bold" data-testid="stat-active-ridecheckers">{activeInspectors}</p>
+                <p className="text-xs text-muted-foreground">Active RideCheckers</p>
               </div>
             </div>
           </CardContent>

@@ -35,11 +35,11 @@ export function canUpdateStatus(role: Role): boolean {
 }
 
 export function canAssignOps(role: Role): boolean {
-  return ["operations_lead", "owner"].includes(role);
+  return ["operations", "operations_lead", "owner"].includes(role);
 }
 
 export function canUploadReport(role: Role): boolean {
-  return ["operations_lead", "owner"].includes(role);
+  return ["operations", "operations_lead", "owner"].includes(role);
 }
 
 export function canSendPayment(role: Role): boolean {

@@ -76,11 +76,6 @@ export default function AdminOrderDetailPage() {
   const [opsNotes, setOpsNotes] = useState("");
   const [opsLoading, setOpsLoading] = useState(false);
 
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [inspectors, setInspectors] = useState<Inspector[]>([]);
-  const [selectedInspector, setSelectedInspector] = useState("");
-  const [assignLoading, setAssignLoading] = useState(false);
-
   const [assignRcOpen, setAssignRcOpen] = useState(false);
   const [rcSuggestions, setRcSuggestions] = useState<any[]>([]);
   const [selectedRc, setSelectedRc] = useState("");
@@ -109,26 +104,18 @@ export default function AdminOrderDetailPage() {
   }, [orderId]);
 
   useEffect(() => {
-    if (assignOpen) {
-      fetch("/api/admin/inspectors")
-        .then((r) => r.json())
-        .then((data) => {
-          const list = Array.isArray(data) ? data : data?.inspectors || [];
-          setInspectors(list.filter((i: Inspector) => i.is_active));
-        });
-    }
-  }, [assignOpen]);
-
-  useEffect(() => {
     if (assignRcOpen && order) {
       const area = order.vehicle_location || order.inspection_address || "";
       fetch(`/api/admin/ridecheckers/suggest?area=${encodeURIComponent(area)}&orderId=${orderId}`)
         .then((r) => r.json())
         .then((data) => {
           setRcSuggestions(data.suggestions || []);
+        })
+        .catch(() => {
+          setRcSuggestions([]);
         });
     }
-  }, [assignRcOpen]);
+  }, [assignRcOpen, order, orderId]);
 
   const handleStatusUpdate = async (newStatus: string) => {
     const res = await fetch(`/api/orders/${orderId}/status`, {
@@ -161,25 +148,6 @@ export default function AdminOrderDetailPage() {
     toast({ title: "Ops status updated" });
     setOpsStatusOpen(false);
     setOpsNotes("");
-    loadData();
-  };
-
-  const handleAssignInspector = async () => {
-    if (!selectedInspector) return;
-    setAssignLoading(true);
-    const res = await fetch(`/api/orders/${orderId}/assign`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inspector_id: selectedInspector }),
-    });
-    setAssignLoading(false);
-    if (!res.ok) {
-      const err = await res.json();
-      toast({ title: "Error", description: err.error, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Inspector assigned" });
-    setAssignOpen(false);
     loadData();
   };
 
@@ -300,8 +268,8 @@ export default function AdminOrderDetailPage() {
             Ops: {statusLabel(order.ops_status || "new")}
           </Badge>
           {inspector && (
-            <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-inspector">
-              Inspector: {inspector.full_name}
+            <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ridechecker">
+              RideChecker: {inspector.full_name}
             </Badge>
           )}
         </div>
@@ -360,49 +328,6 @@ export default function AdminOrderDetailPage() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-assign-inspector">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Assign Inspector
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Assign Inspector</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div>
-                <Label className="mb-2 block">Select Inspector</Label>
-                <Select value={selectedInspector} onValueChange={setSelectedInspector}>
-                  <SelectTrigger data-testid="select-inspector">
-                    <SelectValue placeholder="Select an inspector..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {inspectors.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>
-                        {i.full_name} {i.region ? `(${i.region})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setAssignOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAssignInspector}
-                  disabled={assignLoading || !selectedInspector}
-                  data-testid="button-confirm-assign-inspector"
-                >
-                  {assignLoading ? "Assigning..." : "Assign"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         <Dialog open={assignRcOpen} onOpenChange={setAssignRcOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" data-testid="button-assign-ridechecker">
@@ -416,11 +341,19 @@ export default function AdminOrderDetailPage() {
             </DialogHeader>
             <div className="space-y-4 pt-2">
               {rcSuggestions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active RideCheckers available.</p>
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground mb-2">No active RideCheckers found.</p>
+                  <p className="text-xs text-muted-foreground">Add RideCheckers from the <Link href="/admin/inspectors" className="text-primary hover:underline">RideCheckers page</Link>.</p>
+                </div>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground">Ranked by area match, rating, and current load</p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Ranked by area match, rating, and current load</p>
+                    <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate text-xs">
+                      {rcSuggestions.length} available
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
                     {rcSuggestions.map((rc: any) => (
                       <div
                         key={rc.id}
@@ -428,19 +361,20 @@ export default function AdminOrderDetailPage() {
                         onClick={() => setSelectedRc(rc.id)}
                         data-testid={`rc-option-${rc.id}`}
                       >
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div>
+                        <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                          <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{rc.full_name}</span>
-                            {rc.service_area && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                {rc.service_area}
-                              </span>
-                            )}
+                            <Badge variant="default" className="no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0 bg-green-600">Active</Badge>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>Rating: {rc.rating?.toFixed(1)}</span>
-                            <span>Jobs: {rc.active_jobs}</span>
+                            <span>Rating: {rc.rating?.toFixed(1) ?? "N/A"}</span>
+                            <span>Jobs: {rc.active_jobs}/{rc.max_daily_jobs ?? 5}</span>
                           </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          {rc.service_area && <span>Region: {rc.service_area}</span>}
+                          {rc.phone && <span>Phone: {rc.phone}</span>}
+                          {rc.email && <span>{rc.email}</span>}
                         </div>
                       </div>
                     ))}

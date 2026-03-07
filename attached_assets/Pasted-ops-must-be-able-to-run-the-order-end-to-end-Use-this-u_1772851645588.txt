@@ -1,0 +1,91 @@
+ops must be able to run the order end-to-end.
+
+Use this updated Replit request so it covers both problems at once: ops permissions and RideChecker assignment UX.
+
+Update RideCheck admin permissions and workforce assignment flow for pilot operations.
+
+We have two problems to fix:
+
+PROBLEM 1 — Operations role is too limited
+The Operations account must be able to run the day-to-day workflow without founder intervention. Right now Operations is too restricted.
+
+Operations should be able to:
+- access /admin
+- access /admin/orders
+- access /admin/orders/[orderId]
+- process FIFO order queue
+- contact sellers
+- update ops status
+- request / verify payment
+- assign RideCheckers to jobs
+- review incoming inspection data
+- prepare/send buyer-facing reports
+- close completed orders
+
+Keep restricted to operations_lead / owner only:
+- user/role management
+- auth/system settings
+- payout override if applicable
+- internal destructive test actions if applicable
+- system-wide configuration
+
+PROBLEM 2 — Inspector vs RideChecker is confusing and assignment UI is weak
+I want the branded workforce term to be RideChecker everywhere in the admin UI. The order page should not show both Assign Inspector and Assign RideChecker. There should be one workforce concept only in the UI: RideChecker.
+
+Please make these changes:
+
+1. Permissions
+- Expand `operations` role so it can fully process live orders from queue to report delivery
+- Confirm `operations` can access the routes/actions needed for assignment, report handling, and closeout
+- Keep sensitive admin-only controls limited to operations_lead / owner
+
+2. Naming cleanup
+- Rename all admin/sidebar/user-facing references from “Inspector” to “RideChecker”
+- Rename “Inspector Management” to “RideChecker Management”
+- Rename “Assign Inspector” to “Assign RideChecker”
+- Remove duplicate inspector/ridechecker assignment concepts from the UI
+- If backend table names still use `inspectors`, that is okay for now, but the UI should consistently say RideChecker
+
+3. Sidebar cleanup
+- Keep:
+  - Dashboard
+  - Order Queue
+  - RideCheckers
+- Remove or merge the separate “Inspectors” nav item into RideCheckers
+
+4. Dashboard vs Order Queue
+- Dashboard should be summary/overview only
+- Order Queue should be the FIFO workbench for active processing
+- Make them visually and functionally distinct
+
+5. Assignment workflow
+- On the order detail page, there should be only one assignment action: Assign RideChecker
+- Replace empty dropdowns with a useful RideChecker list/table
+- Show for each RideChecker:
+  - name
+  - active/inactive status
+  - availability
+  - region
+  - capacity
+  - current assigned jobs count if available
+  - distance from job if location data exists
+- If distance is unavailable, show “distance unavailable”
+
+6. Data wiring
+- Ensure sample RideChecker records appear if they are active
+- If current modal filters to active only, make it easy to mark RideCheckers active/available
+- Fix any mismatch where the UI is pulling from the wrong table/source
+
+7. Order detail summary
+- Add a small assignment summary above the assign area:
+  - Active RideCheckers in region
+  - Available now
+  - Closest RideChecker (if calculable)
+
+8. After changes, tell me:
+- which files were changed
+- which routes/actions were opened for `operations`
+- what remains restricted to operations_lead / owner
+- whether backend still uses `inspectors` internally
+- how to mark a RideChecker active/available
+- how to test assignment end-to-end with an Operations account

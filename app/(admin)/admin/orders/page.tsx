@@ -175,7 +175,7 @@ export default function AdminOrdersPage() {
                 <TableHead>Vehicle</TableHead>
                 <TableHead>Ops Status</TableHead>
                 <TableHead>Seller Attempts</TableHead>
-                <TableHead>Inspector</TableHead>
+                <TableHead>RideChecker</TableHead>
                 <TableHead>SLA Flag</TableHead>
               </TableRow>
             </TableHeader>

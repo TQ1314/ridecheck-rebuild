@@ -1,0 +1,290 @@
+What you're seeing exposes three product problems:
+
+Inspector vs RideChecker naming is inconsistent
+
+Dashboard vs Order Queue are overlapping/confusing
+
+Assignment UI is not operationally useful
+
+What should change
+1. Remove “Inspector” as a user-facing/admin term
+
+Use RideChecker everywhere in the app unless there is a hidden backend-only technical table.
+
+So change:
+
+Inspectors → RideCheckers
+
+Assign Inspector → Assign RideChecker
+
+Inspector Management → RideChecker Management
+
+If there is a backend table named inspectors, that can stay internally for now, but the UI should not show both. Right now it makes the workflow look split and confusing.
+
+Your instinct is right: if the brand is RideCheck, the worker should be called RideChecker.
+
+2. Dashboard and Order Queue should not compete
+
+They should be different.
+
+Dashboard
+
+A summary/control center:
+
+total active orders
+
+new queue
+
+pending seller outreach
+
+awaiting RideChecker assignment
+
+inspection complete
+
+reports pending
+
+completed today
+
+Order Queue
+
+The actual working list Ops processes FIFO.
+
+So:
+
+Dashboard = overview
+
+Order Queue = workbench
+
+Right now the difference is not strong enough.
+
+3. Assignment modal must show operational data
+
+This is the biggest issue.
+
+When Ops clicks Assign RideChecker, the modal should show a list with useful decision data, not an empty dropdown.
+
+Ops needs to see:
+
+RideChecker name
+
+status: active / inactive
+
+availability: available now / busy / off
+
+region
+
+distance from job
+
+current workload
+
+vehicle capability if relevant
+
+payout amount if applicable
+
+acceptance rate or reliability later
+
+Without that, assignment is guesswork.
+
+What the correct assignment flow should look like
+
+When opening an order, Ops should see a section like:
+
+Suggested RideCheckers
+
+Lemoi — 8.2 miles away — Available now — Illinois — Capacity 3
+
+Feh Akenji — 14.5 miles away — Busy until 4:30 PM — Illinois — Capacity 5
+
+Buttons:
+
+Assign
+
+View profile
+
+Contact
+
+That is what an operations tool should look like.
+
+Why nothing appears now
+
+From your screenshots, likely one or more of these is true:
+
+sample RideCheckers are marked inactive
+
+the assignment query filters for active only
+
+the UI is pulling from ridecheckers while your sample data is in inspectors
+
+the order-assignment modal is not wired to availability/location fields
+
+no distance calculation exists yet
+
+no availability status exists yet
+
+So the problem is not just naming. It is also data plumbing.
+
+Best immediate product decision
+
+For launch, simplify to one workforce model:
+
+Only one assignable field:
+
+RideChecker
+
+And each RideChecker record should have at minimum:
+
+name
+
+email
+
+phone
+
+region
+
+status: active / inactive
+
+availability: available / unavailable
+
+capacity
+
+current assigned jobs
+
+home base zip or coordinates
+
+Then the assign modal should pull from that one source only.
+
+What I would change now
+In the sidebar
+
+Change:
+
+Dashboard
+
+Order Queue
+
+Inspectors
+
+RideCheckers
+
+To:
+
+Dashboard
+
+Order Queue
+
+RideCheckers
+
+Remove Inspectors from the sidebar completely.
+
+On the order detail page
+
+Change:
+
+Assign Inspector
+
+Assign RideChecker
+
+To just:
+
+Assign RideChecker
+
+And directly under that button, add a small preview block:
+
+Active RideCheckers in region: 2
+
+Available now: 1
+
+Closest RideChecker: Lemoi, 8.2 mi
+
+That helps Ops before even clicking.
+
+In the assignment modal
+
+Replace empty dropdown with a table/list:
+
+Name
+
+Region
+
+Availability
+
+Distance
+
+Capacity
+
+Action
+
+Update request for Replit
+
+Paste this:
+
+Update the RideCheck admin assignment workflow to simplify workforce naming and make assignment operationally useful.
+
+Problems:
+1. The app is inconsistently using both “Inspector” and “RideChecker”. I want the branded workforce term to be RideChecker everywhere in the admin UI.
+2. The order detail page shows both “Assign Inspector” and “Assign RideChecker”, which is confusing.
+3. The assignment modals are not useful. No RideChecker details are shown before assignment, and sample records are not appearing correctly.
+4. Ops needs to see who is available before assigning a job.
+
+Please make these changes:
+
+1. UI naming cleanup
+- Rename all admin/sidebar/user-facing references from “Inspector” to “RideChecker”
+- Rename “Inspector Management” to “RideChecker Management”
+- Rename “Assign Inspector” to “Assign RideChecker”
+- Remove duplicate assignment concepts from the UI so there is only one assignable workforce concept in admin: RideChecker
+- If backend tables still use `inspectors`, that is fine for now, but the UI should consistently say RideChecker
+
+2. Sidebar cleanup
+- Keep:
+  - Dashboard
+  - Order Queue
+  - RideCheckers
+- Remove or merge the separate “Inspectors” nav item into RideCheckers
+
+3. Clarify Dashboard vs Order Queue
+- Dashboard should be an overview page with summary metrics only
+- Order Queue should be the FIFO working page for processing orders
+- Make sure these pages are visually and functionally distinct
+
+4. Fix assignment modal on order detail page
+- Replace empty/simple dropdown with a useful list or table of assignable RideCheckers
+- Show for each RideChecker:
+  - name
+  - status (active/inactive)
+  - availability (available/unavailable or busy)
+  - region
+  - capacity
+  - current assigned jobs count if available
+  - distance from the job if location data exists
+- Allow assignment from this list
+- If distance is not yet available, show “distance unavailable” instead of nothing
+
+5. Data wiring
+- Make sure sample workforce records actually appear in the assignment modal if they are active
+- If the current filter only shows active records, ensure sample records can be marked active and become visible
+- If the modal is pulling from the wrong source/table, fix it so the assignment modal uses the correct workforce data source consistently
+
+6. Order detail improvements
+- On the order page, add a small assignment summary above the assign button area:
+  - Active RideCheckers in region
+  - Available now
+  - Closest RideChecker (if calculable)
+- This should help Ops decide quickly before opening the modal
+
+7. Tell me after update:
+- which files were changed
+- whether the app still uses `inspectors` internally or was fully renamed
+- how to mark a RideChecker active/available
+- how Ops will now assign a RideChecker to a live order
+Product recommendation
+
+For the pilot, keep this very simple:
+
+RideChecker = the field person
+
+Ops assigns one RideChecker
+
+Show active/available only
+
+Add distance later if needed, but at least show region and status now
