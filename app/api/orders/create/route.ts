@@ -301,6 +301,33 @@ export async function POST(req: NextRequest) {
       console.error("[Payment Link Send Error]", linkErr);
     }
 
+    try {
+      if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+        const { orderConfirmationHtml } = await import("@/lib/email/templates/order-confirmation");
+        const { sendEmail } = await import("@/lib/notifications/email");
+        const pkgLabel = (serverPackage || "standard").charAt(0).toUpperCase() + (serverPackage || "standard").slice(1);
+        const confirmHtml = orderConfirmationHtml({
+          orderId: order.id,
+          customerName: data.buyer_name || buyer_email.split("@")[0],
+          vehicleYear: data.vehicle_year,
+          vehicleMake: data.vehicle_make,
+          vehicleModel: data.vehicle_model,
+          packageName: pkgLabel,
+          finalPrice: String(finalPrice),
+          bookingType: data.booking_type,
+          trackUrl: track_url,
+          payUrl,
+        });
+        await sendEmail({
+          to: buyer_email,
+          subject: `Your RideCheck Inspection Request - ${vehicleLabel}`,
+          html: confirmHtml,
+        });
+      }
+    } catch (confirmErr) {
+      console.error("[Order Confirmation Email Error]", confirmErr);
+    }
+
     const isDebug =
       process.env.DEBUG_PAYMENT_LINKS === "true" &&
       process.env.NODE_ENV !== "production";
