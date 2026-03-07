@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Order, Inspector } from "@/types/orders";
+import type { Order } from "@/types/orders";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -17,9 +17,15 @@ import { formatCurrency } from "@/lib/utils/pricing";
 import { formatRelative, statusLabel } from "@/lib/utils/format";
 import Link from "next/link";
 
+interface RideCheckerSummary {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
+
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [inspectors, setInspectors] = useState<Inspector[]>([]);
+  const [ridecheckers, setRidecheckers] = useState<RideCheckerSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
@@ -27,21 +33,21 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [ordersRaw, inspectorsRaw] = await Promise.all([
+        const [ordersRaw, rideCheckersRaw] = await Promise.all([
           fetch("/api/admin/orders?limit=5&sort=recent"),
           fetch("/api/admin/inspectors"),
         ]);
-        if (!ordersRaw.ok || !inspectorsRaw.ok) {
+        if (!ordersRaw.ok || !rideCheckersRaw.ok) {
           setError("Failed to load dashboard data");
           setLoading(false);
           return;
         }
         const ordersRes = await ordersRaw.json();
-        const inspectorsRes = await inspectorsRaw.json();
+        const rcRes = await rideCheckersRaw.json();
         if (Array.isArray(ordersRes)) setOrders(ordersRes);
         else if (ordersRes?.orders) setOrders(ordersRes.orders);
-        if (Array.isArray(inspectorsRes)) setInspectors(inspectorsRes);
-        else if (inspectorsRes?.inspectors) setInspectors(inspectorsRes.inspectors);
+        if (Array.isArray(rcRes)) setRidecheckers(rcRes);
+        else if (rcRes?.inspectors) setRidecheckers(rcRes.inspectors);
       } catch {
         setError("Failed to load dashboard data");
       }
@@ -55,7 +61,7 @@ export default function AdminDashboard() {
   const totalRevenue = orders
     .filter((o) => o.payment_status === "paid")
     .reduce((sum, o) => sum + Number(o.final_price), 0);
-  const activeInspectors = inspectors.filter((i) => i.is_active).length;
+  const activeRidecheckers = ridecheckers.filter((rc) => rc.is_active).length;
 
   if (loading) {
     return (
@@ -133,7 +139,7 @@ export default function AdminDashboard() {
                 <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold" data-testid="stat-active-ridecheckers">{activeInspectors}</p>
+                <p className="text-2xl font-bold" data-testid="stat-active-ridecheckers">{activeRidecheckers}</p>
                 <p className="text-xs text-muted-foreground">Active RideCheckers</p>
               </div>
             </div>

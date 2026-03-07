@@ -39,7 +39,8 @@ const ROLES: Role[] = [
   "customer",
   "operations",
   "operations_lead",
-  "inspector",
+  "ridechecker",
+  "ridechecker_active",
   "qa",
   "developer",
   "platform",
@@ -49,7 +50,7 @@ const ROLES: Role[] = [
 const INVITE_ROLES: Role[] = [
   "operations",
   "operations_lead",
-  "inspector",
+  "ridechecker",
   "qa",
 ];
 
@@ -63,7 +64,7 @@ export default function AdminUsersPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<string>("inspector");
+  const [inviteRole, setInviteRole] = useState<string>("ridechecker");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState("");
 

@@ -14,10 +14,10 @@ export async function GET(req: NextRequest) {
 
   const { data: activeRidecheckers, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, email, phone, service_area, rating, referral_code, ridechecker_max_daily_jobs")
+    .select("id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs")
     .eq("role", "ridechecker_active")
     .eq("is_active", true)
-    .order("rating", { ascending: false });
+    .order("ridechecker_rating", { ascending: false });
 
   if (error) {
     console.error("[suggest ridecheckers error]", error);
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const rating = parseFloat(rc.rating) || 5.0;
+    const rating = parseFloat(rc.ridechecker_rating) || 5.0;
     score += rating * 5;
 
     score -= currentLoad * 10;

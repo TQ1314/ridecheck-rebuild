@@ -183,3 +183,12 @@ The user prefers clear and concise communication. They value iterative developme
   - Suggest API returns max_daily_jobs for capacity display
   - Role permissions: operations can run full order lifecycle; operations_lead/owner for user mgmt, audit, settings
   - Backend tables still use inspectors/assigned_inspector_id internally — UI is fully rebranded
+- RideChecker Data Unification (Mar 2026):
+  - /api/admin/inspectors GET/POST now queries `profiles` table (role IN ridechecker, ridechecker_active) instead of old `inspectors` table
+  - /api/admin/inspectors/[id] PATCH now updates `profiles` table — toggling is_active flips role between ridechecker/ridechecker_active
+  - /api/admin/orders/[orderId] now looks up assigned RideChecker from `profiles` instead of `inspectors` table
+  - Single data source: both management page and assignment modal now use `profiles` table
+  - Order detail page shows RC preview summary: Active RideCheckers count, Available now count, Top match name
+  - Users page: invite role default changed from "inspector" to "ridechecker"; role dropdown includes ridechecker/ridechecker_active
+  - RideChecker login: use standard /auth/login page; signup at /ridechecker/signup; dashboard at /ridechecker/dashboard
+  - To activate a RideChecker: set their role to ridechecker_active via Users page or click Active/Pending badge on RideCheckers management page

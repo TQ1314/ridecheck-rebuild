@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Inspector } from "@/types/orders";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-interface InspectorForm {
+interface RideCheckerForm {
   full_name: string;
   email: string;
   phone: string;
@@ -34,7 +33,20 @@ interface InspectorForm {
   max_daily_capacity: number;
 }
 
-const emptyForm: InspectorForm = {
+interface RideCheckerRow {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  region: string | null;
+  is_active: boolean;
+  max_daily_capacity: number;
+  rating: number | null;
+  quality_score: number | null;
+  role: string;
+}
+
+const emptyForm: RideCheckerForm = {
   full_name: "",
   email: "",
   phone: "",
@@ -43,36 +55,36 @@ const emptyForm: InspectorForm = {
   max_daily_capacity: 5,
 };
 
-export default function InspectorsPage() {
+export default function RideCheckersPage() {
   const { toast } = useToast();
-  const [inspectors, setInspectors] = useState<Inspector[]>([]);
+  const [ridecheckers, setRidecheckers] = useState<RideCheckerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<InspectorForm>(emptyForm);
+  const [form, setForm] = useState<RideCheckerForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  async function loadInspectors() {
+  async function loadRidecheckers() {
     try {
       const res = await fetch("/api/admin/inspectors");
       if (!res.ok) {
-        setError("Failed to load inspectors");
+        setError("Failed to load RideCheckers");
         setLoading(false);
         return;
       }
       setError(null);
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.inspectors || [];
-      setInspectors(list);
+      setRidecheckers(list);
     } catch {
-      setError("Failed to load inspectors");
+      setError("Failed to load RideCheckers");
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    loadInspectors();
+    loadRidecheckers();
   }, []);
 
   const openAdd = () => {
@@ -81,15 +93,15 @@ export default function InspectorsPage() {
     setDialogOpen(true);
   };
 
-  const openEdit = (inspector: Inspector) => {
-    setEditingId(inspector.id);
+  const openEdit = (rc: RideCheckerRow) => {
+    setEditingId(rc.id);
     setForm({
-      full_name: inspector.full_name,
-      email: inspector.email || "",
-      phone: inspector.phone || "",
-      region: inspector.region || "",
-      specialties: (inspector.specialties || []).join(", "),
-      max_daily_capacity: inspector.max_daily_capacity,
+      full_name: rc.full_name,
+      email: rc.email || "",
+      phone: rc.phone || "",
+      region: rc.region || "",
+      specialties: "",
+      max_daily_capacity: rc.max_daily_capacity,
     });
     setDialogOpen(true);
   };
@@ -99,15 +111,16 @@ export default function InspectorsPage() {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
+    if (!form.email.trim()) {
+      toast({ title: "Email is required", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const body = {
       full_name: form.full_name,
       email: form.email || null,
       phone: form.phone || null,
       region: form.region || null,
-      specialties: form.specialties
-        ? form.specialties.split(",").map((s) => s.trim()).filter(Boolean)
-        : null,
       max_daily_capacity: form.max_daily_capacity,
     };
 
@@ -134,22 +147,22 @@ export default function InspectorsPage() {
     }
     toast({ title: editingId ? "RideChecker updated" : "RideChecker created" });
     setDialogOpen(false);
-    loadInspectors();
+    loadRidecheckers();
   };
 
-  const toggleActive = async (inspector: Inspector) => {
-    const res = await fetch(`/api/admin/inspectors/${inspector.id}`, {
+  const toggleActive = async (rc: RideCheckerRow) => {
+    const res = await fetch(`/api/admin/inspectors/${rc.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: !inspector.is_active }),
+      body: JSON.stringify({ is_active: !rc.is_active }),
     });
     if (!res.ok) {
       const err = await res.json();
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: `RideChecker ${inspector.is_active ? "deactivated" : "activated"}` });
-    loadInspectors();
+    toast({ title: `RideChecker ${rc.is_active ? "deactivated" : "activated"}` });
+    loadRidecheckers();
   };
 
   if (loading) {
@@ -168,12 +181,12 @@ export default function InspectorsPage() {
             RideChecker Management
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage your inspection team
+            Manage your RideChecker workforce
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openAdd} data-testid="button-add-inspector">
+            <Button onClick={openAdd} data-testid="button-add-ridechecker">
               <Plus className="h-4 w-4 mr-2" />
               Add RideChecker
             </Button>
@@ -191,17 +204,17 @@ export default function InspectorsPage() {
                   value={form.full_name}
                   onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                   placeholder="Full name"
-                  data-testid="input-inspector-name"
+                  data-testid="input-ridechecker-name"
                 />
               </div>
               <div>
-                <Label className="mb-2 block">Email</Label>
+                <Label className="mb-2 block">Email *</Label>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="Email address"
-                  data-testid="input-inspector-email"
+                  data-testid="input-ridechecker-email"
                 />
               </div>
               <div>
@@ -210,7 +223,7 @@ export default function InspectorsPage() {
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="Phone number"
-                  data-testid="input-inspector-phone"
+                  data-testid="input-ridechecker-phone"
                 />
               </div>
               <div>
@@ -218,17 +231,8 @@ export default function InspectorsPage() {
                 <Input
                   value={form.region}
                   onChange={(e) => setForm({ ...form, region: e.target.value })}
-                  placeholder="e.g. GTA, Montreal"
-                  data-testid="input-inspector-region"
-                />
-              </div>
-              <div>
-                <Label className="mb-2 block">Specialties (comma-separated)</Label>
-                <Input
-                  value={form.specialties}
-                  onChange={(e) => setForm({ ...form, specialties: e.target.value })}
-                  placeholder="e.g. EV, European, Heavy Duty"
-                  data-testid="input-inspector-specialties"
+                  placeholder="e.g. Lake County, IL"
+                  data-testid="input-ridechecker-region"
                 />
               </div>
               <div>
@@ -240,7 +244,7 @@ export default function InspectorsPage() {
                   onChange={(e) =>
                     setForm({ ...form, max_daily_capacity: parseInt(e.target.value) || 1 })
                   }
-                  data-testid="input-inspector-capacity"
+                  data-testid="input-ridechecker-capacity"
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -250,7 +254,7 @@ export default function InspectorsPage() {
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  data-testid="button-save-inspector"
+                  data-testid="button-save-ridechecker"
                 >
                   {saving ? "Saving..." : editingId ? "Update" : "Create"}
                 </Button>
@@ -264,8 +268,11 @@ export default function InspectorsPage() {
         <div className="bg-destructive/10 text-destructive p-4 rounded-md" data-testid="text-error">
           {error}
         </div>
-      ) : inspectors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No RideCheckers yet. Add one to get started.</p>
+      ) : ridecheckers.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-sm text-muted-foreground mb-2">No RideCheckers yet.</p>
+          <p className="text-xs text-muted-foreground">RideCheckers sign up at <span className="font-mono">/ridechecker/signup</span>, then you activate them here.</p>
+        </div>
       ) : (
         <Card>
           <Table>
@@ -281,29 +288,29 @@ export default function InspectorsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {inspectors.map((inspector) => (
-                <TableRow key={inspector.id} data-testid={`row-inspector-${inspector.id}`}>
-                  <TableCell className="font-medium">{inspector.full_name}</TableCell>
-                  <TableCell className="text-sm">{inspector.email || "—"}</TableCell>
-                  <TableCell className="text-sm">{inspector.phone || "—"}</TableCell>
-                  <TableCell className="text-sm">{inspector.region || "—"}</TableCell>
+              {ridecheckers.map((rc) => (
+                <TableRow key={rc.id} data-testid={`row-ridechecker-${rc.id}`}>
+                  <TableCell className="font-medium">{rc.full_name}</TableCell>
+                  <TableCell className="text-sm">{rc.email || "—"}</TableCell>
+                  <TableCell className="text-sm">{rc.phone || "—"}</TableCell>
+                  <TableCell className="text-sm">{rc.region || "—"}</TableCell>
                   <TableCell>
                     <Badge
-                      variant={inspector.is_active ? "default" : "secondary"}
+                      variant={rc.is_active ? "default" : "secondary"}
                       className="no-default-hover-elevate no-default-active-elevate cursor-pointer"
-                      onClick={() => toggleActive(inspector)}
-                      data-testid={`badge-status-${inspector.id}`}
+                      onClick={() => toggleActive(rc)}
+                      data-testid={`badge-status-${rc.id}`}
                     >
-                      {inspector.is_active ? "Active" : "Inactive"}
+                      {rc.is_active ? "Active" : "Pending"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm">{inspector.max_daily_capacity}</TableCell>
+                  <TableCell className="text-sm">{rc.max_daily_capacity}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => openEdit(inspector)}
-                      data-testid={`button-edit-${inspector.id}`}
+                      onClick={() => openEdit(rc)}
+                      data-testid={`button-edit-${rc.id}`}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>

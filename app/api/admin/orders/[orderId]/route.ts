@@ -38,11 +38,22 @@ export async function GET(
     let inspector = null;
     if (orderRes.data.assigned_inspector_id) {
       const { data } = await supabaseAdmin
-        .from("inspectors")
-        .select("*")
+        .from("profiles")
+        .select("id, full_name, email, phone, service_area, role, ridechecker_max_daily_jobs, ridechecker_rating")
         .eq("id", orderRes.data.assigned_inspector_id)
         .single();
-      inspector = data;
+      if (data) {
+        inspector = {
+          id: data.id,
+          full_name: data.full_name || "Unknown",
+          email: data.email,
+          phone: data.phone,
+          region: data.service_area,
+          is_active: data.role === "ridechecker_active",
+          max_daily_capacity: data.ridechecker_max_daily_jobs ?? 5,
+          rating: data.ridechecker_rating,
+        };
+      }
     }
 
     return NextResponse.json({

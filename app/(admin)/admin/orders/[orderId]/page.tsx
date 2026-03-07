@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry, Inspector } from "@/types/orders";
+import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
 import { OpsReportBuilderPanel } from "@/components/orders/OpsReportBuilderPanel";
@@ -31,6 +31,7 @@ import {
   ArrowLeft,
   RefreshCw,
   UserPlus,
+  Users,
   CreditCard,
   Copy,
   Clock,
@@ -67,7 +68,7 @@ export default function AdminOrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [events, setEvents] = useState<OrderEvent[]>([]);
   const [audit, setAudit] = useState<AuditLogEntry[]>([]);
-  const [inspector, setInspector] = useState<Inspector | null>(null);
+  const [assignedRc, setAssignedRc] = useState<any>(null);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -78,6 +79,7 @@ export default function AdminOrderDetailPage() {
 
   const [assignRcOpen, setAssignRcOpen] = useState(false);
   const [rcSuggestions, setRcSuggestions] = useState<any[]>([]);
+  const [rcPreview, setRcPreview] = useState<{ total: number; available: number; closest: string | null } | null>(null);
   const [selectedRc, setSelectedRc] = useState("");
   const [assignRcLoading, setAssignRcLoading] = useState(false);
 
@@ -94,7 +96,7 @@ export default function AdminOrderDetailPage() {
     }
     if (data.events) setEvents(data.events);
     if (data.audit) setAudit(data.audit);
-    if (data.inspector) setInspector(data.inspector);
+    if (data.inspector) setAssignedRc(data.inspector);
     if (data.activities) setActivities(data.activities);
     setLoading(false);
   }
@@ -102,6 +104,25 @@ export default function AdminOrderDetailPage() {
   useEffect(() => {
     loadData();
   }, [orderId]);
+
+  useEffect(() => {
+    if (order && !assignedRc) {
+      const area = order.vehicle_location || order.inspection_address || "";
+      fetch(`/api/admin/ridecheckers/suggest?area=${encodeURIComponent(area)}&orderId=${orderId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const suggestions = data.suggestions || [];
+          setRcPreview({
+            total: suggestions.length,
+            available: suggestions.filter((s: any) => s.active_jobs < (s.max_daily_jobs ?? 5)).length,
+            closest: suggestions.length > 0 ? suggestions[0].full_name : null,
+          });
+        })
+        .catch(() => {
+          setRcPreview({ total: 0, available: 0, closest: null });
+        });
+    }
+  }, [order, orderId, assignedRc]);
 
   useEffect(() => {
     if (assignRcOpen && order) {
@@ -267,13 +288,37 @@ export default function AdminOrderDetailPage() {
           <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ops-status">
             Ops: {statusLabel(order.ops_status || "new")}
           </Badge>
-          {inspector && (
+          {assignedRc && (
             <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ridechecker">
-              RideChecker: {inspector.full_name}
+              RideChecker: {assignedRc.full_name}
             </Badge>
           )}
         </div>
       </div>
+
+      {!assignedRc && rcPreview && (
+        <Card className="border-dashed">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Active RideCheckers:</span>
+                <span className="font-medium" data-testid="text-rc-total">{rcPreview.total}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Available now:</span>
+                <span className="font-medium" data-testid="text-rc-available">{rcPreview.available}</span>
+              </div>
+              {rcPreview.closest && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">Top match:</span>
+                  <span className="font-medium" data-testid="text-rc-closest">{rcPreview.closest}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap">
         <Dialog open={opsStatusOpen} onOpenChange={setOpsStatusOpen}>
