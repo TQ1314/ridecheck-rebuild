@@ -45,8 +45,10 @@ const STAFF_ROLES = [
   "inspector",
 ];
 
+const ES_PREFIX = "/es";
+
 function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX) || pathname.startsWith(PAY_PREFIX);
+  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX) || pathname.startsWith(PAY_PREFIX) || pathname === ES_PREFIX || pathname.startsWith(`${ES_PREFIX}/`);
 }
 
 function isStaticOrInternal(pathname: string) {

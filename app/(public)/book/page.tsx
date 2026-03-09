@@ -51,7 +51,9 @@ function BookInner() {
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [lang, setLang] = useState<Language>("en");
+  const [lang, setLang] = useState<Language>(
+    (searchParams.get("lang") === "es" ? "es" : "en") as Language
+  );
 
   const STEPS = [
     t("booking.step.vehicle", lang),

@@ -1,0 +1,94 @@
+a WhatsApp button in the header or floating bottom corner
+
+a placeholder config value for the WhatsApp number
+
+bilingual text near it:
+
+Chat on WhatsApp
+
+Habla con nosotros por WhatsApp
+
+So later, once your number is ready, you only change one value.
+
+Replit request
+
+Paste this into Replit:
+
+Add WhatsApp contact support to the RideCheck website in a way that is ready now and easy to activate later.
+
+Goal:
+Prepare the website for WhatsApp Business support for both English and Spanish users. The WhatsApp number is not final yet, so build the integration with a configurable placeholder that can be updated later without changing multiple files.
+
+Requirements:
+
+1. Add a floating WhatsApp button on the public site
+- Show on homepage and key buyer-facing pages
+- Position: bottom right
+- Mobile-friendly
+- Use WhatsApp-style icon if already available in the project, otherwise use a simple text button
+
+2. Add header/footer support text:
+English:
+Chat with us on WhatsApp
+
+Spanish:
+Habla con nosotros por WhatsApp
+
+3. Add a configurable variable for the WhatsApp phone number and default message.
+Use existing env/config pattern if available.
+If not, create a single config source for:
+- whatsapp number
+- english default message
+- spanish default message
+
+4. If the WhatsApp number is not set yet:
+- button should still render
+- but either:
+  - link to a placeholder config safely, or
+  - be hidden behind a simple feature flag until number is added
+Choose the safest implementation that is easy to activate later.
+
+5. Prepare bilingual default messages:
+English default message:
+Hi, I’m interested in a RideCheck inspection.
+
+Spanish default message:
+Hola, estoy interesado en una inspección de RideCheck.
+
+6. On Spanish pages, the WhatsApp CTA should use the Spanish text and Spanish prefilled message.
+On English pages, use English.
+
+7. Do not change admin/internal pages.
+Only add this to public buyer-facing pages.
+
+8. After implementation, tell me:
+- which files were changed
+- where to update the WhatsApp number later
+- how to turn the feature on/off if needed
+Best user-facing placement
+
+For the pilot, I’d use all 3:
+
+floating WhatsApp button
+
+footer line
+
+small homepage trust line:
+Questions? Chat with RideCheck on WhatsApp.
+¿Preguntas? Escríbenos por WhatsApp.
+
+Why this is strong
+
+This helps RideCheck feel:
+
+local
+
+responsive
+
+human
+
+accessible
+
+Which matters a lot more than polished automation in early-stage marketplace trust.
+
+Once your number is ready, link it in the standard WhatsApp format:

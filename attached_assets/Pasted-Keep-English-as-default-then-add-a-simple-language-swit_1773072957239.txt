@@ -1,0 +1,145 @@
+Keep English as default, then add a simple language switch:
+
+EN | ES
+
+Spanish pages can either be:
+
+true localized routes like /es, /es/how-it-works, /es/book
+
+or a lighter toggle if your app already supports locale logic
+
+Since your RideCheck app already has route/middleware complexity, the safest pilot move is:
+
+Recommended
+
+Create Spanish routes:
+
+/es
+
+/es/how-it-works
+
+/es/book
+
+That is simpler and less risky than trying to fully internationalize the entire app immediately.
+
+What should be translated first
+Homepage
+
+Make it clear, simple, culturally direct.
+
+Suggested Spanish core copy:
+
+No compres a ciegas.
+Hazle un RideCheck.
+
+RideCheck envía un mecánico local para inspeccionar un carro usado antes de que lo compres.
+
+Copia el enlace del anuncio de Facebook Marketplace, Craigslist u otra página, pégalo en RideCheck y nosotros nos encargamos del resto.
+
+Sin suscripción.
+Pago único.
+Ojos humanos. Criterio experto.
+
+How It Works
+
+Translate the 4-step process.
+
+Book page
+
+Translate:
+
+labels
+
+instructions
+
+package explanations
+
+self-arranged vs concierge wording
+
+Status messages
+
+Examples:
+
+Payment requested
+
+Seller contact in progress
+
+RideChecker assigned
+
+Report delivered
+
+Replit update request
+
+Paste this into Replit:
+
+Add Spanish support to the RideCheck website for the Lake County pilot, focusing on the highest-conversion pages only.
+
+Goal:
+Create a simple Spanish version of the RideCheck website without rebuilding the whole app. Keep English as default. Add clear Spanish routes and navigation for Spanish-speaking users.
+
+Please implement this in the safest, least disruptive way for the current Next.js codebase.
+
+Requirements:
+
+1. Add Spanish versions of these pages:
+- Homepage
+- How It Works
+- Book / Order page
+
+Preferred routes:
+- /es
+- /es/how-it-works
+- /es/book
+
+2. Add a simple language switch in the header or top navigation:
+- EN | ES
+- English routes stay as-is
+- Spanish routes go to /es equivalents
+
+3. Translate visible buyer-facing content on those Spanish pages only.
+Use natural, simple Spanish for U.S. Hispanic used-car buyers.
+Do not make it overly formal.
+
+Use this core Spanish homepage messaging:
+
+Headline:
+No compres a ciegas.
+Hazle un RideCheck.
+
+Subheadline:
+RideCheck envía un mecánico local para inspeccionar un carro usado antes de que lo compres.
+
+Support text:
+Copia el enlace del anuncio de Facebook Marketplace, Craigslist u otra página, pégalo en RideCheck y nosotros nos encargamos del resto.
+
+Trust lines:
+Sin suscripción.
+Pago único.
+Ojos humanos. Criterio experto.
+
+4. Translate the “How It Works” content into Spanish using simple buyer-friendly language.
+
+5. Translate the main “Book” page labels and instructions into Spanish:
+- vehicle details
+- package labels
+- self-arranged vs concierge
+- buttons
+- order summary
+- payment instructions if they are on-page
+
+6. Keep all backend logic the same.
+Do not duplicate business logic.
+Only add Spanish page variants / content wrappers.
+
+7. If shared components are used, reuse them where possible and pass translated copy as props.
+
+8. Do not break current middleware, auth, Stripe, or admin flows.
+
+9. Also add a small Spanish support line in the English homepage/footer:
+¿Habla español? También atendemos en español.
+
+10. After implementation, tell me:
+- which files were created/updated
+- which routes now exist in Spanish
+- how to edit Spanish copy later
+- whether any middleware updates were needed
