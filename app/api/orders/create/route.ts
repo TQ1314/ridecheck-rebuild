@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
         const pkgLabel = (serverPackage || "standard").charAt(0).toUpperCase() + (serverPackage || "standard").slice(1);
         const confirmHtml = orderConfirmationHtml({
           orderId: order.id,
-          customerName: data.buyer_name || buyer_email.split("@")[0],
+          customerName: buyer_email.split("@")[0],
           vehicleYear: data.vehicle_year,
           vehicleMake: data.vehicle_make,
           vehicleModel: data.vehicle_model,
