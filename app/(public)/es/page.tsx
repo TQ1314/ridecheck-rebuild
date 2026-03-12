@@ -100,6 +100,37 @@ export default function SpanishHomePage() {
         </div>
       </section>
 
+      {/* ========== UGC VIDEO ========== */}
+      <section className="border-t bg-gray-50">
+        <div className="mx-auto max-w-4xl px-4 py-12 text-center">
+          <h2 className="text-2xl font-extrabold md:text-3xl">Mira RideCheck en Acción</h2>
+          <p className="mt-3 max-w-2xl mx-auto text-gray-700">
+            Mira cómo RideCheck ayuda a compradores a evitar errores costosos antes de comprar un carro usado.
+          </p>
+
+          <div className="mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm">
+            <video
+              src="/videos/dillon-ugc.mp4"
+              controls
+              playsInline
+              muted
+              className="w-full max-h-[560px] object-contain"
+              data-testid="video-ugc-dillon-es"
+            />
+          </div>
+
+          <div className="mt-6">
+            <a
+              href="/es/book"
+              data-testid="link-book-ugc-es"
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Reservar un RideCheck →
+            </a>
+          </div>
+        </div>
+      </section>
+
       <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-12">
         <h2 className="text-2xl font-extrabold md:text-3xl">{t("home.howTitle", L)}</h2>
         <p className="mt-3 max-w-3xl text-gray-700">

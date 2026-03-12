@@ -1,0 +1,102 @@
+The best place is on the homepage, not buried. Since RideCheck is trust-based, the video should sit where buyers are still deciding whether this is real.
+
+Best placement
+
+I’d have Replit add it in one of these spots:
+
+Option 1 — Best: directly under the hero section
+Reason: it reinforces trust right after “Do Not Buy Blind. RideCheck It.”
+
+Option 2: between hero and “How It Works”
+Reason: buyer sees message, then proof, then process.
+
+For RideCheck, I recommend Option 1.
+
+What Replit should build
+
+Have them add:
+
+a UGC video section on homepage
+
+mobile-friendly embedded video
+
+headline above it
+
+short trust text
+
+CTA below it
+
+Suggested section copy
+
+Headline:
+See Why Buyers Use RideCheck
+
+Body:
+Watch how RideCheck helps used-car buyers avoid costly mistakes before they buy.
+
+CTA under video:
+Book a RideCheck
+
+If you want stronger copy:
+
+Headline:
+Watch RideCheck in Action
+
+Body:
+Real buyer-focused protection before you pay for a used car.
+
+Replit prompt
+
+Paste this into Replit:
+
+Add Dillon’s UGC ad video to the RideCheck homepage.
+
+Goal:
+Use the UGC ad as a trust-building conversion section on the public homepage. This should be mobile-friendly, clean, and placed prominently so buyers understand RideCheck quickly.
+
+Requirements:
+
+1. Add a new homepage video section directly below the hero section.
+Preferred placement:
+- below the hero
+- above the “How It Works” section
+
+2. Use the uploaded Dillon UGC ad file:
+RideCheckAuto.com_-_Hook_3_1773295751900.mp4
+
+3. Build a responsive video card/component that:
+- works well on mobile and desktop
+- uses native HTML5 video or existing video component pattern
+- includes play controls
+- includes poster support if easy to add
+- does not autoplay with sound
+- can autoplay muted only if that already fits the existing design, otherwise leave manual play
+
+4. Add this copy above the video:
+Headline:
+Watch RideCheck in Action
+
+Body:
+See how RideCheck helps used-car buyers avoid costly mistakes before they buy.
+
+5. Add a CTA below the video:
+Button text:
+Book a RideCheck
+
+Link it to the main booking page.
+
+6. Keep the styling consistent with the current RideCheck homepage:
+- rounded card
+- clean spacing
+- same font system
+- same color palette
+
+7. Make sure the section looks good on mobile first.
+
+8. Do not affect admin, auth, Stripe, booking logic, or ops pages.
+
+9. After implementation, tell me:
+- which file was updated
+- where the video file lives
+- how to swap the video later if I want a different UGC ad
+One important note
