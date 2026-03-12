@@ -110,7 +110,7 @@ export default function SpanishHomePage() {
 
           <div className="mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm">
             <video
-              src="/videos/dillon-ugc.mp4"
+              src="/videos/dillon-ugc-v2.mp4"
               controls
               playsInline
               muted
