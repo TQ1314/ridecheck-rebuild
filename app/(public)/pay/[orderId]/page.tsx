@@ -7,9 +7,10 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CreditCard, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { formatCurrency } from "@/lib/utils/pricing";
+import { LEGAL_SUMMARY_BULLETS, TERMS_VERSION } from "@/lib/legal/constants";
 
 interface PayOrderSummary {
   id: string;
@@ -18,6 +19,7 @@ interface PayOrderSummary {
   vehicle_model: string;
   booking_type: string;
   package: string;
+  buyer_email?: string;
 }
 
 export default function PayPage() {
@@ -40,6 +42,7 @@ function PayInner() {
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (!orderId || !token) {
@@ -69,8 +72,19 @@ function PayInner() {
   }, [orderId, token]);
 
   const handlePay = async () => {
+    if (!termsAccepted) return;
     setPaying(true);
     try {
+      await fetch(`/api/orders/${orderId}/accept-terms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accepted: true,
+          buyerEmail: order?.buyer_email || undefined,
+          userAgent: navigator.userAgent,
+        }),
+      });
+
       const res = await fetch("/api/pay/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,11 +173,41 @@ function PayInner() {
                 </div>
               </div>
 
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-5" data-testid="section-legal-summary">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <span className="text-sm font-semibold text-gray-800">Inspection Scope &amp; Terms ({TERMS_VERSION})</span>
+                </div>
+                <ul className="space-y-1.5 mb-4">
+                  {LEGAL_SUMMARY_BULLETS.map((bullet, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                      <span className="mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+                <label
+                  className="flex items-start gap-3 cursor-pointer"
+                  data-testid="label-terms-checkbox"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-emerald-600"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    data-testid="checkbox-terms-accept"
+                  />
+                  <span className="text-xs text-gray-700 leading-snug">
+                    I have read and agree to the RideCheck inspection scope and terms above. I understand this is a visual, non-invasive assessment and the final purchase decision is mine.
+                  </span>
+                </label>
+              </div>
+
               <Button
                 className="w-full"
                 size="lg"
                 onClick={handlePay}
-                disabled={paying}
+                disabled={paying || !termsAccepted}
                 data-testid="button-pay-now"
               >
                 {paying ? (
@@ -178,6 +222,12 @@ function PayInner() {
                   </span>
                 )}
               </Button>
+
+              {!termsAccepted && (
+                <p className="text-xs text-center text-amber-600 mt-2" data-testid="text-terms-required">
+                  Please accept the terms above to continue
+                </p>
+              )}
 
               <p className="text-xs text-center text-gray-500 mt-3">
                 You&apos;ll be redirected to Stripe for secure payment

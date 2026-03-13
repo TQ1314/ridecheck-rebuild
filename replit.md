@@ -20,6 +20,7 @@ The platform is built with Next.js 14 App Router and utilizes Supabase for authe
     - Buyer ownership and payment reconciliation are handled by associating orders with authenticated user IDs and backfilling customer IDs via webhooks.
     - The system fully rebrands "Inspectors" to "RideCheckers" across the UI and integrates RideChecker data management directly with the `profiles` table for a single source of truth.
     - Spanish language support is implemented for key public-facing pages, with an EN|ES language toggle and locale-aware components.
+    - A legal protection layer is implemented: terms acceptance checkbox on the `/pay/[orderId]` page (required before Stripe session creation), `terms_acceptances` table storing immutable acceptance records (hashed IP, user agent, terms version), `APPROVED_RECOMMENDATIONS` constant controlling valid inspector recommendation values (BUY / BUY_WITH_NEGOTIATION / DO_NOT_BUY_AT_ASKING_PRICE / FURTHER_INSPECTION_REQUIRED), legal disclaimer block appended to the intelligence report HTML template, inspection scope table (performed/not performed) in reports, and a standalone `legal-shield/` Express prototype package. Legal constants live in `lib/legal/constants.ts`.
 - **Feature Specifications**:
     - **Booking Types**: Supports Concierge (RideCheck contacts seller), Self-Arranged (customer arranges appointment), and Buyer-Arranged (customer coordinates, gets discount, feature-flagged).
     - **Packages**: Vehicle-determined flat-rate pricing (Standard, Plus, Premium, Exotic, and a `$1` internal test option).
