@@ -1,0 +1,114 @@
+Do not connect the form to your database yet
+
+For the first pass, make the “Seller Closing Checklist” form a UI-only placeholder or send to your existing contact email.
+
+Safest first version:
+
+name
+
+email
+
+submit button
+
+success message only
+
+No database writes yet unless you already have a stable form handler.
+
+5. Hide advanced features until page works
+
+Phase 1 should include only:
+
+hero
+
+benefits
+
+how it works
+
+FAQ
+
+pre-listing CTA
+
+checklist form
+
+Do not add yet:
+
+seller dashboards
+
+auth
+
+CRM integrations
+
+downloadable PDFs
+
+dynamic report previews
+
+booking logic changes
+
+Those are the things that usually break apps.
+
+Best prompt to run safely
+
+Paste this exactly:
+
+IMPORTANT: This is an add-only update. Do not modify or break any existing working routes, components, booking flow, pricing flow, authentication, backend logic, database schema, checkout, inspection request flow, or report system.
+
+Create a new isolated route at /seller only.
+
+Requirements:
+- Reuse existing site header/footer/layout if available, without changing their current behavior
+- Build a seller-focused landing page that matches the current RideCheck design style
+- Mobile-first, clean spacing, trust-focused UI
+- No backend changes unless absolutely necessary
+- Do not change navigation behavior unless simply adding one safe link to /seller
+- If adding a form, make it non-destructive and use a simple placeholder submit handler or existing safe contact mechanism only
+
+Page sections:
+1. Hero section with headline:
+   “A buyer requested a RideCheck? That’s how serious deals get DONE.”
+2. Reassurance text explaining RideCheck helps buyers close faster and is not invasive
+3. “Why Sellers Love RideCheck” section with benefits:
+   - Faster closings
+   - Fewer lowball offers
+   - Serious buyers
+   - Reusable report
+4. Simple 4-step process section from seller perspective
+5. “RideCheck Verified” pre-listing upsell section with CTA
+6. “Seller Closing Checklist (Illinois Edition)” email capture section
+7. FAQ section:
+   - No test drive
+   - No cost to seller
+   - Fast process
+   - What happens if buyer walks away
+
+Technical guardrails:
+- Do not refactor existing files unless required for import wiring
+- Prefer creating new files under a seller-specific folder or route
+- Keep changes localized to /seller
+- Preserve current styling system
+- Ensure app builds successfully after changes
+- Show me exactly which files were created or edited before finalizing
+Even safer method
+
+Tell Replit to do it in two passes.
+
+Pass 1
+
+Create only:
+
+route
+
+static content
+
+styling
+
+no form submission
+
+Pass 2
+
+After you test it, add:
+
+email capture functionality
+
+nav link if desired
+
+That reduces break risk a lot.
