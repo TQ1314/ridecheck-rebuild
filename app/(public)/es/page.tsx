@@ -20,9 +20,9 @@ import {
 const L = "es" as const;
 
 export const metadata: Metadata = {
-  title: "RideCheck — No compres a ciegas. Hazle un RideCheck.",
+  title: "RideCheck en Español — No compres a ciegas. Hazle un RideCheck.",
   description:
-    "RideCheck envía un mecánico local para inspeccionar un carro usado antes de que lo compres.",
+    "RideCheck envía un inspector local para revisar un carro usado antes de que lo compres. Inspecciones móviles antes de comprar un carro usado.",
 };
 
 export default function SpanishHomePage() {
@@ -100,33 +100,85 @@ export default function SpanishHomePage() {
         </div>
       </section>
 
-      {/* ========== UGC VIDEO ========== */}
-      <section className="border-t bg-gray-50">
-        <div className="mx-auto max-w-4xl px-4 py-12 text-center">
-          <h2 className="text-2xl font-extrabold md:text-3xl">Mira RideCheck en Acción</h2>
-          <p className="mt-3 max-w-2xl mx-auto text-gray-700">
-            Mira cómo RideCheck ayuda a compradores a evitar errores costosos antes de comprar un carro usado.
-          </p>
+      {/* ========== FEATURED SPANISH UGC VIDEO ========== */}
+      <section className="border-t bg-gray-950 py-14 px-4" data-testid="section-es-ugc-video">
+        <div className="mx-auto max-w-5xl">
 
-          <div className="mt-8 overflow-hidden rounded-2xl border bg-white shadow-sm">
-            <video
-              src="/videos/dillon-ugc-v2.mp4"
-              controls
-              playsInline
-              muted
-              className="w-full max-h-[560px] object-contain"
-              data-testid="video-ugc-dillon-es"
-            />
+          {/* Header */}
+          <div className="text-center mb-8">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white mb-4"
+              data-testid="badge-contenido-espanol"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-white opacity-80" />
+              Contenido en Español
+            </span>
+            <h2 className="text-2xl font-extrabold text-white md:text-3xl">
+              Mira RideCheck en Acción
+            </h2>
+            <p className="mt-2 text-sm text-gray-400">
+              Inspecciones móviles antes de comprar un carro usado.
+            </p>
           </div>
 
-          <div className="mt-6">
-            <a
-              href="/es/book"
-              data-testid="link-book-ugc-es"
-              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-            >
-              Reservar un RideCheck →
-            </a>
+          {/* Portrait video + caption layout */}
+          <div className="flex flex-col md:flex-row items-start justify-center gap-6 md:gap-10">
+
+            {/* Portrait video — 9:16 container */}
+            <div className="w-full max-w-[320px] mx-auto md:mx-0 shrink-0">
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl"
+                   style={{ aspectRatio: "9/16" }}>
+                <video
+                  src="/videos/ridcheck-es-ugc.mp4"
+                  controls
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                  data-testid="video-ugc-es-featured"
+                  preload="metadata"
+                />
+              </div>
+            </div>
+
+            {/* Caption + CTA */}
+            <div className="flex-1 flex flex-col justify-center max-w-md mx-auto md:mx-0 text-center md:text-left">
+              <blockquote className="space-y-3 text-gray-200 text-sm leading-relaxed md:text-base">
+                <p className="font-semibold text-white text-base md:text-lg">
+                  "Estaba a punto de comprar este carro… hasta que el vendedor se negó a la inspección."
+                </p>
+                <p className="text-gray-300">Un carro puede verse perfecto en fotos.</p>
+                <p className="text-gray-300">El vendedor puede decir que todo está bien…</p>
+                <p className="text-gray-300">pero los problemas ocultos pueden costarte miles.</p>
+                <p className="font-semibold text-amber-400">
+                  Si un vendedor se niega a una inspección… eso es un red flag.
+                </p>
+                <p className="text-gray-200">
+                  Antes de comprar un carro usado, revísalo con RideCheck.
+                </p>
+                <p className="text-xs text-emerald-400 font-medium tracking-wide">
+                  ridecheckauto.com
+                </p>
+              </blockquote>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                <a
+                  href="/es/book"
+                  data-testid="link-solicitar-inspeccion"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-500 transition-colors"
+                >
+                  Solicitar Inspección →
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="inline-flex items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-sm font-semibold text-gray-300 hover:bg-white/10 transition-colors"
+                >
+                  ¿Cómo funciona?
+                </a>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-500 text-center md:text-left">
+                Servicio disponible en Lake County, IL · Sin costo para el vendedor
+              </p>
+            </div>
           </div>
         </div>
       </section>
