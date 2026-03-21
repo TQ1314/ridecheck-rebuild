@@ -10,6 +10,7 @@ import { useState } from "react";
 const EN_LINKS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/blog", label: "Buyer Intel" },
   { href: "/join", label: "Join Our Team" },
 ];
 

@@ -23,6 +23,7 @@ const PUBLIC_ROUTES = [
   "/faq",
   "/what-we-check",
   "/seller",
+  "/blog",
 ];
 
 const INVITE_PREFIX = "/invite/";
@@ -49,7 +50,7 @@ const STAFF_ROLES = [
 const ES_PREFIX = "/es";
 
 function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX) || pathname.startsWith(PAY_PREFIX) || pathname === ES_PREFIX || pathname.startsWith(`${ES_PREFIX}/`);
+  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX) || pathname.startsWith(PAY_PREFIX) || pathname === ES_PREFIX || pathname.startsWith(`${ES_PREFIX}/`) || pathname.startsWith("/blog");
 }
 
 function isStaticOrInternal(pathname: string) {
