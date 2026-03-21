@@ -4,12 +4,20 @@ import facebookMarketplaceRedFlags from "@/content/blog/facebook-marketplace-red
 import camryCleanBuy from "@/content/blog/2019-camry-clean-buy";
 import negotiateAfterInspection from "@/content/blog/how-to-negotiate-after-inspection";
 import lakeCountyMarketQ1 from "@/content/blog/lake-county-market-q1-2025";
+import jeepSrtWaukegan from "@/content/blog/jeep-srt-title-problem-waukegan";
+import lexusMundelein from "@/content/blog/2019-lexus-mundelein-green-light";
+import fordF150LakeCounty from "@/content/blog/ford-f150-lake-county";
+import negotiateWithReport from "@/content/blog/negotiate-with-ridecheck-report";
 
 export const ALL_POSTS: BlogPost[] = [
   facebookMarketplaceRedFlags,
   camryCleanBuy,
   negotiateAfterInspection,
   lakeCountyMarketQ1,
+  jeepSrtWaukegan,
+  lexusMundelein,
+  fordF150LakeCounty,
+  negotiateWithReport,
 ].sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
 
 export const BLOG_CATEGORIES: BlogCategory[] = [

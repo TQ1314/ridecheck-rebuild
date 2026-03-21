@@ -17,11 +17,12 @@ export type ContentBlockType =
   | { type: "list"; ordered?: boolean; items: string[] }
   | { type: "alert"; variant: "warning" | "info" | "success" | "danger"; text: string }
   | { type: "callout"; label?: string; text: string }
+  | { type: "youtube"; videoId: string; caption?: string }
   | { type: "divider" };
 
-export type MediaEmbed = {
-  type: "youtube" | "image" | "instagram";
-  url: string;
+export type GalleryImage = {
+  src: string;
+  alt?: string;
   caption?: string;
 };
 
@@ -40,8 +41,8 @@ export interface BlogPost {
   seoTitle?: string;
   seoDescription?: string;
   featured?: boolean;
-  mediaEmbeds?: MediaEmbed[];
-  galleryImages?: string[];
+  galleryImages?: GalleryImage[];
+  youtubeVideoId?: string;
   ctaText?: string;
   body: ContentBlockType[];
 }
