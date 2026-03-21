@@ -17,7 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info, HelpCircle } from "lucide-react";
 import {
   PACKAGE_INFO,
   PRICING,
@@ -85,6 +92,7 @@ function BookInner() {
 
   const [classification, setClassification] = useState<ClassificationResult | null>(null);
   const [useTestPackage, setUseTestPackage] = useState(false);
+  const [showWhyModal, setShowWhyModal] = useState(false);
 
   const isBuyerArranged = bookingType === "buyer_arranged";
 
@@ -491,36 +499,108 @@ function BookInner() {
             </div>
 
             {classification && !useTestPackage && (
-              <Card className="border-primary/50 bg-primary/5" data-testid="card-vehicle-package">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center gap-3">
-                    <Car className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div>
-                          <p className="text-sm font-semibold">
-                            Vehicle Required Package: {PACKAGE_INFO[classification.packageTier as PackageType]?.name || classification.packageTier}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {PACKAGE_INFO[classification.packageTier as PackageType]?.tagline}
-                          </p>
+              <>
+                <Card className="border-primary/50 bg-primary/5" data-testid="card-vehicle-package">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center gap-3">
+                      <Car className="h-5 w-5 text-primary flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold">
+                                Vehicle Required Package: {PACKAGE_INFO[classification.packageTier as PackageType]?.name || classification.packageTier}
+                              </p>
+                              {classification.requiresUpgrade && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowWhyModal(true)}
+                                  className="text-muted-foreground hover:text-primary transition-colors"
+                                  data-testid="button-why-package"
+                                  aria-label="Why is this package required?"
+                                >
+                                  <HelpCircle className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {PACKAGE_INFO[classification.packageTier as PackageType]?.tagline}
+                            </p>
+                            {classification.requiresUpgrade && (
+                              <button
+                                type="button"
+                                onClick={() => setShowWhyModal(true)}
+                                className="text-xs text-primary underline underline-offset-2 mt-1 hover:text-primary/80 transition-colors"
+                                data-testid="link-why-package"
+                              >
+                                Why is this package required?
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-lg font-bold" data-testid="text-determined-price">
+                            {formatCurrency(classification.basePrice)}
+                          </span>
                         </div>
-                        <span className="text-lg font-bold" data-testid="text-determined-price">
-                          {formatCurrency(classification.basePrice)}
-                        </span>
                       </div>
                     </div>
-                  </div>
-                  {(!vehicleMileage || !vehiclePrice) && (
-                    <div className="flex items-start gap-2 mt-3 pt-3 border-t border-primary/20">
-                      <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-muted-foreground">
-                        Add mileage and asking price above for the most accurate package match.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {(!vehicleMileage || !vehiclePrice) && (
+                      <div className="flex items-start gap-2 mt-3 pt-3 border-t border-primary/20">
+                        <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-muted-foreground">
+                          Add mileage and asking price above for the most accurate package match.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Dialog open={showWhyModal} onOpenChange={setShowWhyModal}>
+                  <DialogContent className="max-w-sm" data-testid="dialog-why-package">
+                    <DialogHeader>
+                      <DialogTitle>
+                        Why {PACKAGE_INFO[classification.packageTier as PackageType]?.name} is required
+                      </DialogTitle>
+                      <DialogDescription asChild>
+                        <div className="space-y-3 text-sm text-foreground mt-2">
+                          {classification.packageTier === "plus" && (
+                            <>
+                              <p className="text-muted-foreground">
+                                This vehicle falls into a higher-complexity category based on make, model, drivetrain, or diagnostic risk. To reduce the chance of missed issues, RideCheck requires the Plus inspection level for this type of vehicle.
+                              </p>
+                              <ul className="space-y-1 text-muted-foreground">
+                                {[
+                                  "European luxury vehicles (BMW, Mercedes, Audi, etc.)",
+                                  "EVs and hybrids",
+                                  "Higher diagnostic complexity",
+                                  "Vehicles that benefit from deeper inspection coverage",
+                                ].map((item) => (
+                                  <li key={item} className="flex items-start gap-2">
+                                    <span className="text-primary mt-0.5">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="text-xs text-muted-foreground border-t pt-2">
+                                Basic is not available for this vehicle category.
+                              </p>
+                            </>
+                          )}
+                          {classification.packageTier === "exotic" && (
+                            <>
+                              <p className="text-muted-foreground">
+                                This vehicle falls into a specialty or high-value category with higher inspection complexity and repair exposure. RideCheck requires the Exotic inspection level to provide the appropriate level of documentation and buyer protection.
+                              </p>
+                              <p className="text-xs text-muted-foreground border-t pt-2">
+                                Basic and Plus are not available for this vehicle category.
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+              </>
             )}
 
             {useTestPackage && (

@@ -8,10 +8,27 @@ import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, Upload } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Send, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { canUpdateStatus, canAssignOps, canSendPayment, type Role } from "@/lib/utils/roles";
+import { packageLabel } from "@/lib/utils/format";
+
+const PACKAGE_OPTIONS = [
+  { value: "standard", label: "Basic — $139" },
+  { value: "plus", label: "Plus — $169" },
+  { value: "exotic", label: "Exotic — $299" },
+];
 
 export default function OpsOrderDetailPage() {
   const params = useParams();
@@ -22,6 +39,10 @@ export default function OpsOrderDetailPage() {
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [overridePackage, setOverridePackage] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
+  const [overrideLoading, setOverrideLoading] = useState(false);
 
   async function loadData() {
     const {
@@ -92,6 +113,32 @@ export default function OpsOrderDetailPage() {
     loadData();
   };
 
+  const handlePackageOverride = async () => {
+    if (!overridePackage) {
+      toast({ title: "Select a package first", variant: "destructive" });
+      return;
+    }
+    setOverrideLoading(true);
+    const res = await fetch(`/api/ops/orders/${orderId}/package-override`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        package_override: overridePackage,
+        package_override_reason: overrideReason || null,
+      }),
+    });
+    setOverrideLoading(false);
+    if (!res.ok) {
+      const err = await res.json();
+      toast({ title: "Override failed", description: err.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Package overridden", description: `Set to ${packageLabel(overridePackage)}` });
+    setOverridePackage("");
+    setOverrideReason("");
+    loadData();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -109,6 +156,9 @@ export default function OpsOrderDetailPage() {
   }
 
   const role = (profile?.role || "operations") as Role;
+  const canOverride = ["admin", "operations"].includes(role);
+  const systemReason = order.classification_reason || "—";
+  const isOverridden = systemReason.startsWith("[OPS OVERRIDE");
 
   return (
     <div className="p-6 space-y-4">
@@ -149,7 +199,87 @@ export default function OpsOrderDetailPage() {
             )}
         </div>
       </div>
+
       <OrderDetailPanel order={order} activities={activities} />
+
+      {canOverride && (
+        <Card data-testid="card-package-override">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Package Override
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>
+                <span className="font-medium">Current package:</span>{" "}
+                <span className="font-semibold">{packageLabel(order.package)}</span>
+                {order.base_price && (
+                  <span className="ml-1 text-muted-foreground">
+                    (${order.base_price})
+                  </span>
+                )}
+              </p>
+              <p>
+                <span className="font-medium">System reason:</span>{" "}
+                {isOverridden ? (
+                  <span className="text-amber-600 dark:text-amber-400">{systemReason}</span>
+                ) : (
+                  <span>{systemReason}</span>
+                )}
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="override-pkg" className="text-xs">Force package to</Label>
+                <Select
+                  value={overridePackage}
+                  onValueChange={setOverridePackage}
+                >
+                  <SelectTrigger
+                    id="override-pkg"
+                    className="h-8 text-xs"
+                    data-testid="select-override-package"
+                  >
+                    <SelectValue placeholder="Select package…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PACKAGE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="override-reason" className="text-xs">Reason (optional)</Label>
+                <Textarea
+                  id="override-reason"
+                  className="h-8 min-h-0 text-xs resize-none py-1.5"
+                  placeholder="e.g. Buyer confirmed EV, diesel engine, etc."
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  data-testid="textarea-override-reason"
+                />
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePackageOverride}
+              disabled={overrideLoading || !overridePackage}
+              data-testid="button-apply-override"
+            >
+              {overrideLoading ? "Saving…" : "Apply Override"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

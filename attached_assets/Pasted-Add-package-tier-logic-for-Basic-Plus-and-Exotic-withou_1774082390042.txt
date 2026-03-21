@@ -1,0 +1,160 @@
+Add package tier logic for Basic, Plus, and Exotic without breaking the existing RideCheck booking flow.
+
+GOAL
+Use make/model/value/risk rules to determine whether a vehicle should default to Basic, require Plus, or require Exotic.
+
+IMPORTANT
+- Do not break existing routing, booking forms, checkout flow, order creation flow, or payment flow
+- Do not break auth, admin, ops, Stripe, or current working pages
+- Reuse existing package-selection logic if present
+- If current package logic exists, extend it safely rather than replacing it entirely
+- Keep the user experience clear, mobile-friendly, and easy to understand
+- Do NOT create separate Volt or Torque packages in this build
+- For this build, EVs and hybrids should be routed into Plus
+- Keep the frontend package experience simple for the buyer
+
+PACKAGE RULES
+1. Basic = mainstream vehicles with normal inspection complexity
+2. Plus = higher-complexity vehicles such as Mercedes-Benz, BMW, Audi, EVs, hybrids, and similar categories
+3. Exotic = specialty, ultra-luxury, supercar, collector-risk, or very high-value vehicles
+
+BASIC
+- Default tier when no higher-complexity or exotic rule applies
+
+PLUS SHOULD TRIGGER IF ANY OF THESE ARE TRUE
+- make is in configured higher-complexity brand list
+- vehicle is EV
+- vehicle is hybrid
+- vehicle falls into a configured diagnostic-complexity category
+- vehicle is identified as higher-complexity based on current package rules already in the app
+
+Use an initial higher-complexity brand list like:
+- Mercedes-Benz
+- BMW
+- Audi
+- Volvo
+- Land Rover
+- Jaguar
+- Acura
+- Infiniti
+- Porsche (default to Plus unless overridden to Exotic)
+- Lexus higher-complexity models if current logic supports it
+
+EXOTIC SHOULD TRIGGER IF ANY OF THESE ARE TRUE
+- make is in exotic brand list
+- make/model/trim is in exotic model list
+- estimated market value exceeds configured exotic threshold
+- vehicle is manually flagged by RideCheck ops/admin
+
+Use an initial exotic brand list like:
+- Ferrari
+- Lamborghini
+- McLaren
+- Bentley
+- Rolls-Royce
+- Aston Martin
+- Lotus
+- Maserati
+
+Use an initial model/trim override list if supported, such as:
+- Porsche 911 Turbo / GT3 / GT2
+- BMW M5 / M8
+- Mercedes-Benz S-Class / AMG GT
+- high-end special trims that clearly belong in Exotic
+
+IMPORTANT MODEL/BRAND LOGIC
+- Not every luxury brand vehicle should automatically become Exotic
+- Porsche should default to Plus unless a model/trim override or value threshold triggers Exotic
+- Mercedes-Benz, BMW, and Audi should normally fall into Plus unless a specific exotic override applies
+- Everything not matched by special rules should safely remain Basic
+
+MARKET VALUE LOGIC
+- Only use estimated market value if there is already a reliable source in the current app
+- If no reliable value source exists yet, scaffold the rule structure but do not break the booking flow trying to fetch value data
+- Make the exotic value threshold configurable
+- If no market value is available, skip value-based escalation and continue using make/model/risk rules
+
+FALLBACK LOGIC
+- If make/model/trim cannot be confidently identified, do not block checkout
+- Fall back to the safest existing package logic
+- If parsing or extraction fails, let the user continue normally
+- If no special rule applies, default to Basic
+
+LISTING LINK / VEHICLE DATA INTELLIGENCE
+If the current booking flow already accepts a pasted vehicle listing link:
+1. Check whether the current app can already extract make/model/year from the link
+2. If yes, use that data to help determine the package tier
+3. If VIN can also be extracted reliably, use VIN as a stronger signal
+4. Do not assume VIN will always be available
+5. Do not block users if parsing fails
+
+BUYER EXPERIENCE
+If a vehicle triggers Plus or Exotic:
+- auto-select that package
+- clearly explain why
+- do not make the selection feel arbitrary or confusing
+
+If Plus is required, show a small info icon or inline link:
+Why is this package required?
+
+When clicked, open a modal or expandable panel with:
+
+Title:
+Why Plus is required
+
+Body:
+This vehicle falls into a higher-complexity category based on make, model, drivetrain, or diagnostic risk. To reduce the chance of missed issues, RideCheck requires the Plus inspection level for this type of vehicle.
+
+Add short example bullets:
+- European luxury vehicles
+- EVs and hybrids
+- higher diagnostic complexity
+- vehicles that benefit from deeper inspection coverage
+
+Add a short note:
+Basic is not available for this vehicle category.
+
+If Exotic is required, show a small info icon or inline link:
+Why is this package required?
+
+When clicked, open a modal or expandable panel with:
+
+Title:
+Why Exotic is required
+
+Body:
+This vehicle falls into a specialty or high-value category with higher inspection complexity and repair exposure. RideCheck requires the Exotic inspection level to provide the appropriate level of documentation and buyer protection.
+
+Add a short note:
+Basic is not available for this vehicle category.
+
+MANUAL OVERRIDE
+Include support for manual override by admin/ops at the order level.
+Ops/admin should be able to:
+- force Basic
+- force Plus
+- force Exotic
+- see why the system selected the current package
+
+If current permissions are restrictive, keep the override available to the appropriate admin/ops roles already used by the app.
+
+TECHNICAL IMPLEMENTATION
+- Prefer a clean rules layer or config object rather than hardcoding logic everywhere
+- If possible, use a structure like:
+  - plus_brands
+  - exotic_brands
+  - model_overrides
+  - value_thresholds
+- Keep it easy to expand later
+- Do not add Volt or Torque in this version
+- Keep internal logic ready for future expansion if helpful, but do not expose extra package tiers now
+
+FINAL TASK
+After implementing, show me:
+1. which files were changed
+2. whether existing package logic was reused or a new rules layer was added
+3. how Basic, Plus, and Exotic are triggered
+4. whether make/model/year or VIN can currently be extracted from pasted links
+5. whether market value logic is live or only scaffolded
+6. how admin/ops override works
+7. confirmation that booking, checkout, and current forms still work

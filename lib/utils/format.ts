@@ -45,5 +45,7 @@ export function bookingTypeLabel(type: string): string {
 }
 
 export function packageLabel(pkg: string): string {
+  if (pkg === "standard") return "Basic";
+  if (pkg === "premium") return "Plus";
   return pkg.charAt(0).toUpperCase() + pkg.slice(1);
 }

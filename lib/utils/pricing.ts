@@ -6,7 +6,7 @@ export type PackageTier = "standard" | "plus" | "premium" | "exotic" | "test";
 export const PRICING: Record<PackageType, { full: number; self: number }> = {
   standard: { full: 139, self: 139 },
   plus: { full: 169, self: 169 },
-  premium: { full: 189, self: 189 },
+  premium: { full: 169, self: 169 },
   exotic: { full: 299, self: 299 },
   test: { full: 1, self: 1 },
 };
@@ -38,16 +38,13 @@ export function getPackageTier(vehicle: {
   const make = (vehicle.make || "").toLowerCase();
   const model = (vehicle.model || "").toLowerCase();
 
-  const exoticMakes = ["ferrari", "lamborghini", "mclaren", "bentley", "rolls-royce", "aston martin", "bugatti", "pagani", "koenigsegg", "lotus"];
+  const exoticMakes = ["ferrari", "lamborghini", "mclaren", "bentley", "rolls-royce", "aston martin", "bugatti", "pagani", "koenigsegg", "lotus", "maserati"];
   if (exoticMakes.includes(make)) return "exotic";
 
-  const luxuryMakes = ["mercedes-benz", "mercedes", "bmw", "audi", "porsche", "lexus", "land rover", "range rover", "jaguar", "tesla", "maserati"];
-  if (luxuryMakes.includes(make)) return "premium";
+  const plusMakes = ["mercedes-benz", "mercedes", "bmw", "audi", "porsche", "lexus", "land rover", "range rover", "jaguar", "tesla", "volvo", "acura", "infiniti"];
+  if (plusMakes.includes(make)) return "plus";
 
-  const flagshipKeywords = ["s-class", "s class", "s550", "s500", "7 series", "7-series", "a8", "range rover", "escalade", "navigator", "maybach"];
-  if (flagshipKeywords.some((kw) => model.includes(kw))) return "premium";
-
-  const evMakes = ["tesla", "rivian", "lucid", "polestar", "fisker"];
+  const evMakes = ["rivian", "lucid", "polestar", "fisker"];
   if (evMakes.includes(make)) return "plus";
 
   const evKeywords = ["ev", "hybrid", "plug-in", "phev", "electric", "e-tron", "mach-e"];
@@ -98,7 +95,7 @@ export const PACKAGE_INFO: Record<
   { name: string; tagline: string; features: string[] }
 > = {
   standard: {
-    name: "Standard",
+    name: "Basic",
     tagline: "Essential vehicle screening for informed decisions",
     features: [
       "150+ point inspection",
@@ -112,40 +109,46 @@ export const PACKAGE_INFO: Record<
   },
   plus: {
     name: "Plus",
-    tagline: "Euro, EV & heavy-duty specialist screening",
+    tagline: "Euro, EV, hybrid & higher-complexity screening",
     features: [
-      "Everything in Standard",
+      "Everything in Basic",
       "OBD-II diagnostic scan",
       "Undercarriage inspection",
       "Paint depth measurement",
       "Fluid analysis",
       "Road test evaluation",
-      "Euro/EV/HD-specific checks",
+      "Euro/EV/hybrid-specific checks",
+      "Frame & structural analysis",
+      "VIN consistency check",
       "Report within 12hrs",
     ],
   },
   premium: {
-    name: "Premium",
-    tagline: "Luxury & flagship vehicle diagnostics",
+    name: "Plus",
+    tagline: "Euro, EV, hybrid & higher-complexity screening",
     features: [
-      "Everything in Plus",
+      "Everything in Basic",
+      "OBD-II diagnostic scan",
+      "Undercarriage inspection",
+      "Paint depth measurement",
+      "Fluid analysis",
+      "Road test evaluation",
+      "Euro/EV/hybrid-specific checks",
       "Frame & structural analysis",
       "VIN consistency check",
-      "Fraud & red flag screening",
-      "Video walkthrough",
-      "Priority scheduling",
       "Report within 12hrs",
     ],
   },
   exotic: {
     name: "Exotic",
-    tagline: "Full pre-car-purchase intelligence package",
+    tagline: "Full pre-purchase intelligence for specialty vehicles",
     features: [
-      "Everything in Premium",
+      "Everything in Plus",
       "Title & ownership review",
       "Market value assessment",
       "Negotiation support data",
-      "Dedicated inspector",
+      "Dedicated RideChecker",
+      "Fraud & red flag screening",
       "Report within 6hrs",
       "30-day follow-up support",
     ],
