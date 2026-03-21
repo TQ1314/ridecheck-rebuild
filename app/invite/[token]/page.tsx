@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { getRoleLabel, type Role } from "@/lib/utils/roles";
-import { Eye, EyeOff } from "lucide-react";
+import { getRoleLabel, getDashboardPath, type Role } from "@/lib/utils/roles";
+import { Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function InviteAcceptPage() {
   const params = useParams();
   const router = useRouter();
+  const supabase = createClient();
   const token = params?.token as string;
 
   const [invite, setInvite] = useState<{
@@ -24,7 +26,7 @@ export default function InviteAcceptPage() {
     expires_at: string;
   } | null>(null);
   const [status, setStatus] = useState<
-    "loading" | "ready" | "expired" | "used" | "not_found" | "success" | "error"
+    "loading" | "ready" | "expired" | "used" | "not_found" | "signing_in" | "success" | "error"
   >("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -67,7 +69,9 @@ export default function InviteAcceptPage() {
     }
     setSubmitting(true);
     setErrorMsg("");
+
     try {
+      // Step 1: Create the account
       const res = await fetch(`/api/invites/${token}/accept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,7 +84,23 @@ export default function InviteAcceptPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to accept invite");
-      setStatus("success");
+
+      // Step 2: Auto sign in
+      setStatus("signing_in");
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invite!.email,
+        password,
+      });
+
+      if (signInError) {
+        // Account created but sign-in failed — send them to login with a note
+        setStatus("success");
+        return;
+      }
+
+      // Step 3: Redirect to their role's dashboard
+      const dashPath = getDashboardPath(invite!.role as Role);
+      router.push(dashPath);
     } catch (err: any) {
       setErrorMsg(err.message);
       setStatus("error");
@@ -89,6 +109,7 @@ export default function InviteAcceptPage() {
     }
   };
 
+  // ── Loading skeleton ──────────────────────────────────────────────
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -97,6 +118,17 @@ export default function InviteAcceptPage() {
     );
   }
 
+  // ── Signing in / redirecting ──────────────────────────────────────
+  if (status === "signing_in") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Signing you in…</p>
+      </div>
+    );
+  }
+
+  // ── Invalid / expired / used ──────────────────────────────────────
   if (status === "not_found" || status === "expired" || status === "used") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -125,20 +157,24 @@ export default function InviteAcceptPage() {
     );
   }
 
+  // ── Success fallback (auto sign-in failed) ────────────────────────
   if (status === "success") {
+    const dashPath = invite ? getDashboardPath(invite.role as Role) : "/auth/login";
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10">
-              <Logo size={28} />
+          <CardContent className="pt-6 text-center space-y-4">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-emerald-50">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
             </div>
-            <h2 className="text-lg font-semibold mb-2">Account Created</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Your account has been set up successfully. Sign in with the credentials you just created.
+            <h2 className="text-lg font-semibold">Account Ready</h2>
+            <p className="text-sm text-muted-foreground">
+              Your account has been created. Sign in to access your dashboard.
             </p>
             <Button asChild className="w-full">
-              <Link href="/auth/login">Sign In</Link>
+              <Link href={`/auth/login?redirect=${encodeURIComponent(dashPath)}`}>
+                Sign In to Dashboard
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -146,15 +182,17 @@ export default function InviteAcceptPage() {
     );
   }
 
+  // ── Main form ─────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="flex justify-center mb-2">
+            <Logo size={36} />
+          </div>
           <CardTitle className="text-center">Join RideCheck</CardTitle>
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              You have been invited as
-            </p>
+          <div className="text-center space-y-2 mt-1">
+            <p className="text-sm text-muted-foreground">You have been invited as</p>
             <Badge className="no-default-hover-elevate no-default-active-elevate">
               {getRoleLabel(invite!.role as Role)}
             </Badge>
@@ -202,11 +240,7 @@ export default function InviteAcceptPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   tabIndex={-1}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
@@ -222,17 +256,29 @@ export default function InviteAcceptPage() {
                 data-testid="input-invite-confirm-password"
               />
             </div>
+
             {(errorMsg || status === "error") && (
-              <p className="text-sm text-destructive">{errorMsg}</p>
+              <p className="text-sm text-destructive" data-testid="text-invite-error">
+                {errorMsg}
+              </p>
             )}
+
             <Button
               type="submit"
               className="w-full"
               disabled={submitting}
               data-testid="button-accept-invite"
             >
-              {submitting ? "Creating Account..." : "Create Account"}
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {status === "signing_in" ? "Signing in…" : "Creating Account…"}
+                </span>
+              ) : (
+                "Create Account & Sign In"
+              )}
             </Button>
+
             <p className="text-xs text-center text-muted-foreground">
               Already have an account?{" "}
               <Link href="/auth/login" className="text-primary underline">
