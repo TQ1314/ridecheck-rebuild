@@ -7,6 +7,8 @@ const rejectSchema = z.object({
   reason: z.string().min(1),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

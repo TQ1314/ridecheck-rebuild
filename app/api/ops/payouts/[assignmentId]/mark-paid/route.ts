@@ -8,6 +8,8 @@ const markPaidSchema = z.object({
   method: z.string().optional(),
 }).optional();
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { assignmentId: string } },

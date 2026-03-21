@@ -10,6 +10,8 @@ const schema = z.object({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {

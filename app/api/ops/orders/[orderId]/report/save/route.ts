@@ -12,6 +12,8 @@ const saveReportSchema = z.object({
   issues: z.any().optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

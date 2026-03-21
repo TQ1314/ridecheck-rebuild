@@ -11,6 +11,8 @@ function hashIp(ip: string | null): string {
     .digest("hex");
 }
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } }

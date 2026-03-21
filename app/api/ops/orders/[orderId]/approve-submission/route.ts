@@ -4,6 +4,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { scoreSubmission } from "@/lib/ridechecker/scoring";
 import { getPayoutAmount } from "@/lib/ridechecker/payouts";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

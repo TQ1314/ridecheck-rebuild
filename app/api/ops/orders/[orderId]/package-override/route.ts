@@ -6,6 +6,8 @@ import type { VehicleTier } from "@/lib/vehicleClassification";
 const ALLOWED_OVERRIDES = ["standard", "plus", "exotic"] as const;
 type OverrideTier = typeof ALLOWED_OVERRIDES[number];
 
+export const dynamic = "force-dynamic";
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { orderId: string } }

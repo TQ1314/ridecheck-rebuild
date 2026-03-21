@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
 import { sendEmail } from "@/lib/email/resend";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
   if (!stripe) {

@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const INTERNAL_SECRET = process.env.SESSION_SECRET;
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("x-internal-secret");

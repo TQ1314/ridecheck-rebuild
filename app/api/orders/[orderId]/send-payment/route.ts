@@ -6,6 +6,8 @@ import { getStripe } from "@/lib/stripe/server";
 import { sendEmail } from "@/lib/email/resend";
 import { paymentRequestHtml } from "@/lib/email/templates/payment-request";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },
