@@ -8,8 +8,10 @@ import jeepSrtWaukegan from "@/content/blog/jeep-srt-title-problem-waukegan";
 import lexusMundelein from "@/content/blog/2019-lexus-mundelein-green-light";
 import fordF150LakeCounty from "@/content/blog/ford-f150-lake-county";
 import negotiateWithReport from "@/content/blog/negotiate-with-ridecheck-report";
+import theRedFlagManifesto from "@/content/blog/the-red-flag-manifesto";
 
 export const ALL_POSTS: BlogPost[] = [
+  theRedFlagManifesto,
   facebookMarketplaceRedFlags,
   camryCleanBuy,
   negotiateAfterInspection,

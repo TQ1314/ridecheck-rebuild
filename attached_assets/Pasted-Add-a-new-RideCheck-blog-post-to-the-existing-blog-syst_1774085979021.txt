@@ -1,0 +1,78 @@
+Add a new RideCheck blog post to the existing blog system.
+
+Post data:
+- Title: If They Say “No” to a RideCheck, You Say “No” to the Car
+- Slug: the-red-flag-manifesto
+- Category: Buyer’s Playbook
+- Verdict: red
+- Location tag: Lake County
+- Featured: true
+- SEO title: If a Seller Refuses an Inspection, Walk Away | RideCheck
+- SEO description: A seller who refuses a RideCheck is showing a major red flag. Learn why inspection resistance usually means hidden problems.
+
+Post content:
+
+You found the car. The year, make, model, and price all look right. After weeks of scrolling Facebook Marketplace, this one feels like the deal.
+
+The photos are clean. The seller sounds normal. The description says everything is fine.
+
+Then you ask one simple question:
+
+“Can I have a RideCheck agent inspect it before I bring the cash?”
+
+Suddenly the tone changes.
+
+“I already had my mechanic look at it.”
+“I have other buyers coming today.”
+“I don’t have time for an inspection.”
+
+Here is the RideCheck rule:
+
+If a seller avoids a professional inspection, the deal is dead.
+
+## The Transparency Filter
+
+A seller with nothing to hide usually has no problem with an inspection.
+
+In fact, a clean RideCheck can help justify their asking price.
+
+When a seller pushes back, they may not be protecting their time. They may be protecting a secret.
+
+## What they may be hiding
+
+### 1. Recently cleared warning lights
+The dashboard is clean now, but trouble codes may have been cleared shortly before you arrived.
+
+### 2. Hidden rust
+Fresh undercoating can hide serious corrosion, especially in an Illinois vehicle exposed to road salt.
+
+### 3. Pending problems
+Some faults do not trigger a dashboard light right away. They sit in system memory and show up later as expensive repairs.
+
+## Why RideCheck is different
+
+RideCheck is built to verify the vehicle, not trust the story.
+
+Our inspections focus on:
+- high-risk wear areas
+- scan data beyond a basic dashboard check
+- signs of hidden mechanical or structural problems
+- evidence that gives buyers real decision-making power
+
+## The real math
+
+Buying a used car is one of the biggest purchases most people make.
+
+Spending $139 to avoid a major mistake is not extra. It is protection.
+
+If a seller is confident in the car, they should allow an inspection.
+
+If they refuse, that is your answer.
+
+Don’t guess. Get the data.
+
+CTA text:
+Secure Your Inspection Now
+
+Optional media:
+Embed Alexia’s UGC video at the bottom of the post if the current blog system supports safe video embeds.
