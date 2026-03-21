@@ -13,6 +13,8 @@ const opsStatusSchema = z.object({
   ops_notes: z.string().optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

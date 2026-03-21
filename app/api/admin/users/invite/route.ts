@@ -17,6 +17,8 @@ const inviteSchema = z.object({
   ]),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     const result = await requireRole(["operations_lead", "owner"]);

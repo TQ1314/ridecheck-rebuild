@@ -12,6 +12,8 @@ const availabilitySchema = z.object({
 
 type AvailabilityInput = z.infer<typeof availabilitySchema>;
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const supabase = createRouteHandlerSupabaseClient();

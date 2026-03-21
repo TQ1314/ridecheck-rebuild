@@ -8,6 +8,8 @@ const contactSchema = z.object({
   contact_method: z.enum(["phone", "email", "sms", "other"]).optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

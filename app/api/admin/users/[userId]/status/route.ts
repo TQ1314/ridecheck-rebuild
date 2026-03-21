@@ -8,6 +8,8 @@ const statusSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { userId: string } },

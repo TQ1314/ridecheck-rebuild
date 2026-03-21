@@ -4,6 +4,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const SAFE_COLUMNS = "order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_location, inspection_address, scheduled_date, scheduled_time, inspector_status, report_status, package, booking_type, created_at";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const supabase = createSupabaseServer();

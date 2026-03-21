@@ -11,6 +11,8 @@ const attemptSchema = z.object({
   status: z.enum(["sent", "failed"]).optional().default("sent"),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } },

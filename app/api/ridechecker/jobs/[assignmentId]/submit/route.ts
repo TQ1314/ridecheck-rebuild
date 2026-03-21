@@ -24,6 +24,8 @@ const submitSchema = z.object({
   extra_photos: z.array(z.string()).optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { assignmentId: string } }
