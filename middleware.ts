@@ -27,30 +27,24 @@ const PUBLIC_ROUTES = [
 ];
 
 const INVITE_PREFIX = "/invite/";
-
 const TRACK_PREFIX = "/track/";
 const PAY_PREFIX = "/pay/";
 
-const SKIP_PREFIXES = ["/_next", "/api", "/favicon", "/images", "/fonts"];
-
-const STAFF_PREFIXES = ["/admin", "/dashboard", "/operations", "/qa", "/dev", "/platform"];
-
-const STAFF_ROLES = [
-  "owner",
-  "admin",
-  "operations",
-  "operations_lead",
-  "ops",
-  "qa",
-  "developer",
-  "platform",
-  "inspector",
-];
+// Requests that must never enter the middleware auth logic
+const SKIP_PREFIXES = ["/_next", "/api", "/favicon", "/images", "/fonts", "/videos"];
 
 const ES_PREFIX = "/es";
 
 function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) || pathname.startsWith(INVITE_PREFIX) || pathname.startsWith(TRACK_PREFIX) || pathname.startsWith(PAY_PREFIX) || pathname === ES_PREFIX || pathname.startsWith(`${ES_PREFIX}/`) || pathname.startsWith("/blog");
+  return (
+    PUBLIC_ROUTES.includes(pathname) ||
+    pathname.startsWith(INVITE_PREFIX) ||
+    pathname.startsWith(TRACK_PREFIX) ||
+    pathname.startsWith(PAY_PREFIX) ||
+    pathname === ES_PREFIX ||
+    pathname.startsWith(`${ES_PREFIX}/`) ||
+    pathname.startsWith("/blog")
+  );
 }
 
 function isStaticOrInternal(pathname: string) {
@@ -58,15 +52,17 @@ function isStaticOrInternal(pathname: string) {
   return SKIP_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-function isStaffRoute(pathname: string) {
-  return STAFF_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
+  // Never touch static assets, API routes, or internal Next.js paths
   if (isStaticOrInternal(pathname)) return NextResponse.next();
 
+  // Public pages need no session check — return immediately
+  if (isPublic(pathname)) return NextResponse.next();
+
+  // For all protected routes: one fast cookie-based session read.
+  // No DB call — role enforcement lives in the route/page handlers via rbac.ts.
   const res = NextResponse.next();
   const supabase = createMiddlewareSupabaseClient(req, res);
 
@@ -74,67 +70,10 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (isPublic(pathname)) return res;
-
-  if (isStaffRoute(pathname)) {
-    if (!session) {
-      const url = new URL("/auth/login", req.url);
-      url.searchParams.set("redirect", `${pathname}${search || ""}`);
-      url.searchParams.set("error", "login_required");
-      return NextResponse.redirect(url);
-    }
-
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role, is_active")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (error || !profile || !profile.is_active) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    if (!STAFF_ROLES.includes(profile.role)) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
-      if (["ridechecker", "ridechecker_active"].includes(profile.role)) {
-        return NextResponse.redirect(new URL("/ridechecker/dashboard", req.url));
-      }
-    }
-
-    return res;
-  }
-
-  if (pathname.startsWith("/ridechecker/") && pathname !== "/ridechecker/signup") {
-    if (!session) {
-      const url = new URL("/auth/login", req.url);
-      url.searchParams.set("redirect", `${pathname}${search || ""}`);
-      url.searchParams.set("error", "login_required");
-      return NextResponse.redirect(url);
-    }
-
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role, is_active")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (error || !profile || !profile.is_active) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    if (!["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    return res;
-  }
-
   if (!session) {
     const url = new URL("/auth/login", req.url);
     url.searchParams.set("redirect", `${pathname}${search || ""}`);
+    url.searchParams.set("error", "login_required");
     return NextResponse.redirect(url);
   }
 
