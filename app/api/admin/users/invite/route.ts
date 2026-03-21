@@ -10,6 +10,8 @@ const inviteSchema = z.object({
     "customer",
     "operations",
     "operations_lead",
+    "ridechecker",
+    "ridechecker_active",
     "inspector",
     "qa",
     "developer",

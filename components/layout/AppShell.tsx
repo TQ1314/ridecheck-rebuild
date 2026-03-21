@@ -30,6 +30,7 @@ import {
   Menu,
   ChevronLeft,
   Wrench,
+  Link2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/layout/Logo";
@@ -50,6 +51,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
       { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
+      { href: "/admin/invite", label: "Invite Links", icon: Link2 },
       { href: "/admin/audit", label: "Audit Log", icon: ClipboardList },
       { href: "/admin/users", label: "Users", icon: Settings },
     ];
@@ -59,6 +61,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
       { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
+      { href: "/admin/invite", label: "Invite Links", icon: Link2 },
     ];
   }
   if (role === "operations") {
