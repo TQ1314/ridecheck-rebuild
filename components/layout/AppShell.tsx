@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   Wrench,
   Link2,
+  UserCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/layout/Logo";
@@ -68,6 +69,7 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
+      { href: "/admin/ridecheckers", label: "Applicants", icon: UserCheck },
       { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
     ];
   }

@@ -27,8 +27,13 @@ import {
   Users,
   Wrench,
   MapPin,
+  ShieldOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
+
+// Roles allowed to approve or reject applicants
+const APPROVAL_ROLES = ["owner", "operations_lead"];
 
 interface RideChecker {
   id: string;
@@ -54,6 +59,9 @@ interface Stats {
 
 export default function RideCheckersAdminPage() {
   const { toast } = useToast();
+  const supabase = createClient();
+
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [ridecheckers, setRidecheckers] = useState<RideChecker[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, active: 0 });
   const [loading, setLoading] = useState(true);
@@ -62,6 +70,22 @@ export default function RideCheckersAdminPage() {
   const [rejectTarget, setRejectTarget] = useState<RideChecker | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Determine whether the logged-in user can approve/reject
+  const canApprove = userRole !== null && APPROVAL_ROLES.includes(userRole);
+
+  // Fetch the current user's role once on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      setUserRole(profile?.role ?? null);
+    });
+  }, []);
 
   async function loadData() {
     try {
@@ -150,46 +174,40 @@ export default function RideCheckersAdminPage() {
         <p className="text-sm text-muted-foreground">
           Review applications and manage active RideCheckers
         </p>
+        {!canApprove && userRole === "operations" && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 w-fit">
+            <ShieldOff className="h-3.5 w-3.5 shrink-0" />
+            View-only — approval authority requires Operations Lead or above.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-stat-total">
-              {stats.total}
-            </div>
+            <div className="text-2xl font-bold" data-testid="text-stat-total">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pending Approval
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approval</CardTitle>
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-stat-pending">
-              {stats.pending}
-            </div>
+            <div className="text-2xl font-bold" data-testid="text-stat-pending">{stats.pending}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-stat-active">
-              {stats.active}
-            </div>
+            <div className="text-2xl font-bold" data-testid="text-stat-active">{stats.active}</div>
           </CardContent>
         </Card>
       </div>
@@ -228,9 +246,11 @@ export default function RideCheckersAdminPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Service Area</TableHead>
+                <TableHead>Experience</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Applied</TableHead>
-                <TableHead>Actions</TableHead>
+                {/* Actions column only rendered for users with approval authority */}
+                {canApprove && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -240,9 +260,7 @@ export default function RideCheckersAdminPage() {
                     <div>
                       <span className="font-medium">{rc.full_name}</span>
                       {rc.phone && (
-                        <span className="block text-xs text-muted-foreground">
-                          {rc.phone}
-                        </span>
+                        <span className="block text-xs text-muted-foreground">{rc.phone}</span>
                       )}
                     </div>
                   </TableCell>
@@ -253,9 +271,10 @@ export default function RideCheckersAdminPage() {
                         <MapPin className="h-3 w-3" />
                         {rc.service_area}
                       </span>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
+                    {rc.experience || "—"}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -268,36 +287,40 @@ export default function RideCheckersAdminPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(rc.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>
-                    {rc.role === "ridechecker" && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(rc)}
-                          disabled={actionLoading === rc.id}
-                          data-testid={`button-approve-${rc.id}`}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openRejectDialog(rc)}
-                          disabled={actionLoading === rc.id}
-                          data-testid={`button-reject-${rc.id}`}
-                        >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                    {rc.role === "ridechecker_active" && rc.approved_at && (
-                      <span className="text-xs text-muted-foreground">
-                        Approved {new Date(rc.approved_at).toLocaleDateString()}
-                      </span>
-                    )}
-                  </TableCell>
+
+                  {/* Action buttons — only rendered for operations_lead / owner */}
+                  {canApprove && (
+                    <TableCell>
+                      {rc.role === "ridechecker" && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleApprove(rc)}
+                            disabled={actionLoading === rc.id}
+                            data-testid={`button-approve-${rc.id}`}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openRejectDialog(rc)}
+                            disabled={actionLoading === rc.id}
+                            data-testid={`button-reject-${rc.id}`}
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                      {rc.role === "ridechecker_active" && rc.approved_at && (
+                        <span className="text-xs text-muted-foreground">
+                          Approved {new Date(rc.approved_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -305,6 +328,7 @@ export default function RideCheckersAdminPage() {
         </Card>
       )}
 
+      {/* Reject dialog — only reachable by canApprove users since buttons are hidden otherwise */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent>
           <DialogHeader>

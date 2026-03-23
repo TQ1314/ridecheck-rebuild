@@ -10,7 +10,8 @@ import {
 } from "@/lib/email/templates/ridechecker-approval";
 
 export async function GET(req: NextRequest) {
-  const result = await requireRole(["owner", "operations_lead"]);
+  // operations can VIEW applicants; only operations_lead/owner can APPROVE (see PATCH below)
+  const result = await requireRole(["owner", "operations_lead", "operations"]);
   if (!isAuthorized(result)) return result.error;
 
   const { searchParams } = new URL(req.url);
