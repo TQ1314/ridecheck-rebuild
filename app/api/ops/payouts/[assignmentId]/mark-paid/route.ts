@@ -15,7 +15,7 @@ export async function POST(
   { params }: { params: { assignmentId: string } },
 ) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
+    const result = await requireRole(["operations_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 
