@@ -1,0 +1,93 @@
+Lock down RideCheck-v2 with production-grade Supabase RLS and role enforcement.
+
+Context:
+- Critical public exposure has already been fixed.
+- Public signups are OFF.
+- Supabase Security Advisor now shows 0 errors.
+- Next task is INTERNAL authorization hardening.
+- RideCheck uses role-based access and must not rely only on frontend checks.
+
+Required roles:
+- admin = full control
+- ops_lead = approval authority and broad oversight
+- ops = scheduling/coordination only, no approval power
+- ridechecker = only their own assigned work
+
+Goals:
+1. Audit current schema and identify:
+   - profiles/users table
+   - inspections table
+   - ridecheckers table if separate
+   - any assignment fields
+   - approval fields/status fields
+   - sensitive tables including:
+     - mechanical_findings
+     - obd_findings
+     - fraud_flags
+     - system_flags
+     - seller_contact_attempts
+     - title_intelligence
+     - region_capacity
+
+2. Generate and apply safe RLS policies for all relevant tables.
+3. Enforce authorization at the database layer, not just middleware/UI.
+4. Keep the app functioning after changes.
+5. Add migrations, not manual dashboard-only edits.
+
+Authorization rules:
+- admin:
+  - full read/write on all operational tables
+- ops_lead:
+  - can review and approve RideCheckers
+  - can view operational and fraud-related data as needed
+  - can update approval-related statuses
+- ops:
+  - can view and manage scheduling/workflow data
+  - cannot approve RideCheckers
+  - cannot modify fraud flags or protected system intelligence tables unless explicitly required
+- ridechecker:
+  - can only view/update inspections assigned to them
+  - can only access findings tied to their own assigned inspections
+  - cannot access fraud/system-wide intelligence tables unless specifically needed read-only
+
+Approval hard rule:
+- ops must NOT be able to approve RideCheckers
+- only ops_lead and admin can approve
+- enforce this in database policy and backend route checks
+
+Implementation requirements:
+1. Inspect existing Supabase migration files and schema first.
+2. Create helper SQL functions if needed, such as:
+   - current user role lookup
+   - is_admin()
+   - is_ops_lead()
+   - is_ops()
+   - is_ridechecker()
+3. Add RLS policies using those helper functions.
+4. Ensure policies are explicit for SELECT / INSERT / UPDATE / DELETE where appropriate.
+5. Prevent overly broad policies like USING (true) for authenticated users on sensitive tables.
+6. Update backend/server routes to match the new permission model.
+7. Add defensive checks in APIs for approval actions.
+8. Do not break auth/session handling.
+9. Document all policy decisions in a markdown file.
+
+Deliverables:
+- New migration SQL files for all RLS/policy changes
+- Any backend route updates needed
+- A markdown summary:
+  - tables audited
+  - policies added
+  - what each role can do
+  - any tables still needing manual product decisions
+- A short test plan with exact scenarios to verify:
+  - ridechecker cannot read another ridechecker’s inspections
+  - ops cannot approve ridecheckers
+  - ops_lead can approve ridecheckers
+  - admin has full access
+  - fraud/system tables are protected
+
+Important:
+- Prefer least privilege
+- If schema is ambiguous, infer safely and leave TODO comments
+- Do not remove existing working functionality unless necessary for security
+- Show me the exact migrations and changed files before finalizing
