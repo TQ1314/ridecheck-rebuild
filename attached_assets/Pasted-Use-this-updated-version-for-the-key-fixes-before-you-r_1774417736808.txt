@@ -1,0 +1,116 @@
+Use this updated version for the key fixes before you run it.
+
+1) Replace is_ops() with strict ops-only
+CREATE OR REPLACE FUNCTION public.is_ops()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.current_user_role() = 'operations'
+$$;
+2) Replace mechanical_findings policy block
+
+This keeps:
+
+ops = read-only
+ops_lead and admin = broad access
+ridechecker_active = only assigned work
+ALTER TABLE IF EXISTS mechanical_findings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "mechanical_findings_select" ON mechanical_findings;
+DROP POLICY IF EXISTS "mechanical_findings_write" ON mechanical_findings;
+
+CREATE POLICY "mechanical_findings_select" ON mechanical_findings
+  FOR SELECT
+  USING (
+    public.is_ops_lead()
+    OR public.is_ops()
+    OR (
+      public.is_active_ridechecker()
+      AND EXISTS (
+        SELECT 1
+        FROM ridechecker_job_assignments rja
+        WHERE rja.order_id::text = mechanical_findings.order_id::text
+          AND rja.ridechecker_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "mechanical_findings_write" ON mechanical_findings
+  FOR ALL
+  USING (public.is_ops_lead())
+  WITH CHECK (public.is_ops_lead());
+3) Replace obd_findings policy block
+ALTER TABLE IF EXISTS obd_findings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "obd_findings_select" ON obd_findings;
+DROP POLICY IF EXISTS "obd_findings_write" ON obd_findings;
+
+CREATE POLICY "obd_findings_select" ON obd_findings
+  FOR SELECT
+  USING (
+    public.is_ops_lead()
+    OR public.is_ops()
+    OR (
+      public.is_active_ridechecker()
+      AND EXISTS (
+        SELECT 1
+        FROM ridechecker_job_assignments rja
+        WHERE rja.order_id::text = obd_findings.order_id::text
+          AND rja.ridechecker_id = auth.uid()
+      )
+    )
+  );
+
+CREATE POLICY "obd_findings_write" ON obd_findings
+  FOR ALL
+  USING (public.is_ops_lead())
+  WITH CHECK (public.is_ops_lead());
+4) Keep these decisions as-is
+title_intelligence: ops_lead read, admin write
+system_flags: admin only
+fraud_flags: admin only
+waitlist: no anon insert
+mark_paid: ops_lead and admin only
+5) Important check before running
+
+Only run this if both tables really use order_id:
+
+mechanical_findings
+obd_findings
+
+If either table uses inspection_id or another FK instead, replace:
+
+mechanical_findings.order_id
+obd_findings.order_id
+rja.order_id
+
+with the correct linking column first.
+
+6) Paste this to Replit
+Update the migration with these final fixes before apply:
+
+1. Make is_ops() strict ops-only:
+CREATE OR REPLACE FUNCTION public.is_ops()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.current_user_role() = 'operations'
+$$;
+
+2. Keep mechanical_findings and obd_findings access model as:
+- ops_lead/admin = broad access
+- ops = read-only
+- active ridechecker = only assigned work
+- no customer access
+- no pending ridechecker access
+
+3. Before finalizing, verify that mechanical_findings and obd_findings really link by order_id.
+If not, change the policy joins to the correct FK column before apply.
+
+4. Then show me the final diff for the migration file only.

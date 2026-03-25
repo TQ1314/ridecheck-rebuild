@@ -16,8 +16,10 @@
 --   qa / developer / platform → is_staff()   (internal read access)
 --   customer         → row-owner check        (own orders/data only)
 --
--- Cascade: is_admin ⊂ is_ops_lead ⊂ is_ops ⊂ is_staff
--- i.e. every is_ops_lead() check passes for owner too.
+-- Cascade: is_admin ⊂ is_ops_lead (both cascade up to owner).
+-- is_ops() is STRICT — matches only 'operations', NOT ops_lead or owner.
+-- Policies that need "ops and above" must write: is_ops_lead() OR is_ops()
+-- is_staff() is its own flat list — independent of the above functions.
 --
 -- Design principle: LEAST PRIVILEGE.
 -- When in doubt, restrict rather than allow.
@@ -74,7 +76,8 @@ AS $$
   SELECT public.current_user_role() IN ('owner', 'operations_lead')
 $$;
 
--- operations OR above: scheduling/coordination access
+-- operations ONLY — strict, does NOT cascade to ops_lead or above.
+-- Use is_ops_lead() OR is_ops() in policies where broader access is needed.
 CREATE OR REPLACE FUNCTION public.is_ops()
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -82,7 +85,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT public.current_user_role() IN ('owner', 'operations_lead', 'operations')
+  SELECT public.current_user_role() = 'operations'
 $$;
 
 -- Any internal staff member (ops and above + qa, developer, platform)
@@ -507,7 +510,7 @@ ALTER TABLE seller_contact_attempts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "seller_contact_select" ON seller_contact_attempts
   FOR SELECT
-  USING (public.is_ops());
+  USING (public.is_ops_lead() OR public.is_ops());
 
 
 -- =============================================================
@@ -655,7 +658,7 @@ ALTER TABLE IF EXISTS region_capacity ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "region_capacity_select" ON region_capacity
   FOR SELECT
-  USING (public.is_ops());
+  USING (public.is_ops_lead() OR public.is_ops());
 
 CREATE POLICY "region_capacity_write" ON region_capacity
   FOR ALL
