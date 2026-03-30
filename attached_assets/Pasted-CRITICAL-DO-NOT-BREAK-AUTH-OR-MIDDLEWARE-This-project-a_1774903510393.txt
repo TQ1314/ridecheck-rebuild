@@ -1,0 +1,34 @@
+CRITICAL: DO NOT BREAK AUTH OR MIDDLEWARE
+
+This project already has auth, role gates, protected routes, and middleware logic in place. Any RideChecker approval/onboarding changes must preserve the current middleware behavior.
+
+Requirements:
+- Do not break existing middleware.ts behavior
+- Do not break locale-normalized path handling
+- Do not break PUBLIC_ROUTES or SKIP_PREFIXES logic
+- Do not break Supabase session handling
+- Do not break existing role-based route protection
+- Do not change current dashboard access rules unless explicitly required for the new RideChecker workflow
+- Do not allow pending applicants to access protected RideChecker or admin dashboards
+- Only approved/active RideCheckers should gain RideChecker dashboard access
+- ops users must NOT gain ops_lead approval powers through UI or route changes
+- owner and ops_lead access must continue to work exactly as currently designed
+
+Implementation guidance:
+- Extend the existing authorization model rather than replacing it
+- Reuse current role checks and profile/is_active patterns wherever possible
+- If new statuses like applied, under_review, approved, or active are added, map them carefully into the existing middleware logic
+- Keep middleware changes minimal and isolated
+- If route access needs to change, update only the exact checks required for RideChecker onboarding
+- Do not refactor unrelated auth code
+- Do not rename or remove existing role helpers unless absolutely necessary
+- If any middleware update is required, explain exactly why and keep the diff as small as possible
+
+Before finishing:
+- Verify owner can still access owner/admin routes
+- Verify ops_lead can still access approval routes
+- Verify operations cannot approve RideCheckers
+- Verify pending/applicant users cannot access protected RideChecker dashboard routes
+- Verify active RideCheckers can access only the correct RideChecker routes
+- Verify public auth/signup/invite routes still work properly
+- Verify no redirect loops were introduced
