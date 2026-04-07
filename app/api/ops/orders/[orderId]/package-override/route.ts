@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServer } from "@/lib/supabase/server";
 import { TIER_PRICES } from "@/lib/vehicleClassification";
 import type { VehicleTier } from "@/lib/vehicleClassification";
 
@@ -12,7 +12,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
-  const supabase = await createClient();
+  const supabase = createSupabaseServer();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
