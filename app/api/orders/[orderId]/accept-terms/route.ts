@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createHash } from "crypto";
-import { TERMS_VERSION, INSPECTION_SCOPE_VERSION } from "@/lib/legal/constants";
+import { TERMS_VERSION, INSPECTION_SCOPE_VERSION, LEGAL_VERSION } from "@/lib/legal/constants";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function hashIp(ip: string | null): string {
   return createHash("sha256")
@@ -11,15 +12,19 @@ function hashIp(ip: string | null): string {
     .digest("hex");
 }
 
-export const dynamic = "force-dynamic";
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { accepted, buyerEmail, userAgent } = body;
+    const {
+      accepted,
+      disclaimerAccepted,
+      noSoleRelianceAccepted,
+      buyerEmail,
+      userAgent,
+    } = body;
 
     if (accepted !== true) {
       return NextResponse.json(
@@ -44,13 +49,16 @@ export async function POST(
       null;
 
     const acceptance = {
-      order_id: params.orderId,
-      buyer_email: buyerEmail || order.buyer_email || null,
-      terms_version: TERMS_VERSION,
+      order_id:                 params.orderId,
+      buyer_email:              buyerEmail || order.buyer_email || null,
+      terms_version:            TERMS_VERSION,
       inspection_scope_version: INSPECTION_SCOPE_VERSION,
-      accepted_at: new Date().toISOString(),
-      hashed_ip: hashIp(ip),
-      user_agent: userAgent || req.headers.get("user-agent") || "unknown",
+      legal_version:            LEGAL_VERSION,
+      accepted_at:              new Date().toISOString(),
+      hashed_ip:                hashIp(ip),
+      user_agent:               userAgent || req.headers.get("user-agent") || "unknown",
+      disclaimer_accepted:      disclaimerAccepted === true,
+      no_sole_reliance_accepted: noSoleRelianceAccepted === true,
     };
 
     const { error: insertError } = await supabaseAdmin
@@ -67,13 +75,19 @@ export async function POST(
 
     await supabaseAdmin
       .from("orders")
-      .update({ terms_accepted: true, updated_at: new Date().toISOString() })
+      .update({
+        terms_accepted:            true,
+        disclaimer_accepted:       disclaimerAccepted === true,
+        no_sole_reliance_accepted: noSoleRelianceAccepted === true,
+        updated_at:                new Date().toISOString(),
+      })
       .eq("id", params.orderId);
 
     return NextResponse.json({
       ok: true,
       termsVersion: TERMS_VERSION,
       inspectionScopeVersion: INSPECTION_SCOPE_VERSION,
+      legalVersion: LEGAL_VERSION,
       acceptedAt: acceptance.accepted_at,
     });
   } catch (err: any) {

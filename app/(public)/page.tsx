@@ -1,6 +1,7 @@
 // app/(public)/page.tsx
 import Link from "next/link";
 import { HeroSlideshow } from "@/components/ui/hero-slideshow";
+import { InspectionDisclaimer } from "@/components/legal/InspectionDisclaimer";
 import type { Metadata } from "next";
 import {
   Shield,
@@ -308,6 +309,10 @@ export default function PublicHomePage() {
               </li>
             </ul>
           </div>
+
+          <div className="mt-6 max-w-2xl">
+            <InspectionDisclaimer variant="compact" />
+          </div>
         </div>
       </section>
 
@@ -338,8 +343,13 @@ export default function PublicHomePage() {
             </div>
 
             <p className="mt-5 text-xs text-white/70">
-              RideCheck provides a professional inspection and documented findings to support your decision.
-              It is not a warranty or guarantee of future condition.
+              RideCheck provides independent, non-invasive pre-purchase vehicle inspections and
+              documented findings based on observable conditions at the time of service. RideCheck
+              does not provide repairs, warranties, guarantees, or assurances of future vehicle
+              condition.{" "}
+              <a href="/inspection-disclaimer" className="underline opacity-80 hover:opacity-100">
+                Learn more
+              </a>
             </p>
           </div>
 

@@ -1,0 +1,207 @@
+Update the RideCheck website to add and harden all legal protections without breaking existing middleware, auth, locale handling, booking flow, or current site styling.
+
+Core goal
+
+Implement a strong legal protection layer across the public website and booking flow for RideCheck, an Illinois-based, on-demand, non-invasive pre-purchase vehicle inspection platform.
+
+RideCheck provides inspection and reporting only. It does not repair vehicles, guarantee vehicle condition, or warrant future performance.
+
+1. Create or update these legal pages
+
+Add or replace the following public pages with production-ready content and keep them linked in the footer:
+
+/terms-of-service
+/privacy-policy
+/inspection-disclaimer
+/customer-agreement
+/contractor-agreement
+Requirements for all pages
+Clean formatting with proper headings and spacing
+Consistent RideCheck branding
+Mobile responsive
+Clear effective date at top
+Footer links updated everywhere
+Do not use lorem ipsum or placeholder text
+Write robust, business-protective legal language tailored to RideCheck’s inspection-and-reporting model
+2. Strengthen Terms of Service
+
+Update the Terms of Service so it clearly states:
+
+RideCheck provides non-invasive inspection and observational reporting only
+No repairs are performed
+No warranty, guarantee, certification, or promise of future condition is made
+Reports are limited to visible/observable conditions at the time of inspection
+Hidden, intermittent, emerging, concealed, or inaccessible issues may not be detected
+Customer remains responsible for purchase decision
+RideCheck is not liable for vehicle purchase outcomes, repair costs, diminished value, towing, lost opportunity, incidental damages, or consequential damages
+Maximum liability is capped at the amount paid for the inspection
+Illinois law governs
+Venue and dispute clause set to Illinois
+RideCheck reserves right to refuse or cancel service
+No inspector has authority to bind the company beyond the scope of inspection services
+Terms can be updated over time
+
+Add strong but professional limitation-of-liability and disclaimer language.
+
+3. Create a standalone Inspection Disclaimer page and reusable component
+
+Create a reusable legal disclaimer component and use it in multiple places.
+
+The disclaimer must state:
+Inspection is non-invasive and limited in scope
+No dismantling, teardown, or destructive testing
+Findings are a snapshot in time only
+Results may be affected by weather, lighting, location conditions, access restrictions, vehicle cleanliness, battery state, engine temperature, locked compartments, and seller restrictions
+RideCheck does not guarantee identification of all issues
+Not a substitute for a comprehensive mechanic inspection or dealership diagnostic
+Not a warranty or guarantee of merchantability, safety, or future reliability
+Reuse this disclaimer in:
+Homepage near CTA or booking section
+Pricing page
+Booking page before payment
+Booking confirmation page
+Report delivery page if applicable
+Standalone /inspection-disclaimer page
+4. Add Customer Agreement acceptance to booking flow
+
+Before a customer can complete booking or payment, require explicit agreement via unchecked checkboxes.
+
+Add required checkbox section
+
+User must affirmatively check:
+
+I have read and agree to the Terms of Service.
+I understand RideCheck provides a non-invasive inspection and report only, not a warranty or guarantee.
+I understand I should not rely solely on RideCheck when making a vehicle purchase decision.
+Booking logic
+Disable Continue / Pay / Submit until all required boxes are checked
+Store timestamped acceptance in database with booking record
+Store version or hash of legal text accepted
+Add links beside each checkbox to open relevant legal page
+Make sure this works on mobile
+Do not break current booking flow
+5. Add stronger legal language to homepage and pricing page
+
+Replace any weak one-line disclaimer with a stronger version.
+
+Use this style of copy
+
+RideCheck provides independent, non-invasive pre-purchase vehicle inspections and documented findings based on observable conditions at the time of service. RideCheck does not provide repairs, warranties, guarantees, or assurances of future vehicle condition.
+
+Add a visible “Learn more” link to /inspection-disclaimer.
+
+Keep tone professional and trust-building, not alarmist.
+
+6. Add Customer Agreement page
+
+Create /customer-agreement and include:
+
+Scope of service
+Customer acknowledgment of limitations
+No sole reliance clause
+No warranty / no guarantee
+Limitation of liability
+Indemnification language
+Payment and refund framework if already used on site
+Illinois governing law
+Electronic acceptance / clickwrap enforceability language
+
+This page should align with the booking checkbox flow.
+
+7. Add Contractor Agreement page
+
+Create /contractor-agreement as an internal/public draft page for RideChecker legal framework.
+
+Include:
+
+Independent contractor status only
+No employment relationship
+No benefits or tax withholding
+Contractor responsible for taxes, tools, and lawful operation
+Must follow RideCheck inspection standards and reporting procedures
+Must not make promises, warranties, or representations beyond company-approved language
+Confidentiality and data protection
+Indemnification for negligence, misconduct, fraud, or unauthorized actions
+Termination rights
+Illinois law
+
+If there is an internal team/admin area where RideCheckers onboard, surface this agreement there as well, but do not break auth or middleware.
+
+8. Update Privacy Policy
+
+Strengthen /privacy-policy to cover:
+
+Data collected: name, email, phone, vehicle details, booking details, location/address, communications, device/browser data if applicable
+How data is used: service delivery, booking management, customer support, internal quality control, fraud prevention, analytics
+Third-party service providers: payments, hosting, email, analytics
+Data retention and protection language
+User contact method for privacy questions
+Illinois/U.S. business context
+
+Keep it simple, clear, and credible.
+
+9. Footer and navigation updates
+
+Update footer legal section to include:
+
+Terms of Service
+Privacy Policy
+Inspection Disclaimer
+Customer Agreement
+
+Keep Contractor Agreement linked only if appropriate. If not appropriate for public footer, place it in internal onboarding/admin access only.
+
+Make sure all footer links work.
+
+10. Database and backend updates
+
+If booking records already exist, extend schema safely to capture:
+
+termsAccepted boolean
+disclaimerAccepted boolean
+noSoleRelianceAccepted boolean
+legalAcceptedAt timestamp
+legalVersion string
+
+Requirements:
+
+Safe migration only
+No destructive changes
+Do not break existing records
+Backfill nullable defaults if needed
+11. UI/UX requirements
+Do not redesign the whole site
+Preserve current branding and layout
+Add legal protections cleanly and professionally
+Make legal text readable, not tiny
+Ensure accessibility and mobile responsiveness
+Keep buttons and flow intuitive
+12. Technical guardrails
+
+Very important:
+
+Do not break existing middleware
+Do not break locale-normalized path handling
+Do not break auth, Supabase integration, or current public/private route behavior
+Do not remove current footer/company/service links unless replacing carefully
+Do not introduce placeholder routes
+Do not push unfinished text
+Ensure all new routes render correctly in production
+13. Deliverables
+
+When finished, provide:
+
+List of files created or updated
+New routes added
+Database changes made
+Summary of where disclaimer language now appears
+Any manual follow-up steps needed
+14. Content standard
+
+Write all legal content as robust first-draft business-protective language for RideCheck. Do not use generic SaaS wording. Tailor it specifically to:
+
+used-car pre-purchase inspections
+non-invasive observational findings
+independent contractor inspectors
+customer purchase-risk allocation
+limitation of liability

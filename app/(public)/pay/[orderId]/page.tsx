@@ -7,7 +7,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { CreditCard, AlertCircle, CheckCircle2, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { formatCurrency } from "@/lib/utils/pricing";
 import { LEGAL_SUMMARY_BULLETS, TERMS_VERSION } from "@/lib/legal/constants";
@@ -42,7 +42,13 @@ function PayInner() {
   const [paying, setPaying] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+
+  // Three required checkboxes
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [noSoleRelianceAccepted, setNoSoleRelianceAccepted] = useState(false);
+
+  const allAccepted = termsAccepted && disclaimerAccepted && noSoleRelianceAccepted;
 
   useEffect(() => {
     if (!orderId || !token) {
@@ -72,7 +78,7 @@ function PayInner() {
   }, [orderId, token]);
 
   const handlePay = async () => {
-    if (!termsAccepted) return;
+    if (!allAccepted) return;
     setPaying(true);
     try {
       await fetch(`/api/orders/${orderId}/accept-terms`, {
@@ -80,6 +86,8 @@ function PayInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accepted: true,
+          disclaimerAccepted: true,
+          noSoleRelianceAccepted: true,
           buyerEmail: order?.buyer_email || undefined,
           userAgent: navigator.userAgent,
         }),
@@ -154,6 +162,7 @@ function PayInner() {
                 <p className="text-sm text-gray-600 mt-1">Secure payment powered by Stripe</p>
               </div>
 
+              {/* Order Summary */}
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Vehicle</span>
@@ -173,23 +182,43 @@ function PayInner() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-5" data-testid="section-legal-summary">
-                <div className="flex items-center gap-2 mb-3">
-                  <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0" />
-                  <span className="text-sm font-semibold text-gray-800">Inspection Scope &amp; Terms ({TERMS_VERSION})</span>
+              {/* Legal Section */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-5 space-y-4" data-testid="section-legal-summary">
+                {/* Scope Summary */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0" />
+                    <span className="text-sm font-semibold text-gray-800">
+                      Inspection Scope &amp; Terms ({TERMS_VERSION})
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 mb-1">
+                    {LEGAL_SUMMARY_BULLETS.map((bullet, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                        <span className="mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-1.5 mb-4">
-                  {LEGAL_SUMMARY_BULLETS.map((bullet, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                      <span className="mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                      {bullet}
-                    </li>
-                  ))}
-                </ul>
-                <label
-                  className="flex items-start gap-3 cursor-pointer"
-                  data-testid="label-terms-checkbox"
-                >
+
+                {/* Scope notice */}
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <ShieldAlert className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    This inspection is <strong>non-invasive and visual only</strong>. Hidden or
+                    intermittent issues may not be detected. This is not a warranty.{" "}
+                    <Link href="/inspection-disclaimer" target="_blank" className="underline hover:no-underline">
+                      Full disclaimer
+                    </Link>
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-200" />
+
+                {/* Checkbox 1: Terms of Service */}
+                <label className="flex items-start gap-3 cursor-pointer group" data-testid="label-terms-checkbox">
                   <input
                     type="checkbox"
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-emerald-600"
@@ -198,7 +227,48 @@ function PayInner() {
                     data-testid="checkbox-terms-accept"
                   />
                   <span className="text-xs text-gray-700 leading-snug">
-                    I have read and agree to the RideCheck inspection scope and terms above. I understand this is a visual, non-invasive assessment and the final purchase decision is mine.
+                    I have read and agree to the RideCheck{" "}
+                    <Link href="/terms" target="_blank" className="underline text-emerald-700 hover:no-underline">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/customer-agreement" target="_blank" className="underline text-emerald-700 hover:no-underline">
+                      Customer Agreement
+                    </Link>.
+                  </span>
+                </label>
+
+                {/* Checkbox 2: Inspection Disclaimer */}
+                <label className="flex items-start gap-3 cursor-pointer group" data-testid="label-disclaimer-checkbox">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-emerald-600"
+                    checked={disclaimerAccepted}
+                    onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+                    data-testid="checkbox-disclaimer-accept"
+                  />
+                  <span className="text-xs text-gray-700 leading-snug">
+                    I understand that RideCheck provides a <strong>non-invasive inspection and report only</strong> —
+                    not a warranty, guarantee, or certification of vehicle condition. Hidden or intermittent
+                    issues may not be detected.{" "}
+                    <Link href="/inspection-disclaimer" target="_blank" className="underline text-emerald-700 hover:no-underline">
+                      Inspection Disclaimer
+                    </Link>
+                  </span>
+                </label>
+
+                {/* Checkbox 3: No Sole Reliance */}
+                <label className="flex items-start gap-3 cursor-pointer group" data-testid="label-sole-reliance-checkbox">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-emerald-600"
+                    checked={noSoleRelianceAccepted}
+                    onChange={(e) => setNoSoleRelianceAccepted(e.target.checked)}
+                    data-testid="checkbox-no-sole-reliance"
+                  />
+                  <span className="text-xs text-gray-700 leading-snug">
+                    I understand I should <strong>not rely solely on RideCheck</strong> when making my
+                    vehicle purchase decision. The final decision is mine alone.
                   </span>
                 </label>
               </div>
@@ -207,7 +277,7 @@ function PayInner() {
                 className="w-full"
                 size="lg"
                 onClick={handlePay}
-                disabled={paying || !termsAccepted}
+                disabled={paying || !allAccepted}
                 data-testid="button-pay-now"
               >
                 {paying ? (
@@ -223,9 +293,9 @@ function PayInner() {
                 )}
               </Button>
 
-              {!termsAccepted && (
+              {!allAccepted && (
                 <p className="text-xs text-center text-amber-600 mt-2" data-testid="text-terms-required">
-                  Please accept the terms above to continue
+                  Please check all boxes above to continue
                 </p>
               )}
 

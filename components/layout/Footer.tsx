@@ -114,20 +114,38 @@ export function Footer() {
             <h4 className="font-semibold text-sm mb-3">Legal</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/terms" className="hover:text-foreground transition-colors">
+                <Link href="/terms" className="hover:text-foreground transition-colors" data-testid="link-terms-footer">
                   {isSpanish ? "Términos de Servicio" : "Terms of Service"}
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="hover:text-foreground transition-colors">
+                <Link href="/privacy" className="hover:text-foreground transition-colors" data-testid="link-privacy-footer">
                   {isSpanish ? "Política de Privacidad" : "Privacy Policy"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/inspection-disclaimer" className="hover:text-foreground transition-colors" data-testid="link-disclaimer-footer">
+                  {isSpanish ? "Aviso de Inspección" : "Inspection Disclaimer"}
+                </Link>
+              </li>
+              <li>
+                <Link href="/customer-agreement" className="hover:text-foreground transition-colors" data-testid="link-customer-agreement-footer">
+                  {isSpanish ? "Acuerdo con el Cliente" : "Customer Agreement"}
                 </Link>
               </li>
             </ul>
           </div>
         </div>
-        <div className="mt-8 pt-8 border-t text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} {isSpanish ? "RideCheck. Todos los derechos reservados." : "RideCheck. All rights reserved."}
+        <div className="mt-8 pt-6 border-t space-y-3">
+          <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-3xl mx-auto">
+            RideCheck provides independent, non-invasive pre-purchase vehicle inspections and documented findings based on observable conditions at the time of service. RideCheck does not provide repairs, warranties, guarantees, or assurances of future vehicle condition.{" "}
+            <Link href="/inspection-disclaimer" className="underline underline-offset-2 hover:text-foreground">
+              Inspection Disclaimer
+            </Link>
+          </p>
+          <p className="text-center text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} {isSpanish ? "RideCheck. Todos los derechos reservados." : "RideCheck. All rights reserved."} &nbsp;·&nbsp; Waukegan, IL
+          </p>
         </div>
       </div>
     </footer>

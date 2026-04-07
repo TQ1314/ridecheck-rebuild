@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, ArrowRight, Car } from "lucide-react";
+import { InspectionDisclaimer } from "@/components/legal/InspectionDisclaimer";
 import { PACKAGE_INFO, PRICING, formatCurrency } from "@/lib/utils/pricing";
 import type { PackageType } from "@/lib/utils/pricing";
 
@@ -121,6 +122,11 @@ export default function PricingPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Legal disclaimer */}
+        <div className="max-w-3xl mx-auto mt-12">
+          <InspectionDisclaimer variant="inline" />
         </div>
       </div>
     </div>
