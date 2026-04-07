@@ -146,6 +146,16 @@ export function Footer() {
           <p className="text-center text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} {isSpanish ? "RideCheck. Todos los derechos reservados." : "RideCheck. All rights reserved."} &nbsp;·&nbsp; Waukegan, IL
           </p>
+          <div className="mt-2 text-center text-xs text-muted-foreground/60">
+            <a
+              href="https://fonwebstudios.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-opacity hover:opacity-80"
+            >
+              Powered by Fon Web Studios
+            </a>
+          </div>
         </div>
       </div>
     </footer>

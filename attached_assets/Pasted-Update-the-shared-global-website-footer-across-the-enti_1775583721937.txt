@@ -1,0 +1,62 @@
+Update the shared/global website footer across the entire project.
+
+Requirements:
+- Add this exact text to the footer: "Powered by Fon Web Studios"
+- Make "Fon Web Studios" a clickable link to: https://fonwebstudios.com
+- Open the link in a new tab
+- Add rel="noopener noreferrer"
+- Place it at the bottom of the footer, below the main business footer content
+- If there is already a copyright line, keep it and place "Powered by Fon Web Studios" directly beneath it
+- If there are multiple footer components, update the shared/global footer so it appears sitewide
+- Keep the current design style and do not redesign the footer
+- Make it responsive on mobile and desktop
+- Use subtle styling so it looks professional, clean, and slightly secondary to the client’s brand
+- Do not change any other sections of the site
+
+Preferred display format:
+© 2026 [Business Name]
+Powered by Fon Web Studios
+
+Implementation notes:
+- Find the shared footer component used sitewide
+- Insert a new text row under the existing copyright text
+- Keep spacing and typography consistent with the current footer
+- Use small, centered, slightly muted text
+- Add a subtle hover effect on the link
+- Preserve existing layout, colors, and branding
+- Do not create duplicate footer text if this already exists anywhere
+
+For React/Tailwind sites, use this pattern and adapt it to the existing footer styles:
+
+<div className="mt-2 text-center text-sm text-gray-500">
+  <a
+    href="https://fonwebstudios.com"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="transition-opacity hover:opacity-80"
+  >
+    Powered by Fon Web Studios
+  </a>
+</div>
+
+If there is already a copyright block, place it directly underneath, like this:
+
+<footer className="text-center py-6">
+  <p className="text-sm text-gray-500">© 2026 Business Name</p>
+  <div className="mt-2 text-sm text-gray-500">
+    <a
+      href="https://fonwebstudios.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="transition-opacity hover:opacity-80"
+    >
+      Powered by Fon Web Studios
+    </a>
+  </div>
+</footer>
+
+Deliverables:
+1. Update the shared/global footer component
+2. Confirm which file was changed
+3. Confirm the change is sitewide
+4. Do not modify any other sections
