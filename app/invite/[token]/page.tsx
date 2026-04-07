@@ -272,7 +272,7 @@ export default function InviteAcceptPage() {
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {status === "signing_in" ? "Signing in…" : "Creating Account…"}
+                  {(status as string) === "signing_in" ? "Signing in…" : "Creating Account…"}
                 </span>
               ) : (
                 "Create Account & Sign In"

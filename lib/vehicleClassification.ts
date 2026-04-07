@@ -158,7 +158,7 @@ const HEAVY_DUTY_KEYWORDS = [
   "super duty",
 ];
 
-function matchesAny(value: string, keywords: string[]): boolean {
+function matchesAny(value: string, keywords: readonly string[]): boolean {
   return keywords.some((kw) => value.includes(kw));
 }
 
@@ -171,7 +171,7 @@ export function classifyVehicle(input: ClassificationInput): ClassificationResul
   const mileage = input.mileage ?? null;
   const price = input.askingPrice ?? null;
 
-  if (TIER_CONFIG.exotic_brands.includes(make)) {
+  if ((TIER_CONFIG.exotic_brands as readonly string[]).includes(make)) {
     return {
       packageTier: "exotic",
       basePrice: TIER_PRICES.exotic,
@@ -204,7 +204,7 @@ export function classifyVehicle(input: ClassificationInput): ClassificationResul
     };
   }
 
-  const isPlusBrand = TIER_CONFIG.plus_brands.includes(make);
+  const isPlusBrand = (TIER_CONFIG.plus_brands as readonly string[]).includes(make);
 
   if (isPlusBrand) {
     const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.luxury;
