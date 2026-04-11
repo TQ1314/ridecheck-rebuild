@@ -33,7 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils/format";
 import { getRoleLabel, type Role } from "@/lib/utils/roles";
 import { useToast } from "@/hooks/use-toast";
-import { Inbox, UserPlus, Copy, Search, Users, ShoppingBag, ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { Inbox, UserPlus, Copy, Search, Users, ShoppingBag, ClipboardCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const ROLES: Role[] = [
   "customer",
@@ -57,7 +57,7 @@ const INVITE_ROLES: Role[] = [
 const STAFF_ROLES: Role[] = ["operations", "operations_lead", "qa", "developer", "platform", "owner"];
 const RC_ROLES: Role[] = ["ridechecker", "ridechecker_active"];
 
-type ViewTab = "all" | "customers" | "applicants" | "active";
+type ViewTab = "all" | "customers" | "applicants" | "active" | "orphans";
 
 interface PersonaTag {
   label: string;
@@ -94,6 +94,18 @@ function getPersonaTags(
   return tags;
 }
 
+function isOrphan(
+  profile: Profile,
+  orderUserIds: Set<string>,
+  stageHistoryIds: Set<string>
+): boolean {
+  const role = profile.role as Role;
+  const isStaff = STAFF_ROLES.includes(role);
+  const isRC = RC_ROLES.includes(role) || stageHistoryIds.has(profile.id);
+  const hasOrder = orderUserIds.has(profile.id);
+  return !isStaff && !isRC && !hasOrder;
+}
+
 function isInTab(
   profile: Profile,
   tab: ViewTab,
@@ -110,6 +122,8 @@ function isInTab(
       return role === "ridechecker" || stageHistoryIds.has(profile.id);
     case "active":
       return role === "ridechecker_active";
+    case "orphans":
+      return isOrphan(profile, orderUserIds, stageHistoryIds);
   }
 }
 
@@ -226,10 +240,11 @@ export default function AdminUsersPage() {
   };
 
   const counts = useMemo(() => ({
-    all: users.length,
-    customers: users.filter((u) => orderUserIds.has(u.id)).length,
+    all:        users.length,
+    customers:  users.filter((u) => orderUserIds.has(u.id)).length,
     applicants: users.filter((u) => u.role === "ridechecker" || stageHistoryIds.has(u.id)).length,
-    active: users.filter((u) => u.role === "ridechecker_active").length,
+    active:     users.filter((u) => u.role === "ridechecker_active").length,
+    orphans:    users.filter((u) => isOrphan(u, orderUserIds, stageHistoryIds)).length,
   }), [users, orderUserIds, stageHistoryIds]);
 
   const filteredUsers = useMemo(() => {
@@ -246,10 +261,11 @@ export default function AdminUsersPage() {
   }, [users, activeTab, orderUserIds, stageHistoryIds, search]);
 
   const TABS: { key: ViewTab; label: string; icon: React.ReactNode }[] = [
-    { key: "all", label: "All Profiles", icon: <Users className="h-4 w-4" /> },
-    { key: "customers", label: "Customers", icon: <ShoppingBag className="h-4 w-4" /> },
-    { key: "applicants", label: "RC Applicants", icon: <ClipboardCheck className="h-4 w-4" /> },
-    { key: "active", label: "Active RideCheckers", icon: <CheckCircle2 className="h-4 w-4" /> },
+    { key: "all",        label: "All Profiles",       icon: <Users className="h-4 w-4" /> },
+    { key: "customers",  label: "Customers",           icon: <ShoppingBag className="h-4 w-4" /> },
+    { key: "applicants", label: "RC Applicants",       icon: <ClipboardCheck className="h-4 w-4" /> },
+    { key: "active",     label: "Active RideCheckers", icon: <CheckCircle2 className="h-4 w-4" /> },
+    { key: "orphans",    label: "Orphan Profiles",     icon: <AlertTriangle className="h-4 w-4" /> },
   ];
 
   if (loading) {

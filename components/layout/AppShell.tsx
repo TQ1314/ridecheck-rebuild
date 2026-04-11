@@ -32,6 +32,7 @@ import {
   Wrench,
   Link2,
   UserCheck,
+  FileText,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/layout/Logo";
@@ -51,17 +52,21 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
-      { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
+      { href: "/admin/applications", label: "RC Applications", icon: FileText },
+      { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
+      { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
       { href: "/admin/invite", label: "Invite Links", icon: Link2 },
       { href: "/admin/audit", label: "Audit Log", icon: ClipboardList },
-      { href: "/admin/users", label: "Users", icon: Settings },
+      { href: "/admin/users", label: "People", icon: Settings },
     ];
   }
   if (role === "operations_lead") {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
-      { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
+      { href: "/admin/applications", label: "RC Applications", icon: FileText },
+      { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
+      { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
       { href: "/admin/invite", label: "Invite Links", icon: Link2 },
     ];
   }
@@ -69,8 +74,9 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
-      { href: "/admin/ridecheckers", label: "Applicants", icon: UserCheck },
-      { href: "/admin/inspectors", label: "RideCheckers", icon: Wrench },
+      { href: "/admin/applications", label: "RC Applications", icon: FileText },
+      { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
+      { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
     ];
   }
   if (role === "platform") {

@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     }
 
     // Role is ALWAYS hardcoded to "customer" — never read from the request body
+    // profile_type and origin_type are additive fields; origin_type='legacy' for direct registrations
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .upsert(
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
           phone: phone || null,
           role: "customer",        // ← hardcoded, cannot be overridden by caller
           is_active: true,
+          profile_type: "customer",
+          origin_type: "legacy",   // direct registration — not tied to an order yet
         },
         { onConflict: "id" }
       );

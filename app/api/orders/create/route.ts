@@ -254,6 +254,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Phase 3: stamp profile_type on authenticated buyer (best-effort, additive only)
+    if (customer_id) {
+      try {
+        await supabaseAdmin
+          .from("profiles")
+          .update({
+            profile_type: "customer",
+            origin_type: "order_checkout",
+            origin_id: order.id,
+          })
+          .eq("id", customer_id)
+          .is("origin_id", null); // only set origin on their first order
+      } catch (profileStampErr) {
+        console.error("[Order Create] Profile stamp error:", profileStampErr);
+      }
+    }
+
     const track_url = `/track/${order.id}?t=${tracking_token}`;
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";

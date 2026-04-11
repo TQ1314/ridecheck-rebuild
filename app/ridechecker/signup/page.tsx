@@ -3,15 +3,14 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, EyeOff, Wrench, Gift } from "lucide-react";
+import { CheckCircle2, Wrench, Gift } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,82 +23,52 @@ export default function RideCheckerSignupPage() {
 }
 
 function RideCheckerSignupInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const supabase = createClient();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [serviceArea, setServiceArea] = useState("");
+  const [fullName, setFullName]     = useState("");
+  const [email, setEmail]           = useState("");
+  const [phone, setPhone]           = useState("");
+  const [city, setCity]             = useState("");
   const [experience, setExperience] = useState("");
+  const [notes, setNotes]           = useState("");
   const [referralCode, setReferralCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
     if (ref) setReferralCode(ref);
   }, [searchParams]);
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters",
-        variant: "destructive",
-      });
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch("/api/ridechecker/register", {
+      const res = await fetch("/api/ridechecker/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          full_name: fullName,
           email,
-          password,
-          fullName,
           phone: phone || null,
-          serviceArea: serviceArea || null,
+          city: city || null,
           experience: experience || null,
-          referralCode: referralCode || null,
+          notes: notes || null,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Registration failed");
+        throw new Error(data.error || "Submission failed");
       }
 
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (loginError) {
-        toast({
-          title: "Account created",
-          description: "Your account was created. Please sign in to continue.",
-        });
-        router.push("/auth/login");
-        return;
-      }
-
-      toast({
-        title: "Welcome to RideCheck",
-        description: "Your RideChecker account has been created.",
-      });
-      router.push("/ridechecker/dashboard");
-      router.refresh();
+      setSubmitted(true);
     } catch (err: any) {
       toast({
-        title: "Registration failed",
-        description: err.message || "Something went wrong",
+        title: "Submission failed",
+        description: err.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -107,15 +76,40 @@ function RideCheckerSignupInner() {
     }
   };
 
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-primary/5 via-background to-muted/30">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-10 pb-8 space-y-4">
+            <div className="flex justify-center">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+                <CheckCircle2 className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <h2 className="text-xl font-bold">Application received!</h2>
+            <p className="text-sm text-muted-foreground">
+              Thanks for applying to be a RideChecker. Our team will review your application and reach out to{" "}
+              <strong>{email}</strong> within a few business days.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              No account is created yet. You will receive a setup link by email once approved.
+            </p>
+            <Link href="/">
+              <Button variant="outline" className="mt-2 w-full" data-testid="link-home-after-apply">
+                Back to Home
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-primary/5 via-background to-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center pb-2">
-          <Link
-            href="/"
-            className="flex items-center justify-center gap-2 mb-4"
-            data-testid="link-home"
-          >
+          <Link href="/" className="flex items-center justify-center gap-2 mb-4" data-testid="link-home">
             <Logo size={36} />
             <span className="text-2xl font-bold">RideCheck</span>
           </Link>
@@ -124,13 +118,14 @@ function RideCheckerSignupInner() {
             <CardTitle className="text-xl">Become a RideChecker</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">
-            Apply to join our network of vehicle assessment professionals
+            Apply to join our network of vehicle assessment professionals.
+            If approved, you will receive an email with a link to set up your account.
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleApply} className="space-y-4">
             <div>
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName">Full Name *</Label>
               <Input
                 id="fullName"
                 placeholder="Jane Doe"
@@ -141,7 +136,7 @@ function RideCheckerSignupInner() {
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
@@ -164,13 +159,13 @@ function RideCheckerSignupInner() {
               />
             </div>
             <div>
-              <Label htmlFor="serviceArea">Service Area</Label>
+              <Label htmlFor="city">City / Area</Label>
               <Input
-                id="serviceArea"
-                placeholder="e.g. San Francisco Bay Area"
-                value={serviceArea}
-                onChange={(e) => setServiceArea(e.target.value)}
-                data-testid="input-service-area"
+                id="city"
+                placeholder="e.g. Waukegan, IL"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                data-testid="input-city"
               />
             </div>
             <div>
@@ -186,66 +181,46 @@ function RideCheckerSignupInner() {
               />
             </div>
             <div>
-              <Label htmlFor="referralCode">
-                <span className="flex items-center gap-1">
-                  <Gift className="h-3.5 w-3.5" />
-                  Referral Code (optional)
-                </span>
-              </Label>
-              <Input
-                id="referralCode"
-                placeholder="e.g. RC-JANE-ABC123"
-                value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value)}
-                className="font-mono"
-                data-testid="input-referral-code"
+              <Label htmlFor="notes">Anything else you want us to know?</Label>
+              <Textarea
+                id="notes"
+                placeholder="Optional notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="resize-none"
+                rows={2}
+                data-testid="input-notes"
               />
             </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
+            {referralCode && (
+              <div>
+                <Label htmlFor="referralCode">
+                  <span className="flex items-center gap-1">
+                    <Gift className="h-3.5 w-3.5" />
+                    Referral Code
+                  </span>
+                </Label>
                 <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="At least 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="pr-10"
-                  data-testid="input-password"
+                  id="referralCode"
+                  value={referralCode}
+                  readOnly
+                  className="font-mono bg-muted"
+                  data-testid="input-referral-code"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                  data-testid="button-toggle-password"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
               </div>
-            </div>
+            )}
             <Button
               type="submit"
               className="w-full"
               disabled={loading}
-              data-testid="button-register"
+              data-testid="button-apply"
             >
-              {loading ? "Submitting..." : "Apply as RideChecker"}
+              {loading ? "Submitting..." : "Submit Application"}
             </Button>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{" "}
-            <Link
-              href="/auth/login"
-              className="text-primary hover:underline font-medium"
-              data-testid="link-login"
-            >
+            <Link href="/auth/login" className="text-primary hover:underline font-medium" data-testid="link-login">
               Sign in
             </Link>
           </p>
