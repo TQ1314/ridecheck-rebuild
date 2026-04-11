@@ -98,9 +98,13 @@ export default function InviteAcceptPage() {
         return;
       }
 
-      // Step 3: Redirect to their role's dashboard
-      const dashPath = getDashboardPath(invite!.role as Role);
-      router.push(dashPath);
+      // Step 3: Redirect to onboarding for RideCheckers, dashboard for all others
+      const isRC =
+        invite!.role === "ridechecker_active" || invite!.role === "ridechecker";
+      const redirectPath = isRC
+        ? "/ridechecker/onboarding"
+        : getDashboardPath(invite!.role as Role);
+      router.push(redirectPath);
     } catch (err: any) {
       setErrorMsg(err.message);
       setStatus("error");

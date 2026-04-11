@@ -50,6 +50,11 @@ export async function POST(
       );
     }
 
+    // Resolve application linkage from the invite
+    const applicationId: string | null = invite.application_id ?? null;
+    const isRideCheckerInvite =
+      invite.role === "ridechecker_active" || invite.role === "ridechecker";
+
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email: email.toLowerCase().trim(),
@@ -68,19 +73,30 @@ export async function POST(
           (u) => u.email?.toLowerCase() === email.toLowerCase().trim()
         );
         if (existingUser) {
-          await supabaseAdmin
-            .from("profiles")
-            .upsert(
-              {
-                id: existingUser.id,
-                email: email.toLowerCase().trim(),
-                full_name: fullName.trim(),
-                phone: phone?.trim() || null,
-                role: invite.role,
-                is_active: true,
-              },
-              { onConflict: "id" }
-            );
+          const existingPatch: Record<string, unknown> = {
+            id: existingUser.id,
+            email: email.toLowerCase().trim(),
+            full_name: fullName.trim(),
+            phone: phone?.trim() || null,
+            role: invite.role,
+            is_active: true,
+          };
+
+          if (isRideCheckerInvite) {
+            existingPatch.profile_type = "ridechecker_active";
+            existingPatch.origin_type = applicationId ? "application" : "invite";
+            if (applicationId) existingPatch.origin_id = applicationId;
+            existingPatch.level = "level_1";
+          }
+
+          await supabaseAdmin.from("profiles").upsert(existingPatch, { onConflict: "id" });
+
+          if (applicationId) {
+            await supabaseAdmin
+              .from("ridechecker_applications")
+              .update({ profile_id: existingUser.id })
+              .eq("id", applicationId);
+          }
 
           await supabaseAdmin
             .from("user_invites")
@@ -103,19 +119,29 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
     }
 
+    const userId = authData.user.id;
+
+    // Build profile row
+    const profileRow: Record<string, unknown> = {
+      id: userId,
+      email: email.toLowerCase().trim(),
+      full_name: fullName.trim(),
+      phone: phone?.trim() || null,
+      role: invite.role,
+      is_active: true,
+    };
+
+    // Stamp ridechecker-specific metadata when this is an RC invite
+    if (isRideCheckerInvite) {
+      profileRow.profile_type = "ridechecker_active";
+      profileRow.origin_type = applicationId ? "application" : "invite";
+      if (applicationId) profileRow.origin_id = applicationId;
+      profileRow.level = "level_1";
+    }
+
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .upsert(
-        {
-          id: authData.user.id,
-          email: email.toLowerCase().trim(),
-          full_name: fullName.trim(),
-          phone: phone?.trim() || null,
-          role: invite.role,
-          is_active: true,
-        },
-        { onConflict: "id" }
-      );
+      .upsert(profileRow, { onConflict: "id" });
 
     if (profileError) {
       console.error("Profile creation error:", profileError);
@@ -125,16 +151,23 @@ export async function POST(
       );
     }
 
-    if (invite.role === "inspector") {
+    // Backlink application → profile so admin sees the account created
+    if (applicationId) {
       await supabaseAdmin
-        .from("inspectors")
-        .insert({
-          full_name: fullName.trim(),
-          email: email.toLowerCase().trim(),
-          phone: phone?.trim() || null,
-          user_id: authData.user.id,
-          is_active: true,
-        });
+        .from("ridechecker_applications")
+        .update({ profile_id: userId })
+        .eq("id", applicationId);
+    }
+
+    // Legacy: seed inspectors table if role was 'inspector' (backward compat)
+    if (invite.role === "inspector") {
+      await supabaseAdmin.from("inspectors").insert({
+        full_name: fullName.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone?.trim() || null,
+        user_id: userId,
+        is_active: true,
+      });
     }
 
     await supabaseAdmin
@@ -143,7 +176,7 @@ export async function POST(
       .eq("id", invite.id);
 
     await supabaseAdmin.from("audit_log").insert({
-      actor_id: authData.user.id,
+      actor_id: userId,
       actor_email: email.toLowerCase().trim(),
       actor_role: invite.role,
       action: "invite.accepted",

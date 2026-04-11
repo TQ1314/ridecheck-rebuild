@@ -24,12 +24,23 @@ import {
   Clock,
 } from "lucide-react";
 
+const AVAILABILITY_LABELS: Record<string, string> = {
+  weekdays:              "Weekdays (Mon–Fri)",
+  weekends:              "Weekends (Sat–Sun)",
+  weekdays_and_weekends: "Weekdays & Weekends",
+  mornings:              "Mornings only",
+  evenings:              "Evenings only",
+  flexible:              "Flexible / open schedule",
+};
+
 interface Application {
   id: string;
   full_name: string;
   email: string;
   phone: string | null;
   city: string | null;
+  availability: string | null;
+  willing_to_use_tools: boolean | null;
   experience: string | null;
   notes: string | null;
   status: string;
@@ -286,6 +297,26 @@ export default function AdminApplicationsPage() {
                 <div><span className="font-medium text-muted-foreground">Phone</span><p>{selected.phone ?? "—"}</p></div>
                 <div><span className="font-medium text-muted-foreground">City</span><p>{selected.city ?? "—"}</p></div>
                 <div><span className="font-medium text-muted-foreground">Applied</span><p>{formatDate(selected.created_at)}</p></div>
+                <div>
+                  <span className="font-medium text-muted-foreground">Availability</span>
+                  <p>{selected.availability ? AVAILABILITY_LABELS[selected.availability] ?? selected.availability : "—"}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-muted-foreground">Willing to use tools</span>
+                  <p>
+                    {selected.willing_to_use_tools === true
+                      ? "✓ Yes"
+                      : selected.willing_to_use_tools === false
+                      ? "✗ No"
+                      : "—"}
+                  </p>
+                </div>
+                {selected.profile_id && (
+                  <div className="col-span-2">
+                    <span className="font-medium text-muted-foreground">Account</span>
+                    <p className="text-xs font-mono text-emerald-600">Account created ✓</p>
+                  </div>
+                )}
               </div>
               {selected.experience && (
                 <div>

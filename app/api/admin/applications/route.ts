@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(["admin", "owner", "operations_lead"]);
+  const auth = await requireRole(["admin", "owner", "operations_lead", "operations"]);
   if ("error" in auth) return auth.error;
 
   const { searchParams } = new URL(req.url);
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireRole(["admin", "owner", "operations_lead"]);
+  const auth = await requireRole(["admin", "owner", "operations_lead", "operations"]);
   if ("error" in auth) return auth.error;
 
   let body: Record<string, unknown>;
@@ -107,19 +107,29 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
   }
 
   if (action === "approve") {
-    // Generate invite token and create a user_invite record
+    // Prevent double-approval
+    if (app.status === "approved" && app.profile_id) {
+      return NextResponse.json(
+        { error: "This application has already been approved and an account was created." },
+        { status: 409 }
+      );
+    }
+
+    // Generate invite token linked to this application
     const token = nanoid(40);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
+    // Approved RideCheckers get ridechecker_active role from day 1 (full portal access)
     const { error: inviteErr } = await supabaseAdmin
       .from("user_invites")
       .insert({
         email: app.email,
-        role: "ridechecker",
+        role: "ridechecker_active",
         token,
         expires_at: expiresAt.toISOString(),
         created_by: auth.actor.userId,
+        application_id: app.id,
       });
 
     if (inviteErr) {
@@ -149,9 +159,14 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
         subject: "You're approved! Set up your RideChecker account",
         html: `<p>Hi ${app.full_name},</p>
 <p>Congratulations — your RideChecker application has been approved!</p>
-<p>Click the link below to set up your account. This link expires in <strong>7 days</strong>.</p>
-<p><a href="${onboardingUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Set Up My Account</a></p>
-<p>Or copy this link: ${onboardingUrl}</p>
+<p>Click the button below to set up your account and password. This link expires in <strong>7 days</strong>.</p>
+<p>
+  <a href="${onboardingUrl}" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+    Set Up My RideChecker Account
+  </a>
+</p>
+<p style="font-size:13px;color:#666">Or copy this link: ${onboardingUrl}</p>
+<p>Once your account is set up you will have full access to the RideChecker portal where you can accept jobs, track your earnings, and manage your schedule.</p>
 <p>— The RideCheck Team</p>`,
       });
     } catch (e) {
