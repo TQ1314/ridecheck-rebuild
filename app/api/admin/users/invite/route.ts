@@ -2,7 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { z } from "zod";
-import { randomBytes } from "crypto";
+
+// Human-readable token: 12 uppercase alphanumeric chars (no 0/O, 1/I confusion)
+// Example: K8MZWNTQ4RXA → www.ridecheckauto.com/invite/K8MZWNTQ4RXA
+const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function generateInviteToken(): string {
+  const chars: string[] = [];
+  const array = new Uint8Array(12);
+  // Use Node's crypto for server-side randomness
+  const { randomFillSync } = require("crypto");
+  randomFillSync(array);
+  for (const byte of array) {
+    chars.push(TOKEN_ALPHABET[byte % TOKEN_ALPHABET.length]);
+  }
+  return chars.join("");
+}
+
+// Always use the canonical production domain for invite links.
+// Falls back to NEXT_PUBLIC_APP_URL if set, then the live domain.
+const APP_URL =
+  process.env.RIDECHECKAUTO_DOMAIN ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "https://www.ridecheckauto.com";
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -36,7 +57,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const token = randomBytes(32).toString("hex");
+    const token = generateInviteToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: invite, error } = await supabaseAdmin
@@ -66,8 +87,7 @@ export async function POST(req: NextRequest) {
       newValue: { email: parsed.data.email, role: parsed.data.role },
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const inviteUrl = `${appUrl}/invite/${token}`;
+    const inviteUrl = `${APP_URL}/invite/${token}`;
 
     return NextResponse.json({ invite, inviteUrl });
   } catch (err: any) {
@@ -91,7 +111,13 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch invites" }, { status: 500 });
     }
 
-    return NextResponse.json({ invites: data || [] });
+    // Attach the full invite URL server-side so the client always gets the right domain
+    const invites = (data || []).map((inv) => ({
+      ...inv,
+      inviteUrl: `${APP_URL}/invite/${inv.token}`,
+    }));
+
+    return NextResponse.json({ invites });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -34,24 +34,27 @@ import {
 } from "lucide-react";
 
 const STAFF_INVITE_ROLES = [
-  { value: "operations", label: "Operations" },
+  { value: "operations",      label: "Operations" },
   { value: "operations_lead", label: "Operations Lead" },
-  { value: "ridechecker", label: "RideChecker (invite)" },
-  { value: "qa", label: "QA Reviewer" },
+  { value: "ridechecker",     label: "RideChecker (invite)" },
+  { value: "qa",              label: "QA Reviewer" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  operations: "Operations",
-  operations_lead: "Operations Lead",
-  ridechecker: "RideChecker",
-  ridechecker_active: "RideChecker (Active)",
-  qa: "QA Reviewer",
-  customer: "Customer",
-  inspector: "Inspector",
-  developer: "Developer",
-  platform: "Platform",
-  owner: "Owner",
+  operations:        "Operations",
+  operations_lead:   "Operations Lead",
+  ridechecker:       "RideChecker",
+  ridechecker_active:"RideChecker (Active)",
+  qa:                "QA Reviewer",
+  customer:          "Customer",
+  inspector:         "Inspector",
+  developer:         "Developer",
+  platform:          "Platform",
+  owner:             "Owner",
 };
+
+const PRODUCTION_URL = "https://www.ridecheckauto.com";
+const SIGNUP_URL = `${PRODUCTION_URL}/ridechecker/signup`;
 
 function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -75,21 +78,20 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
 }
 
 function inviteStatus(invite: { used_at?: string | null; expires_at: string }) {
-  if (invite.used_at) return { label: "Used", variant: "secondary" as const };
-  if (new Date(invite.expires_at) < new Date()) return { label: "Expired", variant: "destructive" as const };
-  return { label: "Pending", variant: "default" as const };
+  if (invite.used_at)                               return { label: "Used",    variant: "secondary"    as const };
+  if (new Date(invite.expires_at) < new Date())     return { label: "Expired", variant: "destructive"  as const };
+  return                                                   { label: "Pending", variant: "default"      as const };
 }
 
 export default function InvitePage() {
   const { toast } = useToast();
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("operations");
-  const [loading, setLoading] = useState(false);
+  const [email,        setEmail]        = useState("");
+  const [role,         setRole]         = useState("operations");
+  const [loading,      setLoading]      = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState("");
 
-  const [invites, setInvites] = useState<any[]>([]);
+  const [invites,        setInvites]        = useState<any[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(true);
 
   async function loadInvites() {
@@ -120,6 +122,7 @@ export default function InvitePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create invite");
+      // inviteUrl comes from the server — always the correct domain
       setGeneratedUrl(data.inviteUrl);
       setEmail("");
       await loadInvites();
@@ -130,8 +133,6 @@ export default function InvitePage() {
       setLoading(false);
     }
   }
-
-  const rideCheckerSignupUrl = `${appUrl}/ridechecker/signup`;
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -151,21 +152,16 @@ export default function InvitePage() {
           </CardTitle>
           <p className="text-sm text-gray-600">
             Anyone can use this link to apply as a RideChecker. Share it on job boards,
-            social media, or directly with candidates. No email invite required.
+            social media, or directly with candidates.
           </p>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
             <code className="flex-1 rounded-lg bg-white border px-3 py-2 text-sm font-mono text-gray-800 truncate select-all">
-              {rideCheckerSignupUrl}
+              {SIGNUP_URL}
             </code>
-            <CopyButton text={rideCheckerSignupUrl} label="Copy Link" />
-            <a
-              href="/ridechecker/signup"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0"
-            >
+            <CopyButton text={SIGNUP_URL} label="Copy Link" />
+            <a href="/ridechecker/signup" target="_blank" rel="noopener noreferrer" className="shrink-0">
               <Button variant="outline" size="sm" className="gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
                 Preview
@@ -173,7 +169,7 @@ export default function InvitePage() {
             </a>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            Applications default to <strong>ridechecker</strong> role (pending). Activate them in the RideCheckers tab after review.
+            Applications are reviewed before any account is created. No auth until approved.
           </p>
         </CardContent>
       </Card>
@@ -243,7 +239,7 @@ export default function InvitePage() {
                 Invite link ready — copy and send it now
               </p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 rounded-lg bg-white border px-3 py-2 text-xs font-mono text-gray-800 break-all select-all">
+                <code className="flex-1 rounded-lg bg-white border px-3 py-2 text-sm font-mono text-gray-800 break-all select-all">
                   {generatedUrl}
                 </code>
                 <CopyButton text={generatedUrl} label="Copy" />
@@ -284,7 +280,6 @@ export default function InvitePage() {
                 <TableBody>
                   {invites.map((inv) => {
                     const status = inviteStatus(inv);
-                    const inviteUrl = `${appUrl}/invite/${inv.token}`;
                     const isPending = status.label === "Pending";
                     return (
                       <TableRow key={inv.id}>
@@ -308,7 +303,7 @@ export default function InvitePage() {
                         </TableCell>
                         <TableCell>
                           {isPending ? (
-                            <CopyButton text={inviteUrl} label="Copy" />
+                            <CopyButton text={inv.inviteUrl} label="Copy" />
                           ) : (
                             <span className="text-xs text-gray-400">—</span>
                           )}
