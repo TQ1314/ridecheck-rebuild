@@ -222,7 +222,7 @@ export default function RideCheckerDashboardPage() {
 
   const copyReferralLink = async () => {
     const appUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const link = `${appUrl}/ridechecker/signup?ref=${referralCode}`;
+    const link = `${appUrl}/careers?ref=${referralCode}`;
     try {
       await navigator.clipboard.writeText(link);
       toast({ title: "Referral link copied!" });

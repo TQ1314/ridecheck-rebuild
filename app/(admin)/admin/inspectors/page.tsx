@@ -271,7 +271,7 @@ export default function RideCheckersPage() {
       ) : ridecheckers.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-sm text-muted-foreground mb-2">No RideCheckers yet.</p>
-          <p className="text-xs text-muted-foreground">RideCheckers sign up at <span className="font-mono">/ridechecker/signup</span>, then you activate them here.</p>
+          <p className="text-xs text-muted-foreground">RideCheckers apply at <span className="font-mono">/careers</span>, then you activate them here.</p>
         </div>
       ) : (
         <Card>

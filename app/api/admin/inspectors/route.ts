@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "No account found with that email. The RideChecker must sign up first at /ridechecker/signup, then you can activate them here." },
+      { error: "No account found with that email. The RideChecker must apply first at /careers, then you can activate them here." },
       { status: 400 }
     );
   } catch (err: any) {

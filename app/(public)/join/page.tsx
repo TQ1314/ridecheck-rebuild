@@ -97,7 +97,7 @@ export default function JoinPage() {
             Earn money inspecting cars in your area. Set your own schedule and help buyers make informed decisions.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/ridechecker/signup">
+            <Link href="/careers">
               <Button size="lg" className="gap-2" data-testid="button-apply-hero">
                 Apply Now
                 <ArrowRight className="h-4 w-4" />
@@ -191,7 +191,7 @@ export default function JoinPage() {
           <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
             Apply today and start earning on your own schedule. Our team reviews applications within 48 hours.
           </p>
-          <Link href="/ridechecker/signup">
+          <Link href="/careers">
             <Button size="lg" className="gap-2" data-testid="button-apply-bottom">
               Apply as RideChecker
               <ArrowRight className="h-4 w-4" />

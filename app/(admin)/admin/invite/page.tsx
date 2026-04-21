@@ -54,7 +54,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const PRODUCTION_URL = "https://www.ridecheckauto.com";
-const SIGNUP_URL = `${PRODUCTION_URL}/ridechecker/signup`;
+const SIGNUP_URL = `${PRODUCTION_URL}/careers`;
 
 function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -161,7 +161,7 @@ export default function InvitePage() {
               {SIGNUP_URL}
             </code>
             <CopyButton text={SIGNUP_URL} label="Copy Link" />
-            <a href="/ridechecker/signup" target="_blank" rel="noopener noreferrer" className="shrink-0">
+            <a href="/careers" target="_blank" rel="noopener noreferrer" className="shrink-0">
               <Button variant="outline" size="sm" className="gap-1.5">
                 <ExternalLink className="h-3.5 w-3.5" />
                 Preview
