@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Send, ShieldCheck, Sparkles, FileText, ExternalLink, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { canUpdateStatus, canAssignOps, canSendPayment, type Role } from "@/lib/utils/roles";
@@ -43,6 +43,9 @@ export default function OpsOrderDetailPage() {
   const [overridePackage, setOverridePackage] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
   const [overrideLoading, setOverrideLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
+  const [reportVerdict, setReportVerdict] = useState<string | null>(null);
 
   async function loadData() {
     const {
@@ -139,6 +142,28 @@ export default function OpsOrderDetailPage() {
     loadData();
   };
 
+  const handleGenerateReport = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${orderId}/generate-report`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Report generation failed", description: data.error, variant: "destructive" });
+        return;
+      }
+      setReportUrl(data.report_url);
+      setReportVerdict(data.verdict);
+      toast({ title: "Report generated!", description: `Verdict: ${data.verdict.replace(/_/g, " ")}` });
+      loadData();
+    } catch {
+      toast({ title: "Failed to generate report", variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -201,6 +226,83 @@ export default function OpsOrderDetailPage() {
       </div>
 
       <OrderDetailPanel order={order} activities={activities} />
+
+      {/* AI Report Generation */}
+      <Card data-testid="card-generate-report">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            AI Intelligence Report
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(order.ops_report_url || reportUrl) ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="font-medium">Report generated</span>
+                {(reportVerdict || order.ops_severity_overall) && (
+                  <span className="text-muted-foreground">
+                    — Verdict: {(reportVerdict || order.ops_severity_overall || "").replace(/_/g, " ").toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={order.ops_report_url || reportUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0"
+                >
+                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-view-report">
+                    <FileText className="h-3.5 w-3.5" />
+                    View PDF
+                    <ExternalLink className="h-3 w-3 opacity-60" />
+                  </Button>
+                </a>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleGenerateReport}
+                  disabled={generating}
+                  data-testid="button-regenerate-report"
+                  className="text-muted-foreground"
+                >
+                  {generating ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
+                  ) : (
+                    "Regenerate"
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Generate a branded PDF intelligence report using Claude AI. The RideChecker must have submitted their findings first.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleGenerateReport}
+                disabled={generating}
+                className="gap-2"
+                data-testid="button-generate-report"
+              >
+                {generating ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Generating Report…</>
+                ) : (
+                  <><Sparkles className="h-4 w-4" />Generate AI Report</>
+                )}
+              </Button>
+              {generating && (
+                <p className="text-xs text-muted-foreground">
+                  Analyzing findings with Claude AI and rendering PDF — this takes about 15–30 seconds.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {canOverride && (
         <Card data-testid="card-package-override">
