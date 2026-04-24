@@ -1,3 +1,4 @@
+import "server-only";
 import type { RideCheckerRawSubmission } from "@/types/orders";
 
 const MIN_TEXT_LENGTH = 15;

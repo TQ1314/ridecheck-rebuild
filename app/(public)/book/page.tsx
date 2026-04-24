@@ -33,7 +33,7 @@ import {
   type PackageType,
   type BookingType,
 } from "@/lib/utils/pricing";
-import { classifyVehicle, type ClassificationResult, TIER_PRICES } from "@/lib/vehicleClassification";
+import { type ClassificationResult, TIER_PRICES } from "@/lib/vehicleClassification";
 import { isBuyerArrangedEnabled } from "@/lib/utils/featureFlags";
 import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
 import { t, type Language } from "@/lib/i18n/translations";
@@ -100,18 +100,42 @@ function BookInner() {
   const finalPrice = useTestPackage ? 1 : (classification?.basePrice || TIER_PRICES.standard);
 
   useEffect(() => {
-    if (vehicleMake && vehicleModel && vehicleYear) {
-      const result = classifyVehicle({
-        make: vehicleMake,
-        model: vehicleModel,
-        year: parseInt(vehicleYear) || new Date().getFullYear(),
-        mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
-        askingPrice: vehiclePrice ? parseFloat(vehiclePrice) : null,
-      });
-      setClassification(result);
-    } else {
+    if (!vehicleMake || !vehicleModel || !vehicleYear) {
       setClassification(null);
+      return;
     }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetch("/api/classify-vehicle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          make: vehicleMake,
+          model: vehicleModel,
+          year: parseInt(vehicleYear) || new Date().getFullYear(),
+          mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+          askingPrice: vehiclePrice ? parseFloat(vehiclePrice) : null,
+        }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          setClassification({
+            packageTier: data.tier || "standard",
+            basePrice: data.price || TIER_PRICES.standard,
+            requiresUpgrade: data.requiresUpgrade ?? false,
+            modifier: null,
+            classificationReason: "",
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setClassification(null);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [vehicleMake, vehicleModel, vehicleYear, vehicleMileage, vehiclePrice]);
 
   const handleZipChange = (zip: string) => {
