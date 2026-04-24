@@ -129,7 +129,7 @@ export async function POST(
     const { RideCheckReport }  = await import("@/lib/report/pdf-template");
 
     const pdfBuffer = await renderToBuffer(
-      React.createElement(RideCheckReport, { report: generatedReport, meta: reportMeta })
+      React.createElement(RideCheckReport, { report: generatedReport, meta: reportMeta }) as any
     );
 
     // 7. Upload to Supabase Storage
