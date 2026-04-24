@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPrice, type PackageType, type BookingType } from "@/lib/utils/pricing";
-import { classifyVehicle } from "@/lib/vehicleClassification";
+import { classifyVehicle } from "@/lib/vehicleClassification.server";
 import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
 import { z } from "zod";
 

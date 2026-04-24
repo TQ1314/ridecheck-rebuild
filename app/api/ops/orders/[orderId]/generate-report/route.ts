@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
+import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
 import type { ReportInput, ReportMeta } from "@/lib/report/types";
 import React from "react";
 
@@ -166,6 +167,7 @@ export async function POST(
         ops_severity_overall: mapVerdictToSeverity(generatedReport.verdict),
         ops_recommendation:   mapVerdictToRecommendation(generatedReport.verdict),
         report_status:        "in_review",
+        report_logic_version: REPORT_LOGIC_VERSION,
         updated_at:           new Date().toISOString(),
       })
       .eq("id", params.orderId);
@@ -195,11 +197,11 @@ export async function POST(
     ]);
 
     return NextResponse.json({
-      success:       true,
-      report_number: reportNumber,
-      report_url:    reportUrl,
-      verdict:       generatedReport.verdict,
-      storage_path:  storagePath,
+      success:              true,
+      report_number:        reportNumber,
+      report_url:           reportUrl,
+      verdict:              generatedReport.verdict,
+      report_logic_version: REPORT_LOGIC_VERSION,
     });
   } catch (err: any) {
     console.error("[generate-report] error:", err);
