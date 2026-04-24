@@ -46,21 +46,21 @@ export async function POST(req: NextRequest) {
     const rawIp = clientKey.replace("ip:", "");
     const ipHash = crypto.createHash("sha256").update(rawIp).digest("hex").slice(0, 16);
 
-    supabaseAdmin
-      .from("vehicle_classification_signals")
-      .insert({
-        ip_hash: ipHash,
-        make: input.make.toLowerCase().trim(),
-        model: input.model.toLowerCase().trim(),
-        year: input.year,
-        mileage: input.mileage ?? null,
-        asking_price: input.askingPrice ?? null,
-        tier_result: result.packageTier,
-        signals_triggered: result.signals_triggered,
-        risk_flags: result.risk_flags,
-      })
-      .then(() => {})
-      .catch(() => {});
+    Promise.resolve(
+      supabaseAdmin
+        .from("vehicle_classification_signals")
+        .insert({
+          ip_hash: ipHash,
+          make: input.make.toLowerCase().trim(),
+          model: input.model.toLowerCase().trim(),
+          year: input.year,
+          mileage: input.mileage ?? null,
+          asking_price: input.askingPrice ?? null,
+          tier_result: result.packageTier,
+          signals_triggered: result.signals_triggered,
+          risk_flags: result.risk_flags,
+        })
+    ).catch(() => {});
 
     return NextResponse.json(
       {
