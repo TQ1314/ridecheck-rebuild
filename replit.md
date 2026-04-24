@@ -10,6 +10,8 @@ The user prefers clear and concise communication. They value iterative developme
 The platform is built with Next.js 14 App Router and utilizes Supabase for authentication, database, and storage. Key architectural decisions include:
 - **UI/UX**: Tailwind CSS and shadcn/ui components are used for a consistent and modern interface. The application features distinct route groups for different user roles (public, buyer, operations, admin, inspector, QA), ensuring role-based navigation and access control.
 - **Technical Implementations**:
+    - **Proprietary Logic Protection**: All classification algorithms, AI prompts, scoring rules, and thresholds are server-only. `lib/vehicleClassification.server.ts` contains the full engine (guarded by `server-only`); `lib/vehicleClassification.ts` is a stripped public file (types + prices only). The booking page calls `POST /api/classify-vehicle` instead of running classification client-side. `server-only` guards are on: `claude-generate.ts`, `scoring.ts`, `pdf-template.tsx`, `supabase/admin.ts`, `report-version.ts`. Report generation API responses never include raw prompts, internal paths, or reasoning chains — only customer-safe outputs.
+    - **Report Versioning**: `report_logic_version` (semver) is stored on each order and returned with each generate-report response, enabling audit/rollback. Current version: `1.1.0` (defined in `lib/report/report-version.ts`).
     - Supabase is used for authentication instead of NextAuth, with middleware handling role-based route protection and automatic profile creation on login.
     - Idempotency keys are implemented for reliable order creation.
     - All new features are introduced behind feature flags for controlled rollout.
