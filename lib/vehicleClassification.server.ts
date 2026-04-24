@@ -202,4 +202,75 @@ export function classifyVehicle(input: ClassificationInput): ClassificationResul
   };
 }
 
+export interface ClassificationResultInternal extends ClassificationResult {
+  signals_triggered: string[];
+  risk_flags: Record<string, unknown>;
+}
+
+export function classifyVehicleInternal(input: ClassificationInput): ClassificationResultInternal {
+  const make = (input.make || "").toLowerCase().trim();
+  const model = (input.model || "").toLowerCase().trim();
+  const makeModel = `${make} ${model}`;
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - (input.year || currentYear);
+  const mileage = input.mileage ?? null;
+  const price = input.askingPrice ?? null;
+  const signals: string[] = [];
+  const riskFlags: Record<string, unknown> = {};
+
+  if (age >= 10) { signals.push("VEHICLE_AGE_10_PLUS"); }
+  if (mileage !== null && mileage >= 100000) { signals.push("HIGH_MILEAGE"); riskFlags.high_mileage = mileage; }
+  if (mileage !== null && mileage >= 150000) { signals.push("VERY_HIGH_MILEAGE"); }
+  if (price !== null && price < 5000) { signals.push("LOW_ASK_PRICE"); riskFlags.low_price = price; }
+
+  if ((TIER_CONFIG.exotic_brands as readonly string[]).includes(make)) {
+    signals.push("EXOTIC_BRAND");
+    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "Exotic brand", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  }
+
+  if (price !== null && price >= TIER_CONFIG.value_thresholds.exotic) {
+    signals.push("HIGH_VALUE");
+    riskFlags.high_value_price = price;
+    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "High value vehicle", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  }
+
+  const isExoticModel = matchesAny(model, TIER_CONFIG.exotic_model_overrides) || matchesAny(makeModel, TIER_CONFIG.exotic_model_overrides);
+  if (isExoticModel) {
+    signals.push("EXOTIC_MODEL_OVERRIDE");
+    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "High-complexity model", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  }
+
+  const isPlusBrand = (TIER_CONFIG.plus_brands as readonly string[]).includes(make);
+  if (isPlusBrand) {
+    signals.push("PLUS_BRAND");
+    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.luxury;
+    if (age >= minAge && mileage !== null && mileage >= minMileage && price !== null && price <= maxPrice) {
+      signals.push("AGING_LUXURY_DOWNGRADE");
+      return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: "aging_luxury", classificationReason: "Aging luxury vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
+    }
+    return { packageTier: "plus", basePrice: TIER_PRICES.plus, modifier: null, classificationReason: "Luxury brand", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  }
+
+  const isEV = EV_MAKES.includes(make) || matchesAny(model, EV_HYBRID_KEYWORDS);
+  const isThreeRow = matchesAny(model, THREE_ROW_SUV_KEYWORDS);
+  const isHeavyDuty = matchesAny(model, HEAVY_DUTY_KEYWORDS);
+
+  if (isEV) { signals.push("EV_OR_HYBRID"); }
+  if (isThreeRow) { signals.push("THREE_ROW_SUV"); }
+  if (isHeavyDuty) { signals.push("HEAVY_DUTY_TRUCK"); }
+
+  if (isEV || isThreeRow || isHeavyDuty) {
+    const plusReason = isEV ? "EV/Hybrid vehicle" : isThreeRow ? "3-row SUV" : "Heavy-duty truck";
+    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.plus;
+    if (age >= minAge && mileage !== null && mileage >= minMileage && price !== null && price <= maxPrice) {
+      signals.push("AGING_PLUS_DOWNGRADE");
+      return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: "aging_plus", classificationReason: "Aging complex vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
+    }
+    return { packageTier: "plus", basePrice: TIER_PRICES.plus, modifier: null, classificationReason: plusReason, requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  }
+
+  signals.push("STANDARD");
+  return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: null, classificationReason: "Standard vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
+}
+
 export type { ClassificationInput, ClassificationResult, VehicleTier };

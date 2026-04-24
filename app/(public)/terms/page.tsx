@@ -67,6 +67,13 @@ export default function TermsPage() {
               information is inaccurate or if the vehicle characteristics differ materially from
               what was represented at booking.
             </p>
+            <p className="text-muted-foreground mt-3 font-medium">
+              RideCheck uses proprietary methodologies and internal evaluation systems that are not
+              disclosed as part of the service. Classification criteria, scoring algorithms, risk
+              signals, and AI-assisted analysis processes are confidential and constitute trade secrets
+              of RideCheck. No portion of our evaluation methodology is made available to customers,
+              third parties, or competing services.
+            </p>
           </section>
 
           <section>

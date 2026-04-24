@@ -157,7 +157,7 @@ export async function POST(
 
     const reportUrl = signedData?.signedUrl || null;
 
-    // 9. Update order with report data
+    // 9. Update order with report data (internal JSON stored privately for ML/audit)
     const { error: updateError } = await supabaseAdmin
       .from("orders")
       .update({
@@ -168,6 +168,7 @@ export async function POST(
         ops_recommendation:   mapVerdictToRecommendation(generatedReport.verdict),
         report_status:        "in_review",
         report_logic_version: REPORT_LOGIC_VERSION,
+        report_internal_json: generatedReport as unknown as Record<string, unknown>,
         updated_at:           new Date().toISOString(),
       })
       .eq("id", params.orderId);
