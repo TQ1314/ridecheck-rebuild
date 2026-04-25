@@ -57,7 +57,7 @@ DO $$ BEGIN
   ) THEN
     CREATE TRIGGER training_results_updated_at
       BEFORE UPDATE ON public.ridechecker_training_results
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
   END IF;
 END $$;
 
