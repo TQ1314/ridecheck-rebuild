@@ -52,7 +52,8 @@ const PROFILE_FIELDS = `
   workflow_stage, documents_complete, background_check_status,
   references_status, assessment_score, reviewer_notes,
   invite_sent_at, invite_accepted_at, suspended_at,
-  ridechecker_rating, ridechecker_jobs_completed, ridechecker_quality_score
+  ridechecker_rating, ridechecker_jobs_completed, ridechecker_quality_score,
+  training_sip4_completed
 `.replace(/\n\s+/g, " ").trim();
 
 // ─────────────────────────────────────────────

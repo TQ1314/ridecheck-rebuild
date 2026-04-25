@@ -101,6 +101,7 @@ interface RideChecker {
   ridechecker_rating: string | null;
   ridechecker_jobs_completed: number | null;
   ridechecker_quality_score: number | null;
+  training_sip4_completed: boolean | null;
 }
 
 interface StageHistoryEntry {
@@ -414,6 +415,7 @@ export default function RideCheckersAdminPage() {
                   <TableHead>Stage</TableHead>
                   <TableHead>Checklist</TableHead>
                   <TableHead>Assessment</TableHead>
+                  <TableHead>Training</TableHead>
                   <TableHead>Applied</TableHead>
                   {canApprove && <TableHead>Actions</TableHead>}
                 </TableRow>
@@ -464,6 +466,23 @@ export default function RideCheckersAdminPage() {
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {rc.training_sip4_completed ? (
+                          <span className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
+                            "bg-emerald-100 text-emerald-700 border-emerald-200",
+                          )}>
+                            Passed
+                          </span>
+                        ) : (
+                          <span className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
+                            "bg-gray-100 text-gray-500 border-gray-200",
+                          )}>
+                            Not Started
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">

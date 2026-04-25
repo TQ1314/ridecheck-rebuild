@@ -925,11 +925,40 @@ export default function RideCheckerDashboardPage() {
               <div className="space-y-4" data-testid="tab-content-training">
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                    <GraduationCap className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="font-semibold mb-1">Training</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Training materials and resources coming soon.
-                    </p>
+                    <GraduationCap className="h-12 w-12 text-primary mb-4" />
+                    <h3 className="font-semibold mb-1">RideChecker Basic Certification</h3>
+                    {profile?.training_sip4_completed ? (
+                      <>
+                        <p className="text-sm text-emerald-600 font-medium mb-3">
+                          ✓ Module 1 — Certified
+                        </p>
+                        <p className="text-sm text-muted-foreground max-w-sm mb-4">
+                          You have completed Module 1: Standardized Vehicle Assessment Protocol.
+                        </p>
+                        <a
+                          href="/ridechecker/training"
+                          className="text-sm text-primary underline"
+                          data-testid="link-review-training"
+                        >
+                          Review training material
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground max-w-sm mb-4">
+                          Complete Module 1 to unlock vehicle assessment forms.
+                          Pass the knowledge check (80%) to become certified.
+                        </p>
+                        <a
+                          href="/ridechecker/training"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                          data-testid="link-start-training"
+                        >
+                          <GraduationCap className="h-4 w-4" />
+                          Start Certification
+                        </a>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
