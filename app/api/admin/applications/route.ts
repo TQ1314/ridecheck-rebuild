@@ -108,24 +108,27 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
 
   if (action === "approve") {
     // Prevent double-approval
-    if (app.status === "approved" && app.profile_id) {
+    if (
+      (app.status === "pending_verification" || app.status === "verification_submitted") &&
+      app.profile_id
+    ) {
       return NextResponse.json(
-        { error: "This application has already been approved and an account was created." },
+        { error: "This application has already been approved and a verification link was sent." },
         { status: 409 }
       );
     }
 
-    // Generate invite token linked to this application
+    // Generate invite token linked to this application.
+    // Role is 'ridechecker' (NOT ridechecker_active) — full activation only after verification.
     const token = nanoid(40);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Approved RideCheckers get ridechecker_active role from day 1 (full portal access)
     const { error: inviteErr } = await supabaseAdmin
       .from("user_invites")
       .insert({
         email: app.email,
-        role: "ridechecker_active",
+        role: "ridechecker",
         token,
         expires_at: expiresAt.toISOString(),
         created_by: auth.actor.userId,
@@ -140,7 +143,7 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
     await supabaseAdmin
       .from("ridechecker_applications")
       .update({
-        status: "approved",
+        status: "pending_verification",
         reviewed_at: now,
         reviewed_by: auth.actor.userId,
         review_notes: review_notes || null,
@@ -149,31 +152,30 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
       .eq("id", id);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const onboardingUrl = `${appUrl}/invite/${token}`;
+    const verifySetupUrl = `${appUrl}/invite/${token}`;
 
-    // Send approval + onboarding link email
+    // Send verification setup email
     try {
       const { sendEmail } = await import("@/lib/notifications/email");
       await sendEmail({
         to: app.email,
-        subject: "You're approved! Set up your RideChecker account",
+        subject: "Complete Your RideChecker Verification",
         html: `<p>Hi ${app.full_name},</p>
-<p>Congratulations — your RideChecker application has been approved!</p>
-<p>Click the button below to set up your account and password. This link expires in <strong>7 days</strong>.</p>
+<p>You've been approved to move forward with RideCheck. Before receiving assignments, please complete identity verification and contractor acknowledgment using the secure link below.</p>
 <p>
-  <a href="${onboardingUrl}" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
-    Set Up My RideChecker Account
+  <a href="${verifySetupUrl}" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+    Complete Verification
   </a>
 </p>
-<p style="font-size:13px;color:#666">Or copy this link: ${onboardingUrl}</p>
-<p>Once your account is set up you will have full access to the RideChecker portal where you can accept jobs, track your earnings, and manage your schedule.</p>
+<p style="font-size:13px;color:#666">Or copy this link: ${verifySetupUrl}</p>
+<p><strong>Important:</strong> Approval does not activate your RideChecker account until verification is reviewed and accepted. This link expires in <strong>7 days</strong>.</p>
 <p>— The RideCheck Team</p>`,
       });
     } catch (e) {
-      console.error("[applications] Approval email error:", e);
+      console.error("[applications] Verification email error:", e);
     }
 
-    return NextResponse.json({ success: true, status: "approved", onboarding_url: onboardingUrl });
+    return NextResponse.json({ success: true, status: "pending_verification", setup_url: verifySetupUrl });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

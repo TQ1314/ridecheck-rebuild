@@ -83,10 +83,15 @@ export async function POST(
           };
 
           if (isRideCheckerInvite) {
-            existingPatch.profile_type = "ridechecker_active";
             existingPatch.origin_type = applicationId ? "application" : "invite";
             if (applicationId) existingPatch.origin_id = applicationId;
             existingPatch.level = "level_1";
+            if (invite.role === "ridechecker_active") {
+              existingPatch.profile_type = "ridechecker_active";
+            } else {
+              existingPatch.profile_type = "ridechecker_applicant";
+              existingPatch.verification_status = "pending_verification";
+            }
           }
 
           await supabaseAdmin.from("profiles").upsert(existingPatch, { onConflict: "id" });
@@ -133,10 +138,17 @@ export async function POST(
 
     // Stamp ridechecker-specific metadata when this is an RC invite
     if (isRideCheckerInvite) {
-      profileRow.profile_type = "ridechecker_active";
       profileRow.origin_type = applicationId ? "application" : "invite";
       if (applicationId) profileRow.origin_id = applicationId;
       profileRow.level = "level_1";
+      // ridechecker_active invites are fully active immediately
+      // ridechecker invites (from verification flow) start as pending_verification
+      if (invite.role === "ridechecker_active") {
+        profileRow.profile_type = "ridechecker_active";
+      } else {
+        profileRow.profile_type = "ridechecker_applicant";
+        profileRow.verification_status = "pending_verification";
+      }
     }
 
     const { error: profileError } = await supabaseAdmin

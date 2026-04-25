@@ -98,12 +98,18 @@ export default function InviteAcceptPage() {
         return;
       }
 
-      // Step 3: Redirect to onboarding for RideCheckers, dashboard for all others
-      const isRC =
-        invite!.role === "ridechecker_active" || invite!.role === "ridechecker";
-      const redirectPath = isRC
-        ? "/ridechecker/onboarding"
-        : getDashboardPath(invite!.role as Role);
+      // Step 3: Redirect based on role
+      // ridechecker (verification flow) → verify page
+      // ridechecker_active (direct invite) → onboarding
+      // all others → role dashboard
+      let redirectPath: string;
+      if (invite!.role === "ridechecker") {
+        redirectPath = "/ridechecker/verify";
+      } else if (invite!.role === "ridechecker_active") {
+        redirectPath = "/ridechecker/onboarding";
+      } else {
+        redirectPath = getDashboardPath(invite!.role as Role);
+      }
       router.push(redirectPath);
     } catch (err: any) {
       setErrorMsg(err.message);
