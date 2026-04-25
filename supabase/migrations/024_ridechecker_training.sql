@@ -20,20 +20,21 @@ END $$;
 
 -- =============================================================
 -- B) ridechecker_training_results table
+-- (updated_at is managed by the API on every upsert — no trigger needed)
 -- =============================================================
 CREATE TABLE IF NOT EXISTS public.ridechecker_training_results (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ridechecker_id UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  module_id      TEXT        NOT NULL,                    -- e.g. "sip4"
-  score          INTEGER     NOT NULL,                    -- percentage 0–100
+  module_id      TEXT        NOT NULL,
+  score          INTEGER     NOT NULL,
   passed         BOOLEAN     NOT NULL DEFAULT false,
   attempts       INTEGER     NOT NULL DEFAULT 1,
-  completed_at   TIMESTAMPTZ,                             -- set when passed = true
+  completed_at   TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- One row per ridechecker per module (upsert on (ridechecker_id, module_id))
+-- One row per ridechecker per module (enables upsert on conflict)
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -49,19 +50,7 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_training_results_ridechecker
   ON public.ridechecker_training_results (ridechecker_id);
 
--- Auto-update updated_at
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_trigger
-    WHERE tgname = 'training_results_updated_at'
-  ) THEN
-    CREATE TRIGGER training_results_updated_at
-      BEFORE UPDATE ON public.ridechecker_training_results
-      FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-  END IF;
-END $$;
-
--- RLS: ridecheckers can only read their own results; writes are service-role only
+-- RLS: ridecheckers can read their own results; all writes go through service role
 ALTER TABLE public.ridechecker_training_results ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
