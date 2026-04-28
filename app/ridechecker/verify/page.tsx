@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/layout/Logo";
@@ -29,7 +31,7 @@ interface FileUploadField {
   error: string | null;
 }
 
-export default function RideCheckerVerifyPage() {
+function RideCheckerVerifyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -518,5 +520,19 @@ export default function RideCheckerVerifyPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      }
+    >
+      <RideCheckerVerifyPage />
+    </Suspense>
   );
 }
