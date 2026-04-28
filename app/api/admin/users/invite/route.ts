@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { z } from "zod";
+import { getAppUrl } from "@/lib/app-url";
 
 // Human-readable token: 12 uppercase alphanumeric chars (no 0/O, 1/I confusion)
 // Example: K8MZWNTQ4RXA → www.ridecheckauto.com/invite/K8MZWNTQ4RXA
@@ -18,12 +19,7 @@ function generateInviteToken(): string {
   return chars.join("");
 }
 
-// Always use the canonical production domain for invite links.
-// Falls back to NEXT_PUBLIC_APP_URL if set, then the live domain.
-const APP_URL =
-  process.env.RIDECHECKAUTO_DOMAIN ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  "https://www.ridecheckauto.com";
+const APP_URL = getAppUrl();
 
 const inviteSchema = z.object({
   email: z.string().email(),

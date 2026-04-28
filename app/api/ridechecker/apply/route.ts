@@ -3,6 +3,7 @@
 // No session required — this is a public endpoint.
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAppUrl } from "@/lib/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
   <tr><td style="padding:4px 8px;font-weight:bold">Willing to use tools</td><td style="padding:4px 8px">${willing_to_use_tools === true ? "Yes" : willing_to_use_tools === false ? "No" : "—"}</td></tr>
   <tr><td style="padding:4px 8px;font-weight:bold">Experience</td><td style="padding:4px 8px">${experience ?? "—"}</td></tr>
 </table>
-<p style="margin-top:16px">Review in admin: ${process.env.NEXT_PUBLIC_APP_URL}/admin/applications</p>`,
+<p style="margin-top:16px">Review in admin: ${getAppUrl()}/admin/applications</p>`,
         });
       }
     } catch (emailErr) {

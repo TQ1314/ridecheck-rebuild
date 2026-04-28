@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAppUrl } from "@/lib/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -135,7 +136,6 @@ export async function PATCH(
     // Notify the RideChecker
     try {
       const { sendEmail } = await import("@/lib/notifications/email");
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
       await sendEmail({
         to: profile.email,
         subject: "You're verified — Welcome to RideCheck!",
@@ -143,7 +143,7 @@ export async function PATCH(
 <p>Great news — your identity verification has been reviewed and approved. Your RideChecker account is now <strong>Active</strong>.</p>
 <p>You can now log in to the RideChecker portal to set your availability and start receiving vehicle assessment assignments.</p>
 <p>
-  <a href="${appUrl}/ridechecker/dashboard" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+  <a href="${getAppUrl()}/ridechecker/dashboard" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
     Go to My Dashboard
   </a>
 </p>
@@ -194,7 +194,7 @@ export async function PATCH(
 ${notes ? `<p><strong>Notes from our team:</strong> ${(notes as string).trim()}</p>` : ""}
 <p>Please review the feedback above and resubmit your verification with corrected information.</p>
 <p>
-  <a href="${process.env.NEXT_PUBLIC_APP_URL || ""}/ridechecker/verify" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+  <a href="${getAppUrl()}/ridechecker/verify" style="display:inline-block;padding:12px 24px;background:#2d7a52;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
     Resubmit Verification
   </a>
 </p>

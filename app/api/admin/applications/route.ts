@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/rbac";
 import { nanoid } from "nanoid";
+import { getAppUrl } from "@/lib/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -151,8 +152,7 @@ ${review_notes ? `<p>Notes from our team: ${review_notes}</p>` : ""}
       })
       .eq("id", id);
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const verifySetupUrl = `${appUrl}/invite/${token}`;
+    const verifySetupUrl = `${getAppUrl()}/invite/${token}`;
 
     // Send verification setup email
     try {

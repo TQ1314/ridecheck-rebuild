@@ -8,6 +8,7 @@ import {
   ridecheckerRejectedHtml,
   ridecheckerStageUpdateHtml,
 } from "@/lib/email/templates/ridechecker-approval";
+import { getAppUrl } from "@/lib/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -147,7 +148,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Target is not a RideChecker" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   const now = new Date().toISOString();
 
   // ── ACTION: approve ─────────────────────────────────────────
@@ -173,7 +173,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const inviteToken = nanoid(40);
-    const setupUrl = `${appUrl}/ridechecker/onboarding?token=${inviteToken}`;
+    const setupUrl = `${getAppUrl()}/ridechecker/onboarding?token=${inviteToken}`;
 
     const { error: updateError } = await supabaseAdmin
       .from("profiles")

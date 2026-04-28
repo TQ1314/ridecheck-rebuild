@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAppUrl } from "@/lib/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest) {
   <tr><td style="padding:4px 8px;font-weight:bold">Legal Name</td><td style="padding:4px 8px">${(legal_name as string).trim()}</td></tr>
 </table>
 <p style="margin-top:16px">
-  <a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/applications?filter=verification_submitted">
+  <a href="${getAppUrl()}/admin/applications?filter=verification_submitted">
     Review in admin →
   </a>
 </p>`,
