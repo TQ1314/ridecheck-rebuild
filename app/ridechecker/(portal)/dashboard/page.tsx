@@ -407,10 +407,10 @@ export default function RideCheckerDashboardPage() {
         );
       case "in_progress":
         return (
-          <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
+          <Link href={`/ridechecker/jobs/${assignmentId}`}>
             <Button size="sm" variant="outline" data-testid={`button-submit-data-${assignmentId}`}>
               <Upload className="h-3.5 w-3.5 mr-1" />
-              Submit Raw Data
+              Continue Inspection
             </Button>
           </Link>
         );

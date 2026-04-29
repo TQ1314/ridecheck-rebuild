@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "4TjoVNv2U1cpOw872y8Xz"
+uri = "file://docs/ops-sop.md"
+type = "text"
+title = "RideCheck Operations SOP v1.0"

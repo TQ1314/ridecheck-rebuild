@@ -90,6 +90,51 @@ export async function POST(req: NextRequest) {
           customer_id_backfilled: !existingOrder?.customer_id && !!updatePayload.customer_id,
         },
       });
+
+      if (!isInternalTest) {
+        const buyerEmail =
+          session.customer_details?.email ||
+          existingOrder?.buyer_email;
+
+        const { data: fullOrder } = await supabaseAdmin
+          .from("orders")
+          .select("order_id, vehicle_year, vehicle_make, vehicle_model, package, final_price")
+          .eq("id", orderId)
+          .maybeSingle();
+
+        if (buyerEmail && fullOrder) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
+          const vehicle = `${fullOrder.vehicle_year || ""} ${fullOrder.vehicle_make || ""} ${fullOrder.vehicle_model || ""}`.trim() || "your vehicle";
+          const pkgLabel = fullOrder.package
+            ? fullOrder.package.charAt(0).toUpperCase() + fullOrder.package.slice(1)
+            : "Assessment";
+
+          await sendEmail({
+            to: buyerEmail,
+            subject: `Payment Confirmed — RideCheck Assessment for ${vehicle}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
+                <div style="background:#059669;padding:24px;border-radius:8px 8px 0 0;text-align:center">
+                  <h1 style="color:white;margin:0;font-size:22px">Payment Confirmed ✓</h1>
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;padding:32px">
+                  <p style="margin:0 0 16px">Your RideCheck assessment has been confirmed and is now in our queue.</p>
+                  <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:24px">
+                    <p style="margin:0 0 8px;font-size:14px;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.05em">Assessment Details</p>
+                    <p style="margin:0 0 4px;font-weight:600">${vehicle}</p>
+                    <p style="margin:0 0 4px;color:#374151">${pkgLabel} Package</p>
+                    ${fullOrder.final_price ? `<p style="margin:0;color:#374151">Amount Paid: <strong>$${(fullOrder.final_price / 100).toFixed(2)}</strong></p>` : ""}
+                  </div>
+                  <p style="margin:0 0 16px;color:#374151">Our operations team will be in touch shortly to confirm the inspection schedule. You can track your order status anytime:</p>
+                  <a href="${appUrl}/dashboard" style="display:inline-block;background:#059669;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:24px">View My Dashboard</a>
+                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
+                  <p style="margin:0;font-size:12px;color:#9ca3af">Questions? Reply to this email or contact us at <a href="mailto:support@ridecheckauto.com" style="color:#059669">support@ridecheckauto.com</a></p>
+                </div>
+              </div>
+            `,
+          });
+        }
+      }
     } else {
       console.warn("[Stripe Webhook] checkout.session.completed missing order_id in metadata");
     }
