@@ -355,27 +355,27 @@ function BookInner() {
         {step === 0 && (
           <div className="space-y-6">
             <div>
-              <Label className="text-base font-semibold mb-1 block">Where did you find this vehicle?</Label>
-              <p className="text-sm text-muted-foreground mb-3">This helps us tailor the booking to your situation.</p>
+              <Label className="text-base font-semibold mb-1 block">{t("booking.source.title", lang)}</Label>
+              <p className="text-sm text-muted-foreground mb-3">{t("booking.source.subtitle", lang)}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {([
                   {
                     value: "online_marketplace" as ListingSource,
                     icon: <Monitor className="h-5 w-5 text-blue-500" />,
-                    label: "Online Listing",
-                    desc: "Facebook Marketplace, Craigslist, Autotrader, etc.",
+                    label: t("booking.source.online", lang),
+                    desc: t("booking.source.online.desc", lang),
                   },
                   {
                     value: "dealership" as ListingSource,
                     icon: <Building2 className="h-5 w-5 text-emerald-500" />,
-                    label: "Used Car Dealership",
-                    desc: "Vehicle is on a dealer's lot",
+                    label: t("booking.source.dealership", lang),
+                    desc: t("booking.source.dealership.desc", lang),
                   },
                   {
                     value: "roadside" as ListingSource,
                     icon: <Navigation className="h-5 w-5 text-amber-500" />,
-                    label: "Roadside / For Sale Sign",
-                    desc: "Spotted while driving — private sale",
+                    label: t("booking.source.roadside", lang),
+                    desc: t("booking.source.roadside.desc", lang),
                   },
                 ] as { value: ListingSource; icon: React.ReactNode; label: string; desc: string }[]).map((src) => (
                   <Card
@@ -422,30 +422,30 @@ function BookInner() {
                         { value: "cargurus", label: "CarGurus" },
                         { value: "autotrader", label: "Autotrader" },
                         { value: "cars_com", label: "Cars.com" },
-                        { value: "other", label: "Other / not listed" },
+                        { value: "other", label: t("booking.platform.other", lang) },
                       ]
                     : listingSource === "dealership"
                       ? [
-                          { value: "dealership_website", label: "Dealership website" },
+                          { value: "dealership_website", label: t("booking.platform.dealershipWebsite", lang) },
                           { value: "cargurus", label: "CarGurus" },
                           { value: "autotrader", label: "Autotrader" },
                           { value: "cars_com", label: "Cars.com" },
-                          { value: "walked_in", label: "Walked in / drove by" },
-                          { value: "other", label: "Other" },
+                          { value: "walked_in", label: t("booking.platform.walkedIn", lang) },
+                          { value: "other", label: t("booking.platform.otherShort", lang) },
                         ]
                       : [
-                          { value: "roadside_sign", label: "For Sale sign on the car" },
-                          { value: "other", label: "Other" },
+                          { value: "roadside_sign", label: t("booking.platform.roadsideSign", lang) },
+                          { value: "other", label: t("booking.platform.otherShort", lang) },
                         ];
 
                 return (
                   <div className="mt-3">
                     <Label htmlFor="platformSource" className="text-sm font-medium">
                       {listingSource === "online_marketplace"
-                        ? "Which site is the listing on?"
+                        ? t("booking.platform.online.label", lang)
                         : listingSource === "dealership"
-                          ? "How did you find the dealership?"
-                          : "How did you come across this car?"}
+                          ? t("booking.platform.dealership.label", lang)
+                          : t("booking.platform.roadside.label", lang)}
                     </Label>
                     <Select
                       value={platformSource}
@@ -456,7 +456,7 @@ function BookInner() {
                         className="mt-1.5"
                         data-testid="select-platform-source"
                       >
-                        <SelectValue placeholder="Select one…" />
+                        <SelectValue placeholder={t("booking.platform.placeholder", lang)} />
                       </SelectTrigger>
                       <SelectContent>
                         {opts.map((o) => (
@@ -579,48 +579,48 @@ function BookInner() {
                     onChange={(e) => setVehiclePrice(e.target.value)}
                     data-testid="input-asking-price"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Used for accurate package classification</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("booking.askingPrice.hint", lang)}</p>
                 </div>
               </div>
               <div>
                 <Label htmlFor="location">
                   {listingSource === "roadside"
-                    ? "Where is the car parked? *"
+                    ? t("booking.location.roadside.label", lang)
                     : listingSource === "dealership"
-                      ? "Dealership Address *"
+                      ? t("booking.location.dealership.label", lang)
                       : t("booking.vehicleLocation", lang) + " *"}
                 </Label>
                 <Input
                   id="location"
                   placeholder={
                     listingSource === "roadside"
-                      ? "Street address or intersection (e.g., 123 Oak St, Waukegan IL)"
+                      ? t("booking.location.roadside.placeholder", lang)
                       : listingSource === "dealership"
-                        ? "Dealership full address"
-                        : "City, State or full address"
+                        ? t("booking.location.dealership.placeholder", lang)
+                        : t("booking.location.default.placeholder", lang)
                   }
                   value={vehicleLocation}
                   onChange={(e) => setVehicleLocation(e.target.value)}
                   data-testid="input-location"
                 />
                 {listingSource === "roadside" && (
-                  <p className="text-xs text-muted-foreground mt-1">Be as precise as possible — our RideChecker needs to find the car.</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("booking.location.roadside.hint", lang)}</p>
                 )}
               </div>
               {listingSource === "roadside" && (
                 <div>
                   <Label htmlFor="vehicleSeenLocation">
-                    Where exactly is the car right now?
+                    {t("booking.seenLocation.label", lang)}
                   </Label>
                   <Input
                     id="vehicleSeenLocation"
-                    placeholder="e.g., 456 Elm Ave, Waukegan IL — parked in front yard"
+                    placeholder={t("booking.seenLocation.placeholder", lang)}
                     value={vehicleSeenLocation}
                     onChange={(e) => setVehicleSeenLocation(e.target.value)}
                     data-testid="input-vehicle-seen-location"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    This may differ from the seller's address. Our RideChecker will go directly to this location.
+                    {t("booking.seenLocation.hint", lang)}
                   </p>
                 </div>
               )}
@@ -856,14 +856,14 @@ function BookInner() {
                 <div>
                   <Label htmlFor="sellerName">
                     {listingSource === "dealership"
-                      ? "Dealership Name"
+                      ? t("booking.dealershipName", lang)
                       : t("booking.sellerName", lang)}
                   </Label>
                   <Input
                     id="sellerName"
                     placeholder={
                       listingSource === "dealership"
-                        ? "e.g., Lakeside Auto Sales"
+                        ? t("booking.dealershipName.placeholder", lang)
                         : "John Doe"
                     }
                     value={sellerName}
@@ -874,16 +874,16 @@ function BookInner() {
                 <div>
                   <Label htmlFor="sellerPhone">
                     {listingSource === "dealership"
-                      ? "Dealership Phone"
+                      ? t("booking.dealershipPhone", lang)
                       : listingSource === "roadside"
-                        ? "Phone from Sign (optional)"
+                        ? t("booking.roadsidePhone", lang)
                         : t("booking.sellerPhone", lang)}
                   </Label>
                   <Input
                     id="sellerPhone"
                     placeholder={
                       listingSource === "dealership"
-                        ? "Dealership phone number"
+                        ? t("booking.dealershipPhone.placeholder", lang)
                         : "(555) 123-4567"
                     }
                     value={sellerPhone}
@@ -891,10 +891,10 @@ function BookInner() {
                     data-testid="input-seller-phone"
                   />
                   {listingSource === "dealership" && (
-                    <p className="text-xs text-muted-foreground mt-1">We'll call the dealership to schedule a time for our RideChecker to inspect the vehicle.</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("booking.dealershipPhone.hint", lang)}</p>
                   )}
                   {listingSource === "roadside" && (
-                    <p className="text-xs text-muted-foreground mt-1">We'll reach out to the seller on your behalf to schedule the inspection.</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("booking.roadsidePhone.hint", lang)}</p>
                   )}
                 </div>
               </>
@@ -950,31 +950,31 @@ function BookInner() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  Package
+                  {t("booking.review.package", lang)}
                 </span>
                 <span className="font-medium">
                   {PACKAGE_INFO[pkg]?.name || pkg}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Vehicle Found</span>
+                <span className="text-muted-foreground">{t("booking.review.vehicleFound", lang)}</span>
                 <span>
                   {listingSource === "dealership"
-                    ? "Dealership"
+                    ? t("booking.review.vehicleFound.dealership", lang)
                     : listingSource === "roadside"
-                      ? "Roadside / For Sale Sign"
-                      : "Online Listing"}
+                      ? t("booking.review.vehicleFound.roadside", lang)
+                      : t("booking.review.vehicleFound.online", lang)}
                 </span>
               </div>
               {platformSource && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Platform / Source</span>
+                  <span className="text-muted-foreground">{t("booking.review.platformSource", lang)}</span>
                   <span className="capitalize">{platformSource.replace(/_/g, " ")}</span>
                 </div>
               )}
               {vehicleSeenLocation && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Car Location</span>
+                  <span className="text-muted-foreground">{t("booking.review.carLocation", lang)}</span>
                   <span className="text-right max-w-[55%]">{vehicleSeenLocation}</span>
                 </div>
               )}
