@@ -6,12 +6,34 @@ import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Car,
   MapPin,
   Calendar,
   AlertCircle,
+  ChevronRight,
+  Clock,
 } from "lucide-react";
+
+interface Assignment {
+  id: string;
+  order_id: string;
+  status: string;
+  payout_amount?: number;
+  created_at: string;
+  order?: {
+    vehicle_year?: string;
+    vehicle_make?: string;
+    vehicle_model?: string;
+    inspection_address?: string;
+    vehicle_location?: string;
+    scheduled_date?: string;
+    scheduled_time?: string;
+    package?: string;
+  } | null;
+}
 
 interface Job {
   order_id: string;
@@ -27,15 +49,23 @@ interface Job {
   package: string;
 }
 
-function statusBadgeVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
+function statusBadgeVariant(
+  status: string
+): "default" | "secondary" | "outline" | "destructive" {
   switch (status) {
+    case "approved":
+    case "paid":
     case "completed":
       return "default";
+    case "accepted":
+    case "in_progress":
+    case "submitted":
     case "en_route":
     case "on_site":
     case "inspecting":
-    case "wrapping_up":
       return "secondary";
+    case "rejected":
+      return "destructive";
     default:
       return "outline";
   }
@@ -52,7 +82,8 @@ export default function RideCheckerJobsPage() {
   const router = useRouter();
   const supabase = createClient();
   const [profile, setProfile] = useState<any>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [legacyJobs, setLegacyJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,7 +108,8 @@ export default function RideCheckerJobsPage() {
         const res = await fetch("/api/ridechecker/jobs");
         if (res.ok) {
           const data = await res.json();
-          if (data.jobs) setJobs(data.jobs);
+          if (data.assignments) setAssignments(data.assignments);
+          if (data.jobs) setLegacyJobs(data.jobs);
         }
       } catch {}
 
@@ -98,10 +130,11 @@ export default function RideCheckerJobsPage() {
 
   const isActive = profile?.role === "ridechecker_active";
   const isPending = profile?.role === "ridechecker";
+  const hasWork = assignments.length > 0 || legacyJobs.length > 0;
 
   return (
     <AppShell>
-      <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="p-6 space-y-6 max-w-2xl mx-auto">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-jobs-title">
             My Jobs
@@ -126,47 +159,123 @@ export default function RideCheckerJobsPage() {
           </Card>
         )}
 
-        {isActive && jobs.length === 0 && (
+        {isActive && !hasWork && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <Car className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="font-semibold mb-1">No Jobs Assigned</h3>
               <p className="text-sm text-muted-foreground max-w-sm">
-                You don't have any assessment jobs assigned yet. New jobs will
-                appear here when they are assigned to you.
+                You don&apos;t have any assessment jobs assigned yet. New jobs
+                will appear here when they are assigned to you.
               </p>
             </CardContent>
           </Card>
         )}
 
-        {isActive && jobs.length > 0 && (
+        {isActive && assignments.length > 0 && (
           <div className="space-y-3">
-            {jobs.map((job) => (
-              <Card key={job.order_id} className="hover-elevate">
+            {assignments.map((assignment) => {
+              const order = assignment.order;
+              const vehicle = order
+                ? `${order.vehicle_year || ""} ${order.vehicle_make || ""} ${order.vehicle_model || ""}`.trim()
+                : "Vehicle TBD";
+              const address =
+                order?.inspection_address || order?.vehicle_location || "TBD";
+
+              return (
+                <Link
+                  key={assignment.id}
+                  href={`/ridechecker/jobs/${assignment.id}`}
+                  data-testid={`link-assignment-${assignment.id}`}
+                >
+                  <Card className="hover-elevate cursor-pointer transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className="font-semibold truncate"
+                              data-testid={`text-assignment-vehicle-${assignment.id}`}
+                            >
+                              {vehicle}
+                            </span>
+                            <Badge
+                              variant={statusBadgeVariant(assignment.status)}
+                              data-testid={`badge-assignment-status-${assignment.id}`}
+                            >
+                              {formatStatus(assignment.status)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate max-w-[180px]">
+                                {address}
+                              </span>
+                            </span>
+                            {order?.scheduled_date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {order.scheduled_date}
+                                {order.scheduled_time
+                                  ? ` at ${order.scheduled_time}`
+                                  : ""}
+                              </span>
+                            )}
+                          </div>
+                          {order?.package && (
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {order.package} Package
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {isActive && legacyJobs.length > 0 && (
+          <div className="space-y-3">
+            {legacyJobs.map((job) => (
+              <Card
+                key={job.order_id}
+                className="hover-elevate"
+                data-testid={`card-legacy-job-${job.order_id}`}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between flex-wrap gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold" data-testid={`text-job-vehicle-${job.order_id}`}>
-                          {job.vehicle_year} {job.vehicle_make} {job.vehicle_model}
-                        </span>
-                        <Badge
-                          variant={statusBadgeVariant(job.inspector_status)}
-                          data-testid={`badge-job-status-${job.order_id}`}
+                        <span
+                          className="font-semibold"
+                          data-testid={`text-job-vehicle-${job.order_id}`}
                         >
+                          {job.vehicle_year} {job.vehicle_make}{" "}
+                          {job.vehicle_model}
+                        </span>
+                        <Badge variant={statusBadgeVariant(job.inspector_status)}>
                           {formatStatus(job.inspector_status)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
                           <MapPin className="h-3.5 w-3.5" />
-                          {job.inspection_address || job.vehicle_location || "TBD"}
+                          {job.inspection_address ||
+                            job.vehicle_location ||
+                            "TBD"}
                         </span>
                         {job.scheduled_date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
                             {job.scheduled_date}
-                            {job.scheduled_time ? ` at ${job.scheduled_time}` : ""}
+                            {job.scheduled_time
+                              ? ` at ${job.scheduled_time}`
+                              : ""}
                           </span>
                         )}
                       </div>

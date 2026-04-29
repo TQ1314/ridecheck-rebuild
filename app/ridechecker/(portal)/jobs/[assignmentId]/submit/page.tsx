@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { PhotoUpload } from "@/components/ridechecker/PhotoUpload";
 import {
   Camera,
   Car,
@@ -27,6 +30,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
+  Gauge,
+  Wrench,
+  Mic,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -64,10 +70,10 @@ interface FormData {
 }
 
 const REQUIRED_FIELDS: { key: keyof FormData; label: string }[] = [
-  { key: "vin_photo_url", label: "VIN Photo URL" },
-  { key: "odometer_photo_url", label: "Odometer Photo URL" },
-  { key: "under_hood_photo_url", label: "Under Hood Photo URL" },
-  { key: "undercarriage_photo_url", label: "Undercarriage Photo URL" },
+  { key: "vin_photo_url", label: "VIN Photo" },
+  { key: "odometer_photo_url", label: "Odometer Photo" },
+  { key: "under_hood_photo_url", label: "Engine Bay Photo" },
+  { key: "undercarriage_photo_url", label: "Undercarriage Photo" },
   { key: "cosmetic_exterior", label: "Cosmetic Exterior" },
   { key: "interior_condition", label: "Interior Condition" },
   { key: "mechanical_issues", label: "Mechanical Issues" },
@@ -132,29 +138,23 @@ export default function RideCheckerSubmitPage() {
       }
 
       try {
-        const res = await fetch("/api/ridechecker/jobs");
+        const res = await fetch(
+          `/api/ridechecker/jobs/${assignmentId}/detail`
+        );
         if (res.ok) {
           const data = await res.json();
-          const found = data.assignments?.find(
-            (a: any) => a.id === assignmentId
-          );
-          if (found) {
-            const job = data.jobs?.find(
-              (j: any) => j.order_id === found.order_id
-            );
+          if (data.assignment && data.order) {
             setAssignment({
-              id: found.id,
-              order_id: found.order_id,
-              status: found.status,
-              vehicle_year: job?.vehicle_year || found.vehicle_year,
-              vehicle_make: job?.vehicle_make || found.vehicle_make,
-              vehicle_model: job?.vehicle_model || found.vehicle_model,
-              vehicle_location:
-                job?.vehicle_location || found.vehicle_location,
-              inspection_address:
-                job?.inspection_address || found.inspection_address,
-              scheduled_date: job?.scheduled_date || found.scheduled_date,
-              scheduled_time: job?.scheduled_time || found.scheduled_time,
+              id: data.assignment.id,
+              order_id: data.assignment.order_id,
+              status: data.assignment.status,
+              vehicle_year: data.order.vehicle_year,
+              vehicle_make: data.order.vehicle_make,
+              vehicle_model: data.order.vehicle_model,
+              vehicle_location: data.order.vehicle_location,
+              inspection_address: data.order.inspection_address,
+              scheduled_date: data.order.scheduled_date,
+              scheduled_time: data.order.scheduled_time,
             });
           }
         }
@@ -179,7 +179,7 @@ export default function RideCheckerSubmitPage() {
   };
 
   const addScanCode = () => {
-    const code = scanCodeInput.trim();
+    const code = scanCodeInput.trim().toUpperCase();
     if (code && !form.scan_codes.includes(code)) {
       setForm((prev) => ({
         ...prev,
@@ -221,7 +221,7 @@ export default function RideCheckerSubmitPage() {
   const handleSubmit = async () => {
     if (!allRequiredFilled) {
       toast({
-        title: "Please fill all required fields",
+        title: "Please complete all required fields",
         variant: "destructive",
       });
       return;
@@ -242,26 +242,16 @@ export default function RideCheckerSubmitPage() {
       };
 
       if (form.tire_tread_mm_front_left)
-        payload.tire_tread_mm_front_left = Number(
-          form.tire_tread_mm_front_left
-        );
+        payload.tire_tread_mm_front_left = Number(form.tire_tread_mm_front_left);
       if (form.tire_tread_mm_front_right)
-        payload.tire_tread_mm_front_right = Number(
-          form.tire_tread_mm_front_right
-        );
+        payload.tire_tread_mm_front_right = Number(form.tire_tread_mm_front_right);
       if (form.tire_tread_mm_rear_left)
-        payload.tire_tread_mm_rear_left = Number(
-          form.tire_tread_mm_rear_left
-        );
+        payload.tire_tread_mm_rear_left = Number(form.tire_tread_mm_rear_left);
       if (form.tire_tread_mm_rear_right)
-        payload.tire_tread_mm_rear_right = Number(
-          form.tire_tread_mm_rear_right
-        );
+        payload.tire_tread_mm_rear_right = Number(form.tire_tread_mm_rear_right);
 
       if (form.brake_condition) payload.brake_condition = form.brake_condition;
-
       if (form.scan_codes.length > 0) payload.scan_codes = form.scan_codes;
-
       if (form.audio_note_url.trim())
         payload.audio_note_url = form.audio_note_url.trim();
 
@@ -280,7 +270,7 @@ export default function RideCheckerSubmitPage() {
       );
 
       if (res.ok) {
-        toast({ title: "Submission saved successfully!" });
+        toast({ title: "Submission saved! Great work." });
         router.push("/ridechecker/dashboard");
       } else {
         const data = await res.json();
@@ -307,26 +297,19 @@ export default function RideCheckerSubmitPage() {
 
   return (
     <AppShell>
-      <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="p-4 sm:p-6 space-y-5 max-w-2xl mx-auto pb-10">
         <div className="flex items-center gap-3 flex-wrap">
-          <Link href="/ridechecker/dashboard">
-            <Button
-              size="icon"
-              variant="ghost"
-              data-testid="button-back"
-            >
+          <Link href={`/ridechecker/jobs/${assignmentId}`}>
+            <Button size="icon" variant="ghost" data-testid="button-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <h1
-              className="text-2xl font-bold"
-              data-testid="text-submit-title"
-            >
-              Submit Raw Data
+            <h1 className="text-xl font-bold" data-testid="text-submit-title">
+              Submit Inspection
             </h1>
             <p className="text-muted-foreground text-sm">
-              Complete the inspection checklist for this assignment
+              Complete all required sections below
             </p>
           </div>
         </div>
@@ -352,7 +335,9 @@ export default function RideCheckerSubmitPage() {
                 )}
               </div>
               <Badge variant="outline" data-testid="badge-assignment-status">
-                {assignment.status?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                {assignment.status
+                  ?.replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}
               </Badge>
             </CardContent>
           </Card>
@@ -372,7 +357,9 @@ export default function RideCheckerSubmitPage() {
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span
-                className={`text-sm font-medium ${allRequiredFilled ? "text-green-600" : "text-red-500"}`}
+                className={`text-sm font-medium ${
+                  allRequiredFilled ? "text-green-600" : "text-red-500"
+                }`}
                 data-testid="text-progress-count"
               >
                 {filledCount}/{totalRequired} required fields complete
@@ -383,7 +370,11 @@ export default function RideCheckerSubmitPage() {
             </div>
             <Progress
               value={progressPercent}
-              className={`h-2 ${allRequiredFilled ? "[&>div]:bg-green-600" : "[&>div]:bg-red-500"}`}
+              className={`h-2 ${
+                allRequiredFilled
+                  ? "[&>div]:bg-green-600"
+                  : "[&>div]:bg-red-500"
+              }`}
               data-testid="progress-checklist"
             />
           </CardContent>
@@ -396,73 +387,55 @@ export default function RideCheckerSubmitPage() {
               Required Photos
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="vin_photo_url">
-                  VIN Photo URL <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="vin_photo_url"
-                  placeholder="https://..."
-                  value={form.vin_photo_url}
-                  onChange={(e) =>
-                    updateField("vin_photo_url", e.target.value)
-                  }
-                  data-testid="input-vin-photo-url"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="odometer_photo_url">
-                  Odometer Photo URL <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="odometer_photo_url"
-                  placeholder="https://..."
-                  value={form.odometer_photo_url}
-                  onChange={(e) =>
-                    updateField("odometer_photo_url", e.target.value)
-                  }
-                  data-testid="input-odometer-photo-url"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="under_hood_photo_url">
-                  Under Hood Photo URL{" "}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="under_hood_photo_url"
-                  placeholder="https://..."
-                  value={form.under_hood_photo_url}
-                  onChange={(e) =>
-                    updateField("under_hood_photo_url", e.target.value)
-                  }
-                  data-testid="input-under-hood-photo-url"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="undercarriage_photo_url">
-                  Undercarriage Photo URL{" "}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="undercarriage_photo_url"
-                  placeholder="https://..."
-                  value={form.undercarriage_photo_url}
-                  onChange={(e) =>
-                    updateField("undercarriage_photo_url", e.target.value)
-                  }
-                  data-testid="input-undercarriage-photo-url"
-                />
-              </div>
-            </div>
+          <CardContent className="space-y-5">
+            <PhotoUpload
+              label="VIN Plate"
+              hint="Driver's door jamb sticker. All 17 characters must be legible."
+              fieldKey="vin_photo"
+              value={form.vin_photo_url}
+              onChange={(url) => updateField("vin_photo_url", url)}
+              assignmentId={assignmentId}
+              required
+            />
+            <PhotoUpload
+              label="Odometer"
+              hint="Dashboard display with ignition on. Show full gauge cluster."
+              fieldKey="odometer_photo"
+              value={form.odometer_photo_url}
+              onChange={(url) => updateField("odometer_photo_url", url)}
+              assignmentId={assignmentId}
+              required
+            />
+            <PhotoUpload
+              label="Engine Bay"
+              hint="Hood fully open. Overhead shot showing full engine and fluid reservoirs."
+              fieldKey="under_hood_photo"
+              value={form.under_hood_photo_url}
+              onChange={(url) => updateField("under_hood_photo_url", url)}
+              assignmentId={assignmentId}
+              required
+            />
+            <PhotoUpload
+              label="Undercarriage"
+              hint="Low-angle shot from the front. Show frame, suspension, and exhaust. Look for rust or leaks."
+              fieldKey="undercarriage_photo"
+              value={form.undercarriage_photo_url}
+              onChange={(url) => updateField("undercarriage_photo_url", url)}
+              assignmentId={assignmentId}
+              required
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Tire Tread Depth</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-muted-foreground" />
+              Tire Tread Depth
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Measure each tire with a depth gauge or coin. 1.6mm = legal minimum. 3mm+ recommended.
+            </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -473,6 +446,7 @@ export default function RideCheckerSubmitPage() {
                   type="number"
                   step="0.1"
                   min="0"
+                  max="15"
                   placeholder="mm"
                   value={form.tire_tread_mm_front_left}
                   onChange={(e) =>
@@ -488,6 +462,7 @@ export default function RideCheckerSubmitPage() {
                   type="number"
                   step="0.1"
                   min="0"
+                  max="15"
                   placeholder="mm"
                   value={form.tire_tread_mm_front_right}
                   onChange={(e) =>
@@ -503,6 +478,7 @@ export default function RideCheckerSubmitPage() {
                   type="number"
                   step="0.1"
                   min="0"
+                  max="15"
                   placeholder="mm"
                   value={form.tire_tread_mm_rear_left}
                   onChange={(e) =>
@@ -518,6 +494,7 @@ export default function RideCheckerSubmitPage() {
                   type="number"
                   step="0.1"
                   min="0"
+                  max="15"
                   placeholder="mm"
                   value={form.tire_tread_mm_rear_right}
                   onChange={(e) =>
@@ -533,6 +510,9 @@ export default function RideCheckerSubmitPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Brake Condition</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Good: plenty of pad life remaining. Fair: wear is noticeable. Poor: squealing, grinding, or &lt;2mm pad.
+            </p>
           </CardHeader>
           <CardContent>
             <Select
@@ -540,13 +520,13 @@ export default function RideCheckerSubmitPage() {
               onValueChange={(val) => updateField("brake_condition", val)}
             >
               <SelectTrigger data-testid="select-brake-condition">
-                <SelectValue placeholder="Select condition..." />
+                <SelectValue placeholder="Select condition…" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="good">Good</SelectItem>
                 <SelectItem value="fair">Fair</SelectItem>
                 <SelectItem value="poor">Poor</SelectItem>
-                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="unknown">Unknown / Couldn't inspect</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>
@@ -554,21 +534,26 @@ export default function RideCheckerSubmitPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Scan Codes</CardTitle>
+            <CardTitle className="text-base">OBD-II Scan Codes</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter each code separately. Include cleared codes if the scan tool shows them. Leave empty if no codes found.
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Input
-                placeholder="Enter code (e.g. P0301)"
+                placeholder="e.g. P0301"
                 value={scanCodeInput}
-                onChange={(e) => setScanCodeInput(e.target.value)}
+                onChange={(e) =>
+                  setScanCodeInput(e.target.value.toUpperCase())
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     addScanCode();
                   }
                 }}
-                className="flex-1 min-w-[150px]"
+                className="flex-1 min-w-[140px] uppercase"
                 data-testid="input-scan-code"
               />
               <Button
@@ -601,88 +586,121 @@ export default function RideCheckerSubmitPage() {
                 ))}
               </div>
             )}
+            {form.scan_codes.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">
+                No codes added — that's fine if the scan was clean.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              Inspection Notes <span className="text-red-500">*</span>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-muted-foreground" />
+              Condition Notes
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Be specific. These notes feed directly into the buyer's report.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="cosmetic_exterior">
                 Cosmetic Exterior <span className="text-red-500">*</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Dents, scratches, rust, paint fade, cracked glass, panel gaps.
+              </p>
               <Textarea
                 id="cosmetic_exterior"
-                placeholder="Describe exterior condition, paint, dents, scratches..."
+                placeholder="e.g. Minor scratch on rear bumper, small dent on driver's door, no rust visible…"
                 value={form.cosmetic_exterior}
                 onChange={(e) =>
                   updateField("cosmetic_exterior", e.target.value)
                 }
                 rows={3}
+                className="resize-none"
                 data-testid="textarea-cosmetic-exterior"
               />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="interior_condition">
                 Interior Condition <span className="text-red-500">*</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Seat wear, stains, odors, non-working controls, trim cracks, headliner condition.
+              </p>
               <Textarea
                 id="interior_condition"
-                placeholder="Describe interior condition, seats, dashboard, electronics..."
+                placeholder="e.g. Seats are clean with minor wear on driver's side, AC works, no unusual odors…"
                 value={form.interior_condition}
                 onChange={(e) =>
                   updateField("interior_condition", e.target.value)
                 }
                 rows={3}
+                className="resize-none"
                 data-testid="textarea-interior-condition"
               />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="mechanical_issues">
                 Mechanical Issues <span className="text-red-500">*</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Engine noises, fluid leaks, smoke, unusual smells under hood, suspension concerns.
+              </p>
               <Textarea
                 id="mechanical_issues"
-                placeholder="Note any mechanical issues, engine, transmission, suspension..."
+                placeholder="e.g. No visible leaks, engine bay clean, slight oil residue near valve cover…"
                 value={form.mechanical_issues}
                 onChange={(e) =>
                   updateField("mechanical_issues", e.target.value)
                 }
                 rows={3}
+                className="resize-none"
                 data-testid="textarea-mechanical-issues"
               />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="test_drive_notes">
                 Test Drive Notes <span className="text-red-500">*</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Transmission shifts, braking feel, steering pull, vibrations, any warning lights.
+              </p>
               <Textarea
                 id="test_drive_notes"
-                placeholder="Describe test drive experience, handling, braking, noises..."
+                placeholder="e.g. Smooth acceleration, no vibration, brakes feel firm, slight pull to the right…"
                 value={form.test_drive_notes}
                 onChange={(e) =>
                   updateField("test_drive_notes", e.target.value)
                 }
                 rows={3}
+                className="resize-none"
                 data-testid="textarea-test-drive-notes"
               />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="immediate_concerns">
                 Immediate Concerns <span className="text-red-500">*</span>
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Anything safety-critical, deal-breaking, or that requires urgent attention. Write "None" if nothing stands out.
+              </p>
               <Textarea
                 id="immediate_concerns"
-                placeholder="Any safety concerns or issues requiring immediate attention..."
+                placeholder="e.g. None — vehicle appears to be in acceptable condition for the price range."
                 value={form.immediate_concerns}
                 onChange={(e) =>
                   updateField("immediate_concerns", e.target.value)
                 }
                 rows={3}
+                className="resize-none"
                 data-testid="textarea-immediate-concerns"
               />
             </div>
@@ -691,73 +709,88 @@ export default function RideCheckerSubmitPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Optional Fields</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4 text-muted-foreground" />
+              Additional Photos
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Any other photos that support your findings — damage, rust, extra details.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="audio_note_url">Audio Note URL</Label>
-              <Input
-                id="audio_note_url"
-                placeholder="https://..."
-                value={form.audio_note_url}
-                onChange={(e) =>
-                  updateField("audio_note_url", e.target.value)
-                }
-                data-testid="input-audio-note-url"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <Label>Extra Photos</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addExtraPhoto}
-                  data-testid="button-add-extra-photo"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Photo URL
-                </Button>
-              </div>
-              {form.extra_photos.map((url, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    placeholder="https://..."
-                    value={url}
-                    onChange={(e) => updateExtraPhoto(i, e.target.value)}
-                    className="flex-1"
-                    data-testid={`input-extra-photo-${i}`}
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => removeExtraPhoto(i)}
-                    data-testid={`button-remove-extra-photo-${i}`}
+            {form.extra_photos.map((url, index) => (
+              <div key={index} className="relative">
+                <PhotoUpload
+                  label={`Extra Photo ${index + 1}`}
+                  fieldKey={`extra_photo_${index}`}
+                  value={url}
+                  onChange={(u) => updateExtraPhoto(index, u)}
+                  assignmentId={assignmentId}
+                />
+                {!url && (
+                  <button
+                    className="absolute top-0 right-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeExtraPhoto(index)}
+                    data-testid={`button-remove-extra-photo-${index}`}
                   >
                     <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+                  </button>
+                )}
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={addExtraPhoto}
+              data-testid="button-add-extra-photo"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Another Photo
+            </Button>
           </CardContent>
         </Card>
 
-        <div className="flex items-center justify-end gap-3 pb-6 flex-wrap">
-          <Link href="/ridechecker/dashboard">
-            <Button
-              variant="outline"
-              data-testid="button-cancel"
-            >
-              Cancel
-            </Button>
-          </Link>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mic className="h-4 w-4 text-muted-foreground" />
+              Audio Note (Optional)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload a voice memo if you recorded any engine sounds or observations.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <PhotoUpload
+              label="Audio Note"
+              hint="Voice memo or audio recording. Optional — use if you captured an unusual sound."
+              fieldKey="audio_note"
+              value={form.audio_note_url}
+              onChange={(url) => updateField("audio_note_url", url)}
+              assignmentId={assignmentId}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="pt-2">
           <Button
+            className="w-full h-12 text-base"
             onClick={handleSubmit}
-            disabled={!allRequiredFilled || submitting}
-            data-testid="button-submit"
+            disabled={submitting || !allRequiredFilled}
+            data-testid="button-submit-inspection"
           >
-            {submitting ? "Submitting..." : "Submit Raw Data"}
+            {submitting ? (
+              <span className="flex items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                Submitting…
+              </span>
+            ) : allRequiredFilled ? (
+              "Submit Inspection"
+            ) : (
+              `Complete ${totalRequired - filledCount} more required field${
+                totalRequired - filledCount !== 1 ? "s" : ""
+              } to submit`
+            )}
           </Button>
         </div>
       </div>
