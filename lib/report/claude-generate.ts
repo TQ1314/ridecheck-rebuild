@@ -18,6 +18,15 @@ function buildPrompt(input: ReportInput): string {
     ? input.scan_codes.join(", ")
     : "None detected";
 
+  const sourceLabel =
+    input.listing_source === "dealership" ? "Used Car Dealership" :
+    input.listing_source === "roadside"   ? "Roadside / For Sale Sign" :
+    "Online Marketplace / Listing";
+
+  const platformLabel = input.platform_source
+    ? input.platform_source.replace(/_/g, " ")
+    : null;
+
   return `You are a senior automotive analyst for RideCheck, a pre-purchase vehicle intelligence platform based in Lake County, Illinois.
 
 You have received raw inspection findings from a RideChecker (certified inspector) and must transform them into a structured intelligence report for the buyer.
@@ -32,6 +41,9 @@ You have received raw inspection findings from a RideChecker (certified inspecto
 - Inspection Location: ${input.inspection_address || "Illinois area"}
 - Inspection Date: ${input.inspection_date}
 - Package: ${input.package}
+
+## PURCHASE CONTEXT
+- Vehicle Source: ${sourceLabel}${platformLabel ? ` (${platformLabel})` : ""}${input.vehicle_seen_location ? `\n- Car Parked At: ${input.vehicle_seen_location}` : ""}
 
 ## RAW INSPECTION FINDINGS
 

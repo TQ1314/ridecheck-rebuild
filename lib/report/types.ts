@@ -79,6 +79,9 @@ export interface ReportInput {
   vehicle_mileage?: number;
   vehicle_price?: number;
   inspection_address?: string;
+  listing_source?: "online_marketplace" | "dealership" | "roadside" | null;
+  platform_source?: string | null;
+  vehicle_seen_location?: string | null;
   order_id: string;
   package: string;
   inspection_date: string;

@@ -313,6 +313,24 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">Vehicle Found</span>
+            <span className="font-medium" data-testid="text-listing-source">
+              {order.listing_source === "dealership"
+                ? "Used Car Dealership"
+                : order.listing_source === "roadside"
+                  ? "Roadside / For Sale Sign"
+                  : "Online Marketplace / Listing"}
+            </span>
+          </div>
+          {order.platform_source && (
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Platform / Source</span>
+              <span className="font-medium capitalize" data-testid="text-platform-source">
+                {order.platform_source.replace(/_/g, " ")}
+              </span>
+            </div>
+          )}
           {order.seller_name && (
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">
@@ -324,7 +342,11 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           {order.seller_phone && (
             <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">
-                {order.listing_source === "dealership" ? "Dealership Phone" : "Seller Phone"}
+                {order.listing_source === "dealership"
+                  ? "Dealership Phone"
+                  : order.listing_source === "roadside"
+                    ? "Phone from Sign"
+                    : "Seller Phone"}
               </span>
               <span className="font-medium" data-testid="text-seller-phone">{order.seller_phone}</span>
             </div>
@@ -335,11 +357,11 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
               <span className="font-medium" data-testid="text-seller-email">{order.seller_email}</span>
             </div>
           )}
-          {order.platform_source && (
+          {order.vehicle_price && (
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Found On</span>
-              <span className="font-medium capitalize" data-testid="text-platform-source">
-                {order.platform_source.replace(/_/g, " ")}
+              <span className="text-muted-foreground">Asking Price</span>
+              <span className="font-medium" data-testid="text-asking-price">
+                ${Number(order.vehicle_price).toLocaleString()}
               </span>
             </div>
           )}
