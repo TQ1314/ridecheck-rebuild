@@ -40,6 +40,7 @@ const createOrderSchema = z.object({
   package_tier: z.string().optional(),
 
   service_zip: z.string().regex(/^\d{5}$/, "ZIP must be 5 digits"),
+  listing_source: z.enum(["online_marketplace", "dealership", "roadside"]).optional(),
 });
 
 function safeString(v: unknown, fallback = "") {
@@ -176,6 +177,7 @@ export async function POST(req: NextRequest) {
       vehicle_description: data.vehicle_description ?? null,
 
       listing_url: data.listing_url ?? null,
+      listing_source: data.listing_source ?? "online_marketplace",
       seller_name: data.seller_name ?? null,
       seller_phone: data.seller_phone ?? null,
 

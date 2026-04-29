@@ -295,16 +295,36 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {order.listing_source === "dealership" && (
+          <div className="flex items-start gap-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm">
+            <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+            <span className="text-emerald-800 dark:text-emerald-300">
+              <strong>Dealership sale.</strong> Call the dealership during business hours to schedule a time for the RideChecker to inspect the vehicle on the lot.
+            </span>
+          </div>
+        )}
+        {order.listing_source === "roadside" && (
+          <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <span className="text-amber-800 dark:text-amber-300">
+              <strong>Roadside / For Sale sign.</strong> Contact the seller using the phone number from the sign. No listing URL available.
+            </span>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           {order.seller_name && (
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Seller Name</span>
+              <span className="text-muted-foreground">
+                {order.listing_source === "dealership" ? "Dealership Name" : "Seller Name"}
+              </span>
               <span className="font-medium" data-testid="text-seller-name">{order.seller_name}</span>
             </div>
           )}
           {order.seller_phone && (
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Seller Phone</span>
+              <span className="text-muted-foreground">
+                {order.listing_source === "dealership" ? "Dealership Phone" : "Seller Phone"}
+              </span>
               <span className="font-medium" data-testid="text-seller-phone">{order.seller_phone}</span>
             </div>
           )}

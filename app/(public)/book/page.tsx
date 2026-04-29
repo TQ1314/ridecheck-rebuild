@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info, HelpCircle } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info, HelpCircle, Monitor, Building2, Navigation } from "lucide-react";
 import {
   PACKAGE_INFO,
   PRICING,
@@ -68,6 +68,8 @@ function BookInner() {
     t("booking.step.review", lang),
   ];
 
+  type ListingSource = "online_marketplace" | "dealership" | "roadside";
+  const [listingSource, setListingSource] = useState<ListingSource>("online_marketplace");
   const [bookingType, setBookingType] = useState<BookingType>("concierge");
   const [vehicleYear, setVehicleYear] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
@@ -194,6 +196,7 @@ function BookInner() {
         booking_method: isBuyerArranged ? "buyer_arranged" : "concierge",
         preferred_language: lang,
         listing_platform: listingPlatform,
+        listing_source: listingSource,
         service_zip: serviceZip,
         vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
         vehicle_price: vehiclePrice ? parseFloat(vehiclePrice) : null,
@@ -349,6 +352,65 @@ function BookInner() {
         {step === 0 && (
           <div className="space-y-6">
             <div>
+              <Label className="text-base font-semibold mb-1 block">Where did you find this vehicle?</Label>
+              <p className="text-sm text-muted-foreground mb-3">This helps us tailor the booking to your situation.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  {
+                    value: "online_marketplace" as ListingSource,
+                    icon: <Monitor className="h-5 w-5 text-blue-500" />,
+                    label: "Online Listing",
+                    desc: "Facebook Marketplace, Craigslist, Autotrader, etc.",
+                  },
+                  {
+                    value: "dealership" as ListingSource,
+                    icon: <Building2 className="h-5 w-5 text-emerald-500" />,
+                    label: "Used Car Dealership",
+                    desc: "Vehicle is on a dealer's lot",
+                  },
+                  {
+                    value: "roadside" as ListingSource,
+                    icon: <Navigation className="h-5 w-5 text-amber-500" />,
+                    label: "Roadside / For Sale Sign",
+                    desc: "Spotted while driving — private sale",
+                  },
+                ] as { value: ListingSource; icon: React.ReactNode; label: string; desc: string }[]).map((src) => (
+                  <Card
+                    key={src.value}
+                    className={`cursor-pointer transition-colors hover-elevate ${
+                      listingSource === src.value ? "border-primary" : ""
+                    }`}
+                    onClick={() => setListingSource(src.value)}
+                    data-testid={`card-source-${src.value}`}
+                  >
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            listingSource === src.value
+                              ? "border-primary bg-primary"
+                              : "border-muted-foreground/30"
+                          }`}
+                        >
+                          {listingSource === src.value && (
+                            <Check className="h-3 w-3 text-primary-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {src.icon}
+                            <h3 className="font-semibold text-sm">{src.label}</h3>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{src.desc}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <Label className="text-base font-semibold mb-3 block">
                 {t("booking.bookingType", lang)}
               </Label>
@@ -461,15 +523,28 @@ function BookInner() {
               </div>
               <div>
                 <Label htmlFor="location">
-                  {t("booking.vehicleLocation", lang)} *
+                  {listingSource === "roadside"
+                    ? "Where is the car parked? *"
+                    : listingSource === "dealership"
+                      ? "Dealership Address *"
+                      : t("booking.vehicleLocation", lang) + " *"}
                 </Label>
                 <Input
                   id="location"
-                  placeholder="City, State or full address"
+                  placeholder={
+                    listingSource === "roadside"
+                      ? "Street address or intersection (e.g., 123 Oak St, Waukegan IL)"
+                      : listingSource === "dealership"
+                        ? "Dealership full address"
+                        : "City, State or full address"
+                  }
                   value={vehicleLocation}
                   onChange={(e) => setVehicleLocation(e.target.value)}
                   data-testid="input-location"
                 />
+                {listingSource === "roadside" && (
+                  <p className="text-xs text-muted-foreground mt-1">Be as precise as possible — our RideChecker needs to find the car.</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="serviceZip">Service ZIP Code *</Label>
@@ -507,19 +582,21 @@ function BookInner() {
                   data-testid="input-description"
                 />
               </div>
-              <div>
-                <Label htmlFor="listing">
-                  {t("booking.listingUrl", lang)}
-                </Label>
-                <Input
-                  id="listing"
-                  type="url"
-                  placeholder="https://..."
-                  value={listingUrl}
-                  onChange={(e) => setListingUrl(e.target.value)}
-                  data-testid="input-listing-url"
-                />
-              </div>
+              {listingSource === "online_marketplace" && (
+                <div>
+                  <Label htmlFor="listing">
+                    {t("booking.listingUrl", lang)}
+                  </Label>
+                  <Input
+                    id="listing"
+                    type="url"
+                    placeholder="https://..."
+                    value={listingUrl}
+                    onChange={(e) => setListingUrl(e.target.value)}
+                    data-testid="input-listing-url"
+                  />
+                </div>
+              )}
             </div>
 
             {classification && !useTestPackage && (
@@ -752,11 +829,17 @@ function BookInner() {
               <>
                 <div>
                   <Label htmlFor="sellerName">
-                    {t("booking.sellerName", lang)}
+                    {listingSource === "dealership"
+                      ? "Dealership Name"
+                      : t("booking.sellerName", lang)}
                   </Label>
                   <Input
                     id="sellerName"
-                    placeholder="John Doe"
+                    placeholder={
+                      listingSource === "dealership"
+                        ? "e.g., Lakeside Auto Sales"
+                        : "John Doe"
+                    }
                     value={sellerName}
                     onChange={(e) => setSellerName(e.target.value)}
                     data-testid="input-seller-name"
@@ -764,15 +847,29 @@ function BookInner() {
                 </div>
                 <div>
                   <Label htmlFor="sellerPhone">
-                    {t("booking.sellerPhone", lang)}
+                    {listingSource === "dealership"
+                      ? "Dealership Phone"
+                      : listingSource === "roadside"
+                        ? "Phone from Sign (optional)"
+                        : t("booking.sellerPhone", lang)}
                   </Label>
                   <Input
                     id="sellerPhone"
-                    placeholder="(555) 123-4567"
+                    placeholder={
+                      listingSource === "dealership"
+                        ? "Dealership phone number"
+                        : "(555) 123-4567"
+                    }
                     value={sellerPhone}
                     onChange={(e) => setSellerPhone(e.target.value)}
                     data-testid="input-seller-phone"
                   />
+                  {listingSource === "dealership" && (
+                    <p className="text-xs text-muted-foreground mt-1">We'll call the dealership to schedule a time for our RideChecker to inspect the vehicle.</p>
+                  )}
+                  {listingSource === "roadside" && (
+                    <p className="text-xs text-muted-foreground mt-1">We'll reach out to the seller on your behalf to schedule the inspection.</p>
+                  )}
                 </div>
               </>
             )}
@@ -831,6 +928,16 @@ function BookInner() {
                 </span>
                 <span className={`font-medium ${useTestPackage ? "text-amber-600" : ""}`}>
                   {PACKAGE_INFO[pkg]?.name || pkg}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Vehicle Found</span>
+                <span>
+                  {listingSource === "dealership"
+                    ? "Dealership"
+                    : listingSource === "roadside"
+                      ? "Roadside / For Sale Sign"
+                      : "Online Listing"}
                 </span>
               </div>
               <div className="flex justify-between">
