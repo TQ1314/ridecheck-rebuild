@@ -95,13 +95,13 @@ function BookInner() {
   const [zipStatus, setZipStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
   const [classification, setClassification] = useState<ClassificationResult | null>(null);
-  const [useTestPackage, setUseTestPackage] = useState(false);
+
   const [showWhyModal, setShowWhyModal] = useState(false);
 
   const isBuyerArranged = bookingType === "buyer_arranged";
 
-  const pkg: PackageType = useTestPackage ? "test" : (classification?.packageTier || "standard") as PackageType;
-  const finalPrice = useTestPackage ? 1 : (classification?.basePrice || TIER_PRICES.standard);
+  const pkg: PackageType = (classification?.packageTier || "standard") as PackageType;
+  const finalPrice = classification?.basePrice || TIER_PRICES.standard;
 
   useEffect(() => {
     if (!vehicleMake || !vehicleModel || !vehicleYear) {
@@ -204,7 +204,6 @@ function BookInner() {
         service_zip: serviceZip,
         vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
         vehicle_price: vehiclePrice ? parseFloat(vehiclePrice) : null,
-        ...(useTestPackage && { package: "test" }),
       };
 
       if (isBuyerArranged) {
@@ -678,7 +677,7 @@ function BookInner() {
               )}
             </div>
 
-            {classification && !useTestPackage && (
+            {classification && (
               <>
                 <Card className="border-primary/50 bg-primary/5" data-testid="card-vehicle-package">
                   <CardContent className="pt-5 pb-4">
@@ -783,58 +782,6 @@ function BookInner() {
               </>
             )}
 
-            {useTestPackage && (
-              <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/30" data-testid="card-test-package">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div>
-                          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                            $1 Test Package Selected
-                          </p>
-                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                            Internal testing — full end-to-end flow for $1
-                          </p>
-                        </div>
-                        <span className="text-lg font-bold text-amber-900 dark:text-amber-200" data-testid="text-determined-price">
-                          $1
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card
-              className={`cursor-pointer transition-colors hover-elevate border-dashed ${
-                useTestPackage ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/20" : "border-muted-foreground/30"
-              }`}
-              onClick={() => setUseTestPackage(!useTestPackage)}
-              data-testid="card-toggle-test-package"
-            >
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                      useTestPackage
-                        ? "border-amber-500 bg-amber-500"
-                        : "border-muted-foreground/30"
-                    }`}
-                  >
-                    {useTestPackage && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Use $1 Test Package</p>
-                    <p className="text-xs text-muted-foreground">
-                      For internal testing only — overrides vehicle classification with $1 pricing
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
@@ -1005,7 +952,7 @@ function BookInner() {
                 <span className="text-muted-foreground">
                   Package
                 </span>
-                <span className={`font-medium ${useTestPackage ? "text-amber-600" : ""}`}>
+                <span className="font-medium">
                   {PACKAGE_INFO[pkg]?.name || pkg}
                 </span>
               </div>

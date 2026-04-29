@@ -38,7 +38,6 @@ import {
   Shield,
   Send,
   FileCheck,
-  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -205,7 +204,6 @@ export default function AdminOrderDetailPage() {
   };
 
   const [deliverLoading, setDeliverLoading] = useState(false);
-  const [testFlowLoading, setTestFlowLoading] = useState(false);
 
   const handleDeliverReport = async () => {
     setDeliverLoading(true);
@@ -227,28 +225,6 @@ export default function AdminOrderDetailPage() {
     }
   };
 
-  const handleInternalTestFlow = async () => {
-    setTestFlowLoading(true);
-    try {
-      const res = await fetch(`/api/admin/orders/${orderId}/internal-test`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error, variant: "destructive" });
-        return;
-      }
-      toast({ title: "Test flow started", description: `Test ID: ${data.testRunId}` });
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, "_blank");
-      }
-      loadData();
-    } catch {
-      toast({ title: "Test flow failed", variant: "destructive" });
-    } finally {
-      setTestFlowLoading(false);
-    }
-  };
 
   const copyToClipboard = async (text: string, label: string) => {
     try {
@@ -463,26 +439,6 @@ export default function AdminOrderDetailPage() {
             <Send className="h-4 w-4 mr-2" />
             {deliverLoading ? "Delivering..." : "Deliver Report"}
           </Button>
-        )}
-
-        {order.payment_status !== "paid" && order.payment_status !== "paid_test" && (
-          <Button
-            variant="outline"
-            onClick={handleInternalTestFlow}
-            disabled={testFlowLoading}
-            className="border-amber-500 text-amber-700 hover:bg-amber-50"
-            data-testid="button-internal-test-flow"
-          >
-            <FlaskConical className="h-4 w-4 mr-2" />
-            {testFlowLoading ? "Starting..." : "Run Internal $1 Test Flow"}
-          </Button>
-        )}
-
-        {order.is_internal_test && (
-          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate border-amber-500 text-amber-700">
-            <FlaskConical className="h-3 w-3 mr-1" />
-            Internal Test
-          </Badge>
         )}
 
         {order.report_status && (

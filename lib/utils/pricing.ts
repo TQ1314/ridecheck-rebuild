@@ -1,14 +1,13 @@
 export type BookingType = "self_arrange" | "concierge" | "buyer_arranged";
-export type PackageType = "standard" | "plus" | "premium" | "exotic" | "test";
+export type PackageType = "standard" | "plus" | "premium" | "exotic";
 
-export type PackageTier = "standard" | "plus" | "premium" | "exotic" | "test";
+export type PackageTier = "standard" | "plus" | "premium" | "exotic";
 
 export const PRICING: Record<PackageType, { full: number; self: number }> = {
   standard: { full: 139, self: 139 },
   plus: { full: 169, self: 169 },
   premium: { full: 169, self: 169 },
   exotic: { full: 299, self: 299 },
-  test: { full: 1, self: 1 },
 };
 
 export function getPrice(pkg: PackageType, bookingType: BookingType) {
@@ -151,16 +150,6 @@ export const PACKAGE_INFO: Record<
       "Fraud & red flag screening",
       "Report within 6hrs",
       "30-day follow-up support",
-    ],
-  },
-  test: {
-    name: "$1 Test",
-    tagline: "Internal testing — full flow for $1",
-    features: [
-      "End-to-end flow test",
-      "$1 Stripe payment",
-      "$1 RideChecker payout",
-      "All workflow steps included",
     ],
   },
 };

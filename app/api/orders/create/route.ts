@@ -24,7 +24,7 @@ const createOrderSchema = z.object({
   buyer_email_input: z.string().email().nullable().optional(),
 
   booking_type: z.enum(["self_arrange", "concierge"]),
-  package: z.enum(["standard", "plus", "premium", "exotic", "comprehensive", "test"]).optional(),
+  package: z.enum(["standard", "plus", "premium", "exotic", "comprehensive"]).optional(),
   preferred_date: z.string().nullable().optional(),
   vehicle_mileage: z.number().int().min(0).nullable().optional(),
   vehicle_price: z.number().min(0).nullable().optional(),
@@ -145,8 +145,6 @@ export async function POST(req: NextRequest) {
     const buyer_phone = data.buyer_phone;
     const customer_id = session?.user?.id ?? null;
 
-    const isTestPackage = data.package === "test";
-
     const classification = classifyVehicle({
       make: data.vehicle_make,
       model: data.vehicle_model,
@@ -155,9 +153,9 @@ export async function POST(req: NextRequest) {
       askingPrice: data.vehicle_price ?? null,
     });
 
-    const serverPackage = isTestPackage ? "test" : classification.packageTier;
-    const basePrice = isTestPackage ? 1 : classification.basePrice;
-    const finalPrice = isTestPackage ? 1 : classification.basePrice;
+    const serverPackage = classification.packageTier;
+    const basePrice = classification.basePrice;
+    const finalPrice = classification.basePrice;
     const discountAmount = 0;
 
     const tracking_token = crypto.randomUUID();
@@ -195,11 +193,6 @@ export async function POST(req: NextRequest) {
       tracking_token,
       payment_link_token,
     };
-
-    if (isTestPackage) {
-      insertPayload.is_internal_test = true;
-      insertPayload.test_run_id = `test-booking-${Date.now()}`;
-    }
 
     try {
       const { error: colErr } = await supabaseAdmin

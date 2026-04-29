@@ -17,7 +17,7 @@ export async function POST(
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, report_status, report_storage_path, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, is_internal_test"
+        "id, order_id, report_status, report_storage_path, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model"
       )
       .eq("id", params.orderId)
       .single();
@@ -52,10 +52,9 @@ export async function POST(
     if (buyerEmail) {
       try {
         const { sendEmail } = await import("@/lib/email/resend");
-        const subjectPrefix = order.is_internal_test ? "[INTERNAL TEST] " : "";
         await sendEmail({
           to: buyerEmail,
-          subject: `${subjectPrefix}Your RideCheck Intelligence Report is Ready - ${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`,
+          subject: `Your RideCheck Intelligence Report is Ready — ${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
               <h2>Your Intelligence Report is Ready</h2>

@@ -1,5 +1,5 @@
 export type BookingType = "self_arrange" | "concierge";
-export type PackageType = "standard" | "plus" | "premium" | "exotic" | "test";
+export type PackageType = "standard" | "plus" | "premium" | "exotic";
 
 export type OrderStatus =
   | "submitted"
@@ -34,7 +34,6 @@ export type PaymentStatus =
   | "not_requested"
   | "requested"
   | "paid"
-  | "paid_test"
   | "pending"
   | "failed"
   | "refunded";
@@ -131,8 +130,6 @@ export interface Order {
   assigned_ridechecker_id?: string;
   report_sent_at?: string;
   ridechecker_pay?: number;
-  is_internal_test?: boolean;
-  test_run_id?: string;
   classification_modifier?: string | null;
   classification_reason?: string | null;
   vehicle_mileage?: number | null;

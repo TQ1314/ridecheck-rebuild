@@ -43,12 +43,11 @@ export async function POST(
 
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("package, is_internal_test")
+      .select("package")
       .eq("id", params.orderId)
       .single();
 
-    const isTest = order?.is_internal_test === true;
-    const payout_amount = isTest ? 1.00 : getPayoutAmount(order?.package || "standard");
+    const payout_amount = getPayoutAmount(order?.package || "standard");
     const now = new Date().toISOString();
 
     const { error: updateAssignmentError } = await supabaseAdmin
@@ -58,8 +57,7 @@ export async function POST(
         approved_at: now,
         job_score: score.total,
         payout_amount,
-        payout_status: isTest ? "pending" : "pending",
-        ...(isTest && { is_internal_test: true }),
+        payout_status: "pending",
       })
       .eq("id", assignment.id);
 
@@ -101,8 +99,7 @@ export async function POST(
         order_id: params.orderId,
         package: order?.package || "standard",
         amount: payout_amount,
-        status: isTest ? "pending" : "pending",
-        ...(isTest && { is_internal_test: true }),
+        status: "pending",
       });
 
     await Promise.all([
