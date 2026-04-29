@@ -70,6 +70,8 @@ function BookInner() {
 
   type ListingSource = "online_marketplace" | "dealership" | "roadside";
   const [listingSource, setListingSource] = useState<ListingSource>("online_marketplace");
+  const [platformSource, setPlatformSource] = useState<string>("");
+  const [vehicleSeenLocation, setVehicleSeenLocation] = useState("");
   const [bookingType, setBookingType] = useState<BookingType>("concierge");
   const [vehicleYear, setVehicleYear] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
@@ -197,6 +199,8 @@ function BookInner() {
         preferred_language: lang,
         listing_platform: listingPlatform,
         listing_source: listingSource,
+        platform_source: platformSource || null,
+        vehicle_seen_location: vehicleSeenLocation || null,
         service_zip: serviceZip,
         vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
         vehicle_price: vehiclePrice ? parseFloat(vehiclePrice) : null,
@@ -380,7 +384,7 @@ function BookInner() {
                     className={`cursor-pointer transition-colors hover-elevate ${
                       listingSource === src.value ? "border-primary" : ""
                     }`}
-                    onClick={() => setListingSource(src.value)}
+                    onClick={() => { setListingSource(src.value); setPlatformSource(""); }}
                     data-testid={`card-source-${src.value}`}
                   >
                     <CardContent className="pt-4 pb-4">
@@ -408,6 +412,64 @@ function BookInner() {
                   </Card>
                 ))}
               </div>
+
+              {listingSource && (() => {
+                const opts: { value: string; label: string }[] =
+                  listingSource === "online_marketplace"
+                    ? [
+                        { value: "facebook_marketplace", label: "Facebook Marketplace" },
+                        { value: "craigslist", label: "Craigslist" },
+                        { value: "offerup", label: "OfferUp" },
+                        { value: "cargurus", label: "CarGurus" },
+                        { value: "autotrader", label: "Autotrader" },
+                        { value: "cars_com", label: "Cars.com" },
+                        { value: "other", label: "Other / not listed" },
+                      ]
+                    : listingSource === "dealership"
+                      ? [
+                          { value: "dealership_website", label: "Dealership website" },
+                          { value: "cargurus", label: "CarGurus" },
+                          { value: "autotrader", label: "Autotrader" },
+                          { value: "cars_com", label: "Cars.com" },
+                          { value: "walked_in", label: "Walked in / drove by" },
+                          { value: "other", label: "Other" },
+                        ]
+                      : [
+                          { value: "roadside_sign", label: "For Sale sign on the car" },
+                          { value: "other", label: "Other" },
+                        ];
+
+                return (
+                  <div className="mt-3">
+                    <Label htmlFor="platformSource" className="text-sm font-medium">
+                      {listingSource === "online_marketplace"
+                        ? "Which site is the listing on?"
+                        : listingSource === "dealership"
+                          ? "How did you find the dealership?"
+                          : "How did you come across this car?"}
+                    </Label>
+                    <Select
+                      value={platformSource}
+                      onValueChange={setPlatformSource}
+                    >
+                      <SelectTrigger
+                        id="platformSource"
+                        className="mt-1.5"
+                        data-testid="select-platform-source"
+                      >
+                        <SelectValue placeholder="Select one…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opts.map((o) => (
+                          <SelectItem key={o.value} value={o.value} data-testid={`option-platform-${o.value}`}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
             </div>
 
             <div>
@@ -546,6 +608,23 @@ function BookInner() {
                   <p className="text-xs text-muted-foreground mt-1">Be as precise as possible — our RideChecker needs to find the car.</p>
                 )}
               </div>
+              {listingSource === "roadside" && (
+                <div>
+                  <Label htmlFor="vehicleSeenLocation">
+                    Where exactly is the car right now?
+                  </Label>
+                  <Input
+                    id="vehicleSeenLocation"
+                    placeholder="e.g., 456 Elm Ave, Waukegan IL — parked in front yard"
+                    value={vehicleSeenLocation}
+                    onChange={(e) => setVehicleSeenLocation(e.target.value)}
+                    data-testid="input-vehicle-seen-location"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This may differ from the seller's address. Our RideChecker will go directly to this location.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label htmlFor="serviceZip">Service ZIP Code *</Label>
                 <Input
@@ -940,6 +1019,18 @@ function BookInner() {
                       : "Online Listing"}
                 </span>
               </div>
+              {platformSource && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Platform / Source</span>
+                  <span className="capitalize">{platformSource.replace(/_/g, " ")}</span>
+                </div>
+              )}
+              {vehicleSeenLocation && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Car Location</span>
+                  <span className="text-right max-w-[55%]">{vehicleSeenLocation}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   {t("booking.bookingType", lang)}

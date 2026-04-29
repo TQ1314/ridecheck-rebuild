@@ -38,6 +38,7 @@ import {
   Clock,
   User,
   Info,
+  MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -334,7 +335,24 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
               <span className="font-medium" data-testid="text-seller-email">{order.seller_email}</span>
             </div>
           )}
+          {order.platform_source && (
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Found On</span>
+              <span className="font-medium capitalize" data-testid="text-platform-source">
+                {order.platform_source.replace(/_/g, " ")}
+              </span>
+            </div>
+          )}
         </div>
+        {order.vehicle_seen_location && (
+          <div className="flex items-start gap-2 rounded-md bg-muted/50 border px-3 py-2 text-sm">
+            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <div>
+              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Car Location</span>
+              <p className="font-medium mt-0.5" data-testid="text-vehicle-seen-location">{order.vehicle_seen_location}</p>
+            </div>
+          </div>
+        )}
 
         {order.listing_url && (
           <a

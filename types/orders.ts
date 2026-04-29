@@ -51,6 +51,8 @@ export interface Order {
   vehicle_description: string | null;
   listing_url: string | null;
   listing_source: "online_marketplace" | "dealership" | "roadside" | null;
+  platform_source: string | null;
+  vehicle_seen_location: string | null;
   seller_name: string | null;
   seller_phone: string | null;
   vehicle_location: string;

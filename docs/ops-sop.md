@@ -91,7 +91,14 @@ In the **Concierge** flow, RideCheck contacts the seller on behalf of the buyer.
 - After buyer pays, status auto-updates to `payment_received` (Stripe webhook)
 - Buyer receives an automated payment confirmation email from RideCheck
 
-**Step 3 — Seller Contact**
+**Step 3 — Check Vehicle Source**
+- Review `listing_source` and `platform_source` on the order
+  - `online_marketplace` — standard contact flow; listing URL may be present
+  - `dealership` — call dealership during business hours; no social media contact
+  - `roadside` — call number from sign; check `vehicle_seen_location` for where the car is parked
+- For roadside orders with `vehicle_seen_location` filled in: pass this address to the assigned RideChecker directly — the car may not be at the seller's home
+
+**Step 4 — Seller Contact**
 > See full protocol in Section 5
 
 - Click **"Contact Seller"** in the Seller Contact Panel
