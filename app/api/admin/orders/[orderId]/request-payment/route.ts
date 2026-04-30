@@ -42,7 +42,7 @@ export async function POST(
       );
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ridecheck.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
     const finalPrice = Number(order.final_price || order.base_price || 14900);
 
     const session = await stripe.checkout.sessions.create({
@@ -81,7 +81,7 @@ export async function POST(
       .eq("id", params.orderId);
 
     const buyerEmail = order.buyer_email || order.customer_email;
-    if (buyerEmail && buyerEmail !== "guest@ridecheck.com") {
+    if (buyerEmail && buyerEmail !== "guest@ridecheckauto.com") {
       try {
         const { sendEmail } = await import("@/lib/email/resend");
         const { paymentRequestHtml } = await import("@/lib/email/templates/payment-request");

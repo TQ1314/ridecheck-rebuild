@@ -372,7 +372,7 @@ export default function AdminUsersPage() {
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="team@ridecheck.com"
+                    placeholder="team@ridecheckauto.com"
                     data-testid="input-invite-email"
                   />
                 </div>

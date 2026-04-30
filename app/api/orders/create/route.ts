@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    const buyer_email = safeString(data.buyer_email_input || session?.user?.email, "guest@ridecheck.com");
+    const buyer_email = safeString(data.buyer_email_input || session?.user?.email, "guest@ridecheckauto.com");
     const buyer_phone = data.buyer_phone;
     const customer_id = session?.user?.id ?? null;
 
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
         });
         if (smsResult.success) {
           paymentChannel = "sms";
-        } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+        } else if (buyer_email && buyer_email !== "guest@ridecheckauto.com") {
           const { sendEmail } = await import("@/lib/notifications/email");
           const emailResult = await sendEmail({
             to: buyer_email,
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
           });
           if (emailResult.success) paymentChannel = "email";
         }
-      } else if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+      } else if (buyer_email && buyer_email !== "guest@ridecheckauto.com") {
         const { sendEmail } = await import("@/lib/notifications/email");
         const emailResult = await sendEmail({
           to: buyer_email,
@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      if (buyer_email && buyer_email !== "guest@ridecheck.com") {
+      if (buyer_email && buyer_email !== "guest@ridecheckauto.com") {
         const { orderConfirmationHtml } = await import("@/lib/email/templates/order-confirmation");
         const { sendEmail } = await import("@/lib/notifications/email");
         const pkgLabel = (serverPackage || "standard").charAt(0).toUpperCase() + (serverPackage || "standard").slice(1);

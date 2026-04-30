@@ -1,7 +1,8 @@
 import { Resend } from "resend";
 
 const apiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@ridecheck.com";
+const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@ridecheckauto.com";
+const fromDisplay = `RideCheck <${fromEmail}>`;
 
 const resend = apiKey ? new Resend(apiKey) : null;
 
@@ -22,7 +23,7 @@ export async function sendEmail({
 
   try {
     const { data, error } = await resend.emails.send({
-      from: fromEmail,
+      from: fromDisplay,
       to,
       subject,
       html,

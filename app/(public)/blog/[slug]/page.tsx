@@ -24,7 +24,7 @@ export async function generateMetadata({
   const post = getPostBySlug(params.slug);
   if (!post) return { title: "Post Not Found | RideCheck" };
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ridecheckauto.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
   const canonicalUrl = `${appUrl}/blog/${post.slug}`;
 
   return {
@@ -132,7 +132,7 @@ const LOCAL_BUSINESS_SCHEMA = {
   name: "RideCheck",
   description:
     "Pre-purchase vehicle inspection service covering Lake County, Illinois. Trusted by buyers in Waukegan, Gurnee, Libertyville, Mundelein, Grayslake, Zion, Round Lake, and surrounding areas.",
-  url: "https://ridecheckauto.com",
+  url: "https://www.ridecheckauto.com",
   email: "support@ridecheckauto.com",
   areaServed: {
     "@type": "AdministrativeArea",
@@ -145,7 +145,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
   const post = getPostBySlug(params.slug);
   if (!post) notFound();
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ridecheckauto.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
   const canonicalUrl = `${appUrl}/blog/${post.slug}`;
 
   const allPosts = getAllPosts();
@@ -172,7 +172,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
     publisher: {
       "@type": "Organization",
       name: "RideCheck",
-      url: "https://ridecheckauto.com",
+      url: "https://www.ridecheckauto.com",
     },
     url: canonicalUrl,
     ...(post.featuredImage && {
