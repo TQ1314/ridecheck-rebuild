@@ -99,38 +99,48 @@ export async function POST(req: NextRequest) {
     const inviteUrl = `${APP_URL}/invite/${token}`;
     const roleLabel = ROLE_LABELS[parsed.data.role] ?? parsed.data.role;
 
+    const logoUrl = `${APP_URL}/ridecheck-logo.jpg`;
     let emailError: string | null = null;
     try {
       await sendEmail({
         to: email,
         subject: "You're invited to RideCheck",
         html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
-            <div style="background:#059669;padding:24px;border-radius:8px 8px 0 0;text-align:center">
-              <h1 style="color:white;margin:0;font-size:22px;font-weight:700">Welcome to RideCheck</h1>
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#f4f7f4">
+            <!-- Header -->
+            <div style="background:#22774F;padding:36px 24px 28px;border-radius:10px 10px 0 0;text-align:center">
+              <img src="${logoUrl}" alt="RideCheck" width="64" height="64"
+                   style="display:block;margin:0 auto 16px;border-radius:4px;border:3px solid rgba(255,255,255,0.25)" />
+              <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;letter-spacing:-0.3px">RideCheck</h1>
+              <p style="color:rgba(255,255,255,0.80);margin:4px 0 0;font-size:13px;letter-spacing:0.5px;text-transform:uppercase">Pre-Purchase Vehicle Intelligence</p>
             </div>
-            <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;padding:32px">
-              <p style="margin:0 0 12px;font-size:16px">Hi there,</p>
-              <p style="margin:0 0 24px;color:#374151;font-size:15px">
-                You've been invited to join the <strong>RideCheck</strong> platform as a
-                <strong>${roleLabel}</strong>. Click the button below to set your password and get started.
+            <!-- Body -->
+            <div style="background:#ffffff;border:1px solid #dde8e1;border-top:none;border-radius:0 0 10px 10px;padding:36px 32px">
+              <p style="margin:0 0 8px;font-size:17px;font-weight:600;color:#111827">You've been invited</p>
+              <p style="margin:0 0 24px;color:#4b5563;font-size:15px;line-height:1.6">
+                You've been added to the <strong style="color:#22774F">RideCheck</strong> platform as a
+                <strong style="color:#22774F">${roleLabel}</strong>. Click the button below to set your password and get started.
               </p>
-              <div style="text-align:center;margin:0 0 28px">
+              <!-- CTA Button -->
+              <div style="text-align:center;margin:0 0 32px">
                 <a href="${inviteUrl}"
-                   style="display:inline-block;background:#059669;color:white;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px">
-                  Accept Invitation
+                   style="display:inline-block;background:#22774F;color:#ffffff;padding:15px 36px;border-radius:7px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.2px;box-shadow:0 2px 8px rgba(34,119,79,0.30)">
+                  Accept Invitation →
                 </a>
               </div>
-              <p style="margin:0 0 8px;font-size:13px;color:#6b7280">
-                Or copy this link into your browser:
-              </p>
-              <p style="margin:0 0 24px;font-size:12px;color:#9ca3af;word-break:break-all">
-                ${inviteUrl}
-              </p>
+              <!-- Divider -->
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px" />
-              <p style="margin:0;font-size:12px;color:#9ca3af">
-                This invitation expires in 7 days. If you weren't expecting this, you can safely ignore it.
+              <!-- Fallback link -->
+              <p style="margin:0 0 6px;font-size:12px;color:#6b7280">Or paste this link in your browser:</p>
+              <p style="margin:0 0 24px;font-size:11px;color:#9ca3af;word-break:break-all;background:#f9fafb;border:1px solid #e5e7eb;border-radius:5px;padding:10px">${inviteUrl}</p>
+              <!-- Footer note -->
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5">
+                This invitation expires in <strong>7 days</strong>. If you weren't expecting this email, you can safely ignore it.
               </p>
+            </div>
+            <!-- Email footer -->
+            <div style="text-align:center;padding:16px 24px">
+              <p style="margin:0;font-size:11px;color:#9ca3af">© RideCheck · Pre-Purchase Vehicle Intelligence</p>
             </div>
           </div>
         `,
