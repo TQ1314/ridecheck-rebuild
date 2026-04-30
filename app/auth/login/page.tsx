@@ -99,6 +99,8 @@ function LoginInner() {
                 ? "Your account profile was not found. Please contact support."
                 : error === "profile_read_failed"
                 ? "Unable to verify your account. Please try again or contact support."
+                : error === "login_required"
+                ? "Please sign in to continue."
                 : "An error occurred. Please try again."}
             </div>
           )}

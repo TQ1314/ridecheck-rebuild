@@ -33,7 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils/format";
 import { getRoleLabel, type Role } from "@/lib/utils/roles";
 import { useToast } from "@/hooks/use-toast";
-import { Inbox, UserPlus, Copy, Search, Users, ShoppingBag, ClipboardCheck, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Inbox, UserPlus, Copy, Search, Users, ShoppingBag, ClipboardCheck, CheckCircle2, AlertTriangle, KeyRound } from "lucide-react";
 
 const ROLES: Role[] = [
   "customer",
@@ -144,6 +144,7 @@ export default function AdminUsersPage() {
   const [inviteRole, setInviteRole] = useState<string>("ridechecker");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState("");
+  const [resetingId, setResetingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -207,6 +208,31 @@ export default function AdminUsersPage() {
     }
     toast({ title: `User ${isActive ? "deactivated" : "activated"}` });
     loadData();
+  };
+
+  const handleSendReset = async (userId: string, email: string) => {
+    setResetingId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/send-reset`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "no_auth_account") {
+          toast({
+            title: "No auth account found",
+            description: "This user hasn't accepted an invite yet. Send them a new invite link instead.",
+            variant: "destructive",
+          });
+        } else {
+          toast({ title: data.error || "Failed to send reset", variant: "destructive" });
+        }
+        return;
+      }
+      toast({ title: `Password reset sent to ${email}` });
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setResetingId(null);
+    }
   };
 
   const handleInvite = async () => {
@@ -443,7 +469,7 @@ export default function AdminUsersPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead className="w-[180px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -494,14 +520,26 @@ export default function AdminUsersPage() {
                       {formatDate(user.created_at)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleActive(user.id, user.is_active)}
-                        data-testid={`button-toggle-${user.id}`}
-                      >
-                        {user.is_active ? "Deactivate" : "Activate"}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(user.id, user.is_active)}
+                          data-testid={`button-toggle-${user.id}`}
+                        >
+                          {user.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Send password reset email"
+                          disabled={resetingId === user.id}
+                          onClick={() => handleSendReset(user.id, user.email)}
+                          data-testid={`button-reset-${user.id}`}
+                        >
+                          <KeyRound className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
