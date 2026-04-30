@@ -144,6 +144,7 @@ export default function AdminUsersPage() {
   const [inviteRole, setInviteRole] = useState<string>("ridechecker");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [lastInviteUrl, setLastInviteUrl] = useState("");
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
   const [resetingId, setResetingId] = useState<string | null>(null);
 
   async function loadData() {
@@ -246,8 +247,9 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create invite");
+      setInviteEmailSent(data.emailSent === true);
       setLastInviteUrl(data.inviteUrl || "");
-      toast({ title: "Invite created" });
+      toast({ title: data.emailSent ? `Invite sent to ${inviteEmail}` : "Invite created — email failed, copy the link below" });
       loadInvites();
     } catch (err: any) {
       toast({ title: err.message, variant: "destructive" });
@@ -314,11 +316,14 @@ export default function AdminUsersPage() {
             All profiles — customers, applicants, and team members
           </p>
         </div>
-        <Dialog open={inviteOpen} onOpenChange={(v) => { setInviteOpen(v); if (!v) { setLastInviteUrl(""); setInviteEmail(""); } }}>
+        <Dialog open={inviteOpen} onOpenChange={(v) => {
+          setInviteOpen(v);
+          if (!v) { setLastInviteUrl(""); setInviteEmail(""); setInviteEmailSent(false); }
+        }}>
           <DialogTrigger asChild>
             <Button data-testid="button-invite-user">
               <UserPlus className="h-4 w-4 mr-2" />
-              Invite User
+              Invite Team Member
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -327,17 +332,36 @@ export default function AdminUsersPage() {
             </DialogHeader>
             {lastInviteUrl ? (
               <div className="space-y-4 pt-2">
-                <p className="text-sm text-muted-foreground">
-                  Invite created. Share this link with <strong>{inviteEmail}</strong>:
-                </p>
-                <div className="flex items-center gap-2">
-                  <Input value={lastInviteUrl} readOnly className="text-xs" data-testid="input-invite-url" />
-                  <Button size="icon" variant="outline" onClick={() => copyInviteUrl(lastInviteUrl)} data-testid="button-copy-invite">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button variant="outline" className="w-full" onClick={() => { setLastInviteUrl(""); setInviteEmail(""); }}>
-                  Create Another
+                {inviteEmailSent ? (
+                  <div className="flex flex-col items-center gap-3 py-4 text-center">
+                    <div className="rounded-full bg-green-100 p-3">
+                      <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Invitation sent!</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        An email was sent to <strong>{inviteEmail}</strong>. They can click the link to set their password and log in.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      <span>Email delivery failed. Copy and share this link manually with <strong>{inviteEmail}</strong>:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input value={lastInviteUrl} readOnly className="text-xs" data-testid="input-invite-url" />
+                      <Button size="icon" variant="outline" onClick={() => copyInviteUrl(lastInviteUrl)} data-testid="button-copy-invite">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <Button variant="outline" className="w-full" onClick={() => {
+                  setLastInviteUrl(""); setInviteEmail(""); setInviteEmailSent(false);
+                }}>
+                  Invite Another
                 </Button>
               </div>
             ) : (
@@ -372,7 +396,7 @@ export default function AdminUsersPage() {
                     disabled={inviteLoading || !inviteEmail}
                     data-testid="button-send-invite"
                   >
-                    {inviteLoading ? "Creating..." : "Create Invite"}
+                    {inviteLoading ? "Sending..." : "Send Invitation"}
                   </Button>
                 </div>
               </div>

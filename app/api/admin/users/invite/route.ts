@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
+import { sendEmail } from "@/lib/email/resend";
 import { z } from "zod";
 import { getAppUrl } from "@/lib/app-url";
 
@@ -10,7 +11,6 @@ const TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function generateInviteToken(): string {
   const chars: string[] = [];
   const array = new Uint8Array(12);
-  // Use Node's crypto for server-side randomness
   const { randomFillSync } = require("crypto");
   randomFillSync(array);
   for (const byte of array) {
@@ -20,6 +20,18 @@ function generateInviteToken(): string {
 }
 
 const APP_URL = getAppUrl();
+
+const ROLE_LABELS: Record<string, string> = {
+  customer: "Customer",
+  operations: "Operations",
+  operations_lead: "Operations Lead",
+  ridechecker: "RideChecker (Pending)",
+  ridechecker_active: "RideChecker",
+  inspector: "Inspector",
+  qa: "QA Reviewer",
+  developer: "Developer",
+  platform: "Platform Admin",
+};
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -53,13 +65,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const email = parsed.data.email.toLowerCase().trim();
     const token = generateInviteToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: invite, error } = await supabaseAdmin
       .from("user_invites")
       .insert({
-        email: parsed.data.email.toLowerCase().trim(),
+        email,
         role: parsed.data.role,
         token,
         expires_at: expiresAt,
@@ -80,12 +93,59 @@ export async function POST(req: NextRequest) {
       action: "user.invited",
       resourceId: invite?.id,
       metadata: { resourceType: "user_invite" },
-      newValue: { email: parsed.data.email, role: parsed.data.role },
+      newValue: { email, role: parsed.data.role },
     });
 
     const inviteUrl = `${APP_URL}/invite/${token}`;
+    const roleLabel = ROLE_LABELS[parsed.data.role] ?? parsed.data.role;
 
-    return NextResponse.json({ invite, inviteUrl });
+    let emailError: string | null = null;
+    try {
+      await sendEmail({
+        to: email,
+        subject: "You're invited to RideCheck",
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
+            <div style="background:#059669;padding:24px;border-radius:8px 8px 0 0;text-align:center">
+              <h1 style="color:white;margin:0;font-size:22px;font-weight:700">Welcome to RideCheck</h1>
+            </div>
+            <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;padding:32px">
+              <p style="margin:0 0 12px;font-size:16px">Hi there,</p>
+              <p style="margin:0 0 24px;color:#374151;font-size:15px">
+                You've been invited to join the <strong>RideCheck</strong> platform as a
+                <strong>${roleLabel}</strong>. Click the button below to set your password and get started.
+              </p>
+              <div style="text-align:center;margin:0 0 28px">
+                <a href="${inviteUrl}"
+                   style="display:inline-block;background:#059669;color:white;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px">
+                  Accept Invitation
+                </a>
+              </div>
+              <p style="margin:0 0 8px;font-size:13px;color:#6b7280">
+                Or copy this link into your browser:
+              </p>
+              <p style="margin:0 0 24px;font-size:12px;color:#9ca3af;word-break:break-all">
+                ${inviteUrl}
+              </p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px" />
+              <p style="margin:0;font-size:12px;color:#9ca3af">
+                This invitation expires in 7 days. If you weren't expecting this, you can safely ignore it.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+    } catch (err: any) {
+      console.error("[invite] email send failed:", err);
+      emailError = err.message || "Email delivery failed";
+    }
+
+    return NextResponse.json({
+      invite,
+      inviteUrl,
+      emailSent: !emailError,
+      emailError: emailError ?? undefined,
+    });
   } catch (err: any) {
     console.error("Invite error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -107,7 +167,6 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch invites" }, { status: 500 });
     }
 
-    // Attach the full invite URL server-side so the client always gets the right domain
     const invites = (data || []).map((inv) => ({
       ...inv,
       inviteUrl: `${APP_URL}/invite/${inv.token}`,
