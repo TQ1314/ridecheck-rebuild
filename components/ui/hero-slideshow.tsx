@@ -31,6 +31,7 @@ export function HeroSlideshow() {
             src={slide.src}
             alt={slide.alt}
             fill
+            sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
             priority={i === 0}
           />

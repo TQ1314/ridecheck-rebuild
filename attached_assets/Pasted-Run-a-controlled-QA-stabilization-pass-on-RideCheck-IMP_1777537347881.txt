@@ -1,0 +1,111 @@
+Run a controlled QA + stabilization pass on RideCheck.
+
+IMPORTANT RULES:
+
+* DO NOT refactor large sections of code
+* DO NOT change authentication, middleware, or role logic
+* DO NOT modify database schema unless explicitly required
+* DO NOT introduce new features
+* ONLY fix issues that impact production reliability, UX, or trust
+
+---
+
+PHASE 1 — CRITICAL FIX VALIDATION
+
+1. Verify all email senders:
+
+* Must use RESEND_FROM_EMAIL
+* Must display: "RideCheck <email>"
+* No usage of ridecheck.com (ONLY ridecheckauto.com)
+
+2. Verify all URLs:
+
+* Must use NEXT_PUBLIC_APP_URL
+* No hardcoded:
+
+  * localhost
+  * replit.dev
+  * ridecheck.com
+
+3. Verify Stripe:
+
+* success_url and cancel_url use NEXT_PUBLIC_APP_URL
+* webhook endpoint intact
+
+---
+
+PHASE 2 — USER FLOW TESTING
+
+Simulate full flows:
+
+A. Buyer Flow:
+
+* Book inspection (with and without listing URL)
+* Payment request → Stripe
+* Confirmation email sent
+* Report delivery email sent
+* Report download link works
+
+B. Admin Flow:
+
+* Invite user
+* Reset password
+* Assign order
+* Deliver report
+
+C. RideChecker Flow:
+
+* Apply via /careers
+* Application stored correctly
+* No auth account created prematurely
+
+---
+
+PHASE 3 — EMAIL QUALITY
+
+Upgrade ALL emails to consistent format:
+
+* Header: RideCheck branding
+* Clear message
+* CTA button
+* Support email footer
+* No raw/plain HTML emails
+
+---
+
+PHASE 4 — SECURITY CHECK
+
+* Confirm ALL tables have RLS enabled
+* Confirm no public table allows unrestricted access
+* Confirm service role keys ONLY used server-side
+
+---
+
+PHASE 5 — BUILD + DEPLOY
+
+* Fix any build errors (including suspense boundary issues)
+* Ensure clean production build
+* Redeploy using production environment
+
+---
+
+PHASE 6 — FINAL OUTPUT
+
+Return:
+
+1. List of issues found (if any)
+2. Files changed
+3. Confirmation:
+
+   * "RideCheck production-safe: YES or NO"
+   * Remaining risks (if any)
+
+---
+
+DO NOT:
+
+* Add new features
+* Add new routes
+* Modify business logic
+
+ONLY stabilize and validate production readiness.
