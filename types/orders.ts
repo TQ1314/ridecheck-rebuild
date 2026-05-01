@@ -134,6 +134,27 @@ export interface Order {
   classification_reason?: string | null;
   vehicle_mileage?: number | null;
   vehicle_price?: number | null;
+  // Pay fields (migration 029)
+  base_pay?: number;
+  current_offer?: number;
+  boost_amount?: number;
+  // Assignment / seller status (migration 029)
+  assignment_status?: "unassigned" | "assigned" | "accepted" | "en_route" | "completed";
+  seller_status?: "awaiting" | "confirmed" | "no_response" | "invalid";
+}
+
+export interface JobBroadcast {
+  id: string;
+  order_id: string;
+  ridechecker_id: string;
+  status: "sent" | "accepted" | "declined" | "expired";
+  offered_pay: number;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined from profiles
+  ridechecker_name?: string;
+  ridechecker_email?: string;
 }
 
 export type SellerContactChannel = 'fb_message' | 'call' | 'sms' | 'email' | 'buyer_message';

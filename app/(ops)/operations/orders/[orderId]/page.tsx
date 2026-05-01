@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, ActivityLogEntry, Profile } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
+import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
+import { BuyerCard } from "@/components/orders/BuyerCard";
+import { RideCheckerAssignmentPanel } from "@/components/orders/RideCheckerAssignmentPanel";
+import { PayPanel } from "@/components/orders/PayPanel";
+import { ReportPanel } from "@/components/orders/ReportPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Send, ShieldCheck, Sparkles, FileText, ExternalLink, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { canUpdateStatus, canAssignOps, canSendPayment, type Role } from "@/lib/utils/roles";
@@ -26,31 +37,45 @@ import { packageLabel } from "@/lib/utils/format";
 
 const PACKAGE_OPTIONS = [
   { value: "standard", label: "Basic — $139" },
-  { value: "plus", label: "Plus — $169" },
-  { value: "exotic", label: "Exotic — $299" },
+  { value: "plus",     label: "Plus — $169" },
+  { value: "exotic",   label: "Exotic — $299" },
 ];
 
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    pending:       "bg-yellow-100 text-yellow-800 border-yellow-200",
+    confirmed:     "bg-blue-100 text-blue-800 border-blue-200",
+    in_progress:   "bg-purple-100 text-purple-800 border-purple-200",
+    completed:     "bg-green-100 text-green-800 border-green-200",
+    delivered:     "bg-green-100 text-green-800 border-green-200",
+    cancelled:     "bg-red-100 text-red-800 border-red-200",
+  };
+  const cls = map[status] ?? "bg-gray-100 text-gray-700 border-gray-200";
+  return (
+    <Badge className={cls} data-testid="badge-order-status">
+      {status.replace(/_/g, " ")}
+    </Badge>
+  );
+}
+
 export default function OpsOrderDetailPage() {
-  const params = useParams();
+  const params  = useParams();
   const orderId = params.orderId as string;
   const supabase = createClient();
   const { toast } = useToast();
-  const [order, setOrder] = useState<Order | null>(null);
+
+  const [order,      setOrder]      = useState<Order | null>(null);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile,    setProfile]    = useState<Profile | null>(null);
+  const [loading,    setLoading]    = useState(true);
 
   const [overridePackage, setOverridePackage] = useState("");
-  const [overrideReason, setOverrideReason] = useState("");
+  const [overrideReason,  setOverrideReason]  = useState("");
   const [overrideLoading, setOverrideLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [reportUrl, setReportUrl] = useState<string | null>(null);
-  const [reportVerdict, setReportVerdict] = useState<string | null>(null);
+  const [sendingPayment,  setSendingPayment]  = useState(false);
 
-  async function loadData() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  const loadData = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     const [orderRes, activityRes, profileRes] = await Promise.all([
@@ -63,16 +88,15 @@ export default function OpsOrderDetailPage() {
       supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle(),
     ]);
 
-    if (orderRes.data) setOrder(orderRes.data);
+    if (orderRes.data)    setOrder(orderRes.data);
     if (activityRes.data) setActivities(activityRes.data);
-    if (profileRes.data) setProfile(profileRes.data);
+    if (profileRes.data)  setProfile(profileRes.data);
     setLoading(false);
-  }
-
-  useEffect(() => {
-    loadData();
   }, [orderId]);
 
+  useEffect(() => { loadData(); }, [loadData]);
+
+  /* ── Handlers ─────────────────────────────────────────────── */
   const handleStatusUpdate = async (newStatus: string) => {
     const res = await fetch(`/api/orders/${orderId}/status`, {
       method: "PATCH",
@@ -104,16 +128,19 @@ export default function OpsOrderDetailPage() {
   };
 
   const handleSendPayment = async () => {
-    const res = await fetch(`/api/orders/${orderId}/send-payment`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      toast({ title: "Error", description: err.error, variant: "destructive" });
-      return;
+    setSendingPayment(true);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/send-payment`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Payment link sent" });
+      loadData();
+    } finally {
+      setSendingPayment(false);
     }
-    toast({ title: "Payment link sent" });
-    loadData();
   };
 
   const handlePackageOverride = async () => {
@@ -126,7 +153,7 @@ export default function OpsOrderDetailPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        package_override: overridePackage,
+        package_override:        overridePackage,
         package_override_reason: overrideReason || null,
       }),
     });
@@ -142,28 +169,7 @@ export default function OpsOrderDetailPage() {
     loadData();
   };
 
-  const handleGenerateReport = async () => {
-    setGenerating(true);
-    try {
-      const res = await fetch(`/api/ops/orders/${orderId}/generate-report`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Report generation failed", description: data.error, variant: "destructive" });
-        return;
-      }
-      setReportUrl(data.report_url);
-      setReportVerdict(data.verdict);
-      toast({ title: "Report generated!", description: `Verdict: ${data.verdict.replace(/_/g, " ")}` });
-      loadData();
-    } catch {
-      toast({ title: "Failed to generate report", variant: "destructive" });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
+  /* ── Guards ───────────────────────────────────────────────── */
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -180,21 +186,49 @@ export default function OpsOrderDetailPage() {
     );
   }
 
-  const role = (profile?.role || "operations") as Role;
-  const canOverride = ["admin", "operations"].includes(role);
+  const role       = (profile?.role || "operations") as Role;
+  const canOverride = ["admin", "operations", "operations_lead", "owner"].includes(role);
+  const vehicle    = [order.vehicle_year, order.vehicle_make, order.vehicle_model]
+    .filter(Boolean).join(" ");
+
   const systemReason = order.classification_reason || "—";
   const isOverridden = systemReason.startsWith("[OPS OVERRIDE");
 
+  /* ── Render ───────────────────────────────────────────────── */
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Link href="/operations/orders">
-          <Button variant="ghost" size="sm" data-testid="button-back">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </Link>
-        <div className="flex items-center gap-2 flex-wrap">
+    <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto">
+      {/* ── Top bar ─────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        {/* Left: back + title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/operations/orders">
+            <Button variant="ghost" size="sm" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1
+                className="font-semibold text-lg leading-tight truncate"
+                data-testid="heading-order-id"
+              >
+                {orderId.slice(0, 8).toUpperCase()}
+              </h1>
+              {statusBadge(order.status)}
+              {order.ops_status && order.ops_status !== order.status && (
+                <Badge variant="outline" className="text-xs">
+                  {order.ops_status.replace(/_/g, " ")}
+                </Badge>
+              )}
+            </div>
+            {vehicle && (
+              <p className="text-sm text-muted-foreground truncate">{vehicle}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           {canUpdateStatus(role) && (
             <StatusUpdateDialog
               orderId={orderId}
@@ -216,172 +250,115 @@ export default function OpsOrderDetailPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleSendPayment}
+                disabled={sendingPayment}
                 data-testid="button-send-payment"
               >
-                <Send className="h-4 w-4 mr-2" />
+                {sendingPayment ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
                 Send Payment Link
               </Button>
             )}
         </div>
       </div>
 
-      <OrderDetailPanel order={order} activities={activities} />
+      {/* ── 2-column dashboard ──────────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
+        {/* ── LEFT column ─────────────────────────────────── */}
+        <div className="space-y-4">
+          <OrderDetailPanel order={order} activities={activities} />
+          <SellerContactPanel order={order} onRefresh={loadData} />
+        </div>
 
-      {/* AI Report Generation */}
-      <Card data-testid="card-generate-report">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            AI Intelligence Report
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(order.ops_report_url || reportUrl) ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4" />
-                <span className="font-medium">Report generated</span>
-                {(reportVerdict || order.ops_severity_overall) && (
-                  <span className="text-muted-foreground">
-                    — Verdict: {(reportVerdict || order.ops_severity_overall || "").replace(/_/g, " ").toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <a
-                  href={order.ops_report_url || reportUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0"
-                >
-                  <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-view-report">
-                    <FileText className="h-3.5 w-3.5" />
-                    View PDF
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </Button>
-                </a>
+        {/* ── RIGHT column ───────────────────────────────── */}
+        <div className="space-y-4">
+          <BuyerCard order={order} onRefresh={loadData} />
+          <RideCheckerAssignmentPanel order={order} onRefresh={loadData} />
+          <PayPanel order={order} onRefresh={loadData} />
+          <ReportPanel order={order} onRefresh={loadData} />
+
+          {/* Package Override */}
+          {canOverride && (
+            <Card data-testid="card-package-override">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Package Override
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  <p>
+                    <span className="font-medium">Current: </span>
+                    <span className="font-semibold">{packageLabel(order.package)}</span>
+                    {order.base_price != null && (
+                      <span className="ml-1">(${order.base_price})</span>
+                    )}
+                  </p>
+                  <p>
+                    <span className="font-medium">System reason: </span>
+                    {isOverridden ? (
+                      <span className="text-amber-600 dark:text-amber-400">{systemReason}</span>
+                    ) : (
+                      <span>{systemReason}</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="override-pkg" className="text-xs">Force package to</Label>
+                    <Select value={overridePackage} onValueChange={setOverridePackage}>
+                      <SelectTrigger
+                        id="override-pkg"
+                        className="h-8 text-xs"
+                        data-testid="select-override-package"
+                      >
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PACKAGE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="override-reason" className="text-xs">Reason (optional)</Label>
+                    <Textarea
+                      id="override-reason"
+                      className="h-8 min-h-0 text-xs resize-none py-1.5"
+                      placeholder="e.g. Confirmed EV, diesel, etc."
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      data-testid="textarea-override-reason"
+                    />
+                  </div>
+                </div>
+
                 <Button
                   size="sm"
-                  variant="ghost"
-                  onClick={handleGenerateReport}
-                  disabled={generating}
-                  data-testid="button-regenerate-report"
-                  className="text-muted-foreground"
+                  variant="outline"
+                  onClick={handlePackageOverride}
+                  disabled={overrideLoading || !overridePackage}
+                  className="w-full"
+                  data-testid="button-apply-override"
                 >
-                  {generating ? (
-                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
+                  {overrideLoading ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</>
                   ) : (
-                    "Regenerate"
+                    "Apply Override"
                   )}
                 </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Generate a branded PDF intelligence report using Claude AI. The RideChecker must have submitted their findings first.
-              </p>
-              <Button
-                size="sm"
-                onClick={handleGenerateReport}
-                disabled={generating}
-                className="gap-2"
-                data-testid="button-generate-report"
-              >
-                {generating ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" />Generating Report…</>
-                ) : (
-                  <><Sparkles className="h-4 w-4" />Generate AI Report</>
-                )}
-              </Button>
-              {generating && (
-                <p className="text-xs text-muted-foreground">
-                  Analyzing findings with Claude AI and rendering PDF — this takes about 15–30 seconds.
-                </p>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
-
-      {canOverride && (
-        <Card data-testid="card-package-override">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              Package Override
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p>
-                <span className="font-medium">Current package:</span>{" "}
-                <span className="font-semibold">{packageLabel(order.package)}</span>
-                {order.base_price && (
-                  <span className="ml-1 text-muted-foreground">
-                    (${order.base_price})
-                  </span>
-                )}
-              </p>
-              <p>
-                <span className="font-medium">System reason:</span>{" "}
-                {isOverridden ? (
-                  <span className="text-amber-600 dark:text-amber-400">{systemReason}</span>
-                ) : (
-                  <span>{systemReason}</span>
-                )}
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="override-pkg" className="text-xs">Force package to</Label>
-                <Select
-                  value={overridePackage}
-                  onValueChange={setOverridePackage}
-                >
-                  <SelectTrigger
-                    id="override-pkg"
-                    className="h-8 text-xs"
-                    data-testid="select-override-package"
-                  >
-                    <SelectValue placeholder="Select package…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PACKAGE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="override-reason" className="text-xs">Reason (optional)</Label>
-                <Textarea
-                  id="override-reason"
-                  className="h-8 min-h-0 text-xs resize-none py-1.5"
-                  placeholder="e.g. Buyer confirmed EV, diesel engine, etc."
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  data-testid="textarea-override-reason"
-                />
-              </div>
-            </div>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handlePackageOverride}
-              disabled={overrideLoading || !overridePackage}
-              data-testid="button-apply-override"
-            >
-              {overrideLoading ? "Saving…" : "Apply Override"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

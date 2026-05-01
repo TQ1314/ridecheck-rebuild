@@ -481,3 +481,69 @@ CREATE POLICY "ridechecker_ops_messages_insert" ON public.ridechecker_ops_messag
   WITH CHECK (ridechecker_id = auth.uid());
 CREATE POLICY "ridechecker_ops_messages_select_own" ON public.ridechecker_ops_messages FOR SELECT TO authenticated
   USING (ridechecker_id = auth.uid() OR public.is_staff());
+
+-- ============================================================
+-- MIGRATION 029: Order Assignment Pay + Job Broadcasts
+-- ============================================================
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='base_pay') THEN
+    ALTER TABLE orders ADD COLUMN base_pay INTEGER DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='current_offer') THEN
+    ALTER TABLE orders ADD COLUMN current_offer INTEGER DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='boost_amount') THEN
+    ALTER TABLE orders ADD COLUMN boost_amount INTEGER DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='assignment_status') THEN
+    ALTER TABLE orders ADD COLUMN assignment_status TEXT DEFAULT 'unassigned';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='seller_status') THEN
+    ALTER TABLE orders ADD COLUMN seller_status TEXT DEFAULT 'awaiting';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name='orders' AND constraint_name='chk_orders_assignment_status') THEN
+    ALTER TABLE orders ADD CONSTRAINT chk_orders_assignment_status CHECK (assignment_status IN ('unassigned','assigned','accepted','en_route','completed'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name='orders' AND constraint_name='chk_orders_seller_status') THEN
+    ALTER TABLE orders ADD CONSTRAINT chk_orders_seller_status CHECK (seller_status IN ('awaiting','confirmed','no_response','invalid'));
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS job_broadcasts (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id         UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  ridechecker_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status           TEXT NOT NULL DEFAULT 'sent',
+  offered_pay      INTEGER NOT NULL DEFAULT 0,
+  responded_at     TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ DEFAULT now(),
+  updated_at       TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT chk_broadcast_status CHECK (status IN ('sent','accepted','declined','expired'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_broadcasts_order_id       ON job_broadcasts(order_id);
+CREATE INDEX IF NOT EXISTS idx_job_broadcasts_ridechecker_id ON job_broadcasts(ridechecker_id);
+CREATE INDEX IF NOT EXISTS idx_job_broadcasts_order_status   ON job_broadcasts(order_id, status);
+
+ALTER TABLE job_broadcasts ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='job_broadcasts' AND policyname='ridecheckers_see_own_broadcasts') THEN
+    CREATE POLICY "ridecheckers_see_own_broadcasts" ON job_broadcasts FOR SELECT TO authenticated USING (ridechecker_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='job_broadcasts' AND policyname='staff_manage_broadcasts') THEN
+    CREATE POLICY "staff_manage_broadcasts" ON job_broadcasts FOR ALL TO authenticated
+      USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role IN ('operations','operations_lead','owner','admin','platform','developer')));
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION update_job_broadcasts_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
+
+DROP TRIGGER IF EXISTS trg_job_broadcasts_updated_at ON job_broadcasts;
+CREATE TRIGGER trg_job_broadcasts_updated_at BEFORE UPDATE ON job_broadcasts FOR EACH ROW EXECUTE FUNCTION update_job_broadcasts_updated_at();
