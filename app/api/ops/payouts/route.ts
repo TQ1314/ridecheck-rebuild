@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // GET — list all payouts with optional status filter
 export async function GET(req: NextRequest) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
 
     const { searchParams } = new URL(req.url);

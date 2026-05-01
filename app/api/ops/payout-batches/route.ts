@@ -14,7 +14,7 @@ const schema = z.object({
 // POST — create a new batch from selected payout IDs
 export async function POST(req: NextRequest) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 // GET — list all batches
 export async function GET(req: NextRequest) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
 
     const { data: batches, error } = await supabaseAdmin
