@@ -157,6 +157,44 @@ export interface JobBroadcast {
   ridechecker_email?: string;
 }
 
+export interface RideCheckerPayout {
+  id: string;
+  ridechecker_id: string;
+  order_id: string;
+  base_pay: number;
+  bonus: number;
+  bonus_breakdown: Record<string, number> | null;
+  total_pay: number;
+  status: "pending" | "approved" | "paid" | "cancelled";
+  payout_batch_id: string | null;
+  notes: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined from profiles
+  ridechecker_name?: string;
+  ridechecker_email?: string;
+  // joined from orders
+  order_display_id?: string;
+  vehicle_label?: string;
+}
+
+export interface RideCheckerPayoutBatch {
+  id: string;
+  batch_name: string | null;
+  total_amount: number;
+  payout_count: number;
+  status: "pending" | "processing" | "completed" | "cancelled";
+  notes: string | null;
+  processed_by: string | null;
+  processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type SellerContactChannel = 'fb_message' | 'call' | 'sms' | 'email' | 'buyer_message';
 export type SellerContactStatus = 'not_started' | 'attempting' | 'accepted' | 'declined' | 'no_response' | 'invalid_contact';
 export type SellerPlatform = 'facebook' | 'craigslist' | 'dealer' | 'other';
