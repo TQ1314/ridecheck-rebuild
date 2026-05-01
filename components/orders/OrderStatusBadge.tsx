@@ -23,6 +23,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   requested: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   paid: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  paid_manual_verified: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   failed: "bg-red-500/10 text-red-700 dark:text-red-400",
   refunded: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
 };
@@ -39,6 +40,17 @@ export function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+  not_requested: "Not Requested",
+  unpaid: "Awaiting Payment",
+  pending: "Awaiting Payment",
+  requested: "Awaiting Payment",
+  paid: "Paid",
+  paid_manual_verified: "Manually Verified",
+  failed: "Payment Failed",
+  refunded: "Refunded",
+};
+
 export function PaymentStatusBadge({ status }: { status: string }) {
   return (
     <Badge
@@ -46,7 +58,7 @@ export function PaymentStatusBadge({ status }: { status: string }) {
       className={`no-default-hover-elevate no-default-active-elevate border-0 font-medium ${PAYMENT_COLORS[status] || "bg-muted text-muted-foreground"}`}
       data-testid={`badge-payment-${status}`}
     >
-      {statusLabel(status)}
+      {PAYMENT_LABELS[status] || statusLabel(status)}
     </Badge>
   );
 }

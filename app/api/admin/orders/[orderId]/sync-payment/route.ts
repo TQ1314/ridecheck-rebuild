@@ -5,14 +5,21 @@ import { getStripe } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 
+const PAID_STATUSES = ["paid", "paid_manual_verified"];
+
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
   try {
     const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
+
+    // Optional: caller can supply a specific Stripe ID to try
+    let body: { stripe_id?: string } = {};
+    try { body = await req.json(); } catch { /* no body is fine */ }
+    const manualStripeId = body.stripe_id?.trim() || null;
 
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
@@ -24,12 +31,14 @@ export async function POST(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Already paid — nothing to sync
-    if (order.payment_status === "paid") {
+    // Already paid in any form — nothing to sync
+    if (PAID_STATUSES.includes(order.payment_status)) {
       return NextResponse.json({
         success: true,
         already_paid: true,
-        message: "Order is already marked as paid.",
+        message: order.payment_status === "paid_manual_verified"
+          ? "Order was manually verified — no Stripe sync needed."
+          : "Order is already marked as paid.",
       });
     }
 
@@ -39,70 +48,98 @@ export async function POST(
     }
 
     let stripePaid = false;
+    let stripeUnpaid = false; // Stripe found but not paid yet
     let paymentIntentId: string | null = null;
     let checkedVia: string = "none";
+    const checked: string[] = [];
 
-    // 1. Try by stripe_session_id
-    if (order.stripe_session_id) {
+    // Helper: try a checkout session by ID
+    async function trySession(sessionId: string): Promise<boolean> {
       try {
-        const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+        const session = await stripe!.checkout.sessions.retrieve(sessionId);
+        checked.push(`session:${sessionId.slice(-8)}`);
         checkedVia = "session";
         if (session.payment_status === "paid") {
-          stripePaid = true;
           paymentIntentId = typeof session.payment_intent === "string"
             ? session.payment_intent
-            : session.payment_intent?.id ?? null;
+            : (session.payment_intent as any)?.id ?? null;
+          return true;
         }
-        console.log("[Sync Payment] Stripe session retrieved", {
-          orderId: params.orderId,
-          sessionId: order.stripe_session_id,
-          sessionPaymentStatus: session.payment_status,
-        });
-      } catch (stripeErr: any) {
-        console.warn("[Sync Payment] Failed to retrieve session from Stripe", {
-          orderId: params.orderId,
-          sessionId: order.stripe_session_id,
-          error: stripeErr.message,
-        });
+        stripeUnpaid = true;
+        console.log("[Sync Payment] Session found but not paid", { sessionId, paymentStatus: session.payment_status });
+        return false;
+      } catch (err: any) {
+        console.warn("[Sync Payment] Session lookup failed", { sessionId: sessionId.slice(-8), msg: err.message });
+        return false;
       }
     }
 
-    // 2. Fallback: try by payment_intent_id
-    if (!stripePaid && order.payment_intent_id) {
+    // Helper: try a payment intent by ID
+    async function tryPaymentIntent(piId: string): Promise<boolean> {
       try {
-        const intent = await stripe.paymentIntents.retrieve(order.payment_intent_id);
+        const intent = await stripe!.paymentIntents.retrieve(piId);
+        checked.push(`pi:${piId.slice(-8)}`);
         checkedVia = "payment_intent";
         if (intent.status === "succeeded") {
-          stripePaid = true;
           paymentIntentId = intent.id;
+          return true;
         }
-        console.log("[Sync Payment] Stripe payment intent retrieved", {
-          orderId: params.orderId,
-          intentId: order.payment_intent_id,
-          intentStatus: intent.status,
-        });
-      } catch (piErr: any) {
-        console.warn("[Sync Payment] Failed to retrieve payment intent from Stripe", {
-          orderId: params.orderId,
-          intentId: order.payment_intent_id,
-          error: piErr.message,
-        });
+        stripeUnpaid = true;
+        console.log("[Sync Payment] Payment intent found but not succeeded", { piId, status: intent.status });
+        return false;
+      } catch (err: any) {
+        console.warn("[Sync Payment] Payment intent lookup failed", { piId: piId.slice(-8), msg: err.message });
+        return false;
       }
+    }
+
+    // 1. Try manually supplied Stripe ID first (could be cs_ or pi_)
+    if (manualStripeId && !stripePaid) {
+      if (manualStripeId.startsWith("cs_")) {
+        stripePaid = await trySession(manualStripeId);
+      } else if (manualStripeId.startsWith("pi_")) {
+        stripePaid = await tryPaymentIntent(manualStripeId);
+      }
+    }
+
+    // 2. Try stored stripe_session_id
+    if (!stripePaid && order.stripe_session_id && order.stripe_session_id !== manualStripeId) {
+      stripePaid = await trySession(order.stripe_session_id);
+    }
+
+    // 3. Try stored payment_intent_id
+    if (!stripePaid && order.payment_intent_id && order.payment_intent_id !== manualStripeId) {
+      stripePaid = await tryPaymentIntent(order.payment_intent_id);
     }
 
     if (!stripePaid) {
-      console.log("[Sync Payment] Stripe confirms NOT paid", { orderId: params.orderId, checkedVia });
+      const hasStripeData = checked.length > 0;
+      console.log("[Sync Payment] Not paid", { orderId: params.orderId, checked, stripeUnpaid });
+
+      let message: string;
+      if (stripeUnpaid && hasStripeData) {
+        message =
+          "Stripe payment found but it has not completed. If the buyer says they paid, use Manual Verification with evidence.";
+      } else if (!hasStripeData) {
+        message =
+          "No Stripe session or payment intent is linked to this order yet. If payment was made, use Manual Verification with evidence and the Stripe payment reference.";
+      } else {
+        message =
+          "Stripe does not show this order as paid. If Stripe confirms payment, use Manual Verification with the Stripe payment reference.";
+      }
+
       return NextResponse.json({
         success: false,
         synced: false,
-        message: "Stripe does not show this order as paid.",
+        message,
         checked_via: checkedVia,
+        checked_ids: checked,
+        suggest_manual: true,
       });
     }
 
     // Stripe confirms paid — update the order
     const now = new Date().toISOString();
-
     const updatePayload: Record<string, any> = {
       payment_status: "paid",
       paid_at: now,

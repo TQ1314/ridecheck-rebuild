@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
@@ -72,6 +73,7 @@ export default function AdminOrderDetailPage() {
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const [opsStatusOpen, setOpsStatusOpen] = useState(false);
   const [opsStatus, setOpsStatus] = useState("");
@@ -106,6 +108,20 @@ export default function AdminOrderDetailPage() {
   useEffect(() => {
     loadData();
   }, [orderId]);
+
+  // Fetch current user role for permission-gated UI
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+      if (profile?.role) setCurrentUserRole(profile.role);
+    });
+  }, []);
 
   useEffect(() => {
     if (assignRcOpen && order) {
@@ -400,7 +416,7 @@ export default function AdminOrderDetailPage() {
 
       {/* ── Control-center top row: Buyer + Next Action ── */}
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
-        <AdminBuyerCard order={order} onRefresh={loadData} />
+        <AdminBuyerCard order={order} onRefresh={loadData} currentUserRole={currentUserRole} />
         <NextActionPanel order={order} attemptCount={attemptCount} />
       </div>
 

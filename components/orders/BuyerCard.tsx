@@ -18,6 +18,8 @@ function paymentBadge(status: string) {
   switch (status) {
     case "paid":
       return <Badge className="bg-green-100 text-green-800 border-green-200">Paid</Badge>;
+    case "paid_manual_verified":
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Manually Verified</Badge>;
     case "requested":
     case "pending":
     case "unpaid":

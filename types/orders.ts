@@ -32,9 +32,11 @@ export type OpsStatus =
 
 export type PaymentStatus =
   | "not_requested"
+  | "unpaid"
   | "requested"
-  | "paid"
   | "pending"
+  | "paid"
+  | "paid_manual_verified"
   | "failed"
   | "refunded";
 
@@ -141,6 +143,14 @@ export interface Order {
   // Assignment / seller status (migration 029)
   assignment_status?: "unassigned" | "assigned" | "accepted" | "en_route" | "completed";
   seller_status?: "awaiting" | "confirmed" | "no_response" | "invalid";
+  // Manual payment verification (migration 031)
+  payment_verification_note?: string | null;
+  payment_verified_by?: string | null;
+  payment_stripe_reference?: string | null;
+  payment_evidence_url?: string | null;
+  payment_verified_at?: string | null;
+  payment_amount_verified?: number | null;
+  payment_payer_email?: string | null;
 }
 
 export interface JobBroadcast {
