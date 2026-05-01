@@ -19,6 +19,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 const PAYMENT_COLORS: Record<string, string> = {
   not_requested: "bg-muted text-muted-foreground",
+  unpaid: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   requested: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   paid: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   failed: "bg-red-500/10 text-red-700 dark:text-red-400",

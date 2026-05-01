@@ -69,21 +69,34 @@ export async function POST(
             quantity: 1,
           },
         ],
-        metadata: { order_id: params.orderId },
+        metadata: {
+          order_id: params.orderId,
+          customer_email: order.buyer_email || order.customer_email || "",
+        },
         success_url: `${appUrl}/orders/${params.orderId}?payment=success`,
         cancel_url: `${appUrl}/orders/${params.orderId}?payment=cancelled`,
       });
       paymentUrl = checkoutSession.url || "";
-    }
 
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        payment_status: "requested",
-        status: "payment_requested",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", params.orderId);
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "requested",
+          stripe_session_id: checkoutSession.id,
+          status: "payment_requested",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.orderId);
+    } else {
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "requested",
+          status: "payment_requested",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.orderId);
+    }
 
     await supabaseAdmin.from("activity_log").insert({
       user_id: session.user.id,

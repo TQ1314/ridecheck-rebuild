@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
-      .select("id, payment_link_token, payment_status, vehicle_year, vehicle_make, vehicle_model, booking_type, package, base_price, final_price, tracking_token")
+      .select("id, payment_link_token, payment_status, vehicle_year, vehicle_make, vehicle_model, booking_type, package, base_price, final_price, tracking_token, buyer_email, customer_email")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -71,7 +71,11 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      metadata: { order_id: orderId, payment_link_token: token },
+      metadata: {
+        order_id: orderId,
+        payment_link_token: token,
+        customer_email: (order as any).buyer_email || (order as any).customer_email || "",
+      },
       success_url: `${appUrl}/order/received?orderId=${orderId}&status=paid${trackParam}`,
       cancel_url: `${appUrl}/pay/${orderId}?t=${token}`,
     });
@@ -85,6 +89,8 @@ export async function POST(req: NextRequest) {
         updated_at: now,
       })
       .eq("id", orderId);
+
+    console.log("[Pay Create Session] Session created", { orderId, sessionId: session.id });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

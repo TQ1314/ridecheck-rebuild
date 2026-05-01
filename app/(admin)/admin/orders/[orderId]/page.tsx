@@ -400,7 +400,7 @@ export default function AdminOrderDetailPage() {
 
       {/* ── Control-center top row: Buyer + Next Action ── */}
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
-        <AdminBuyerCard order={order} />
+        <AdminBuyerCard order={order} onRefresh={loadData} />
         <NextActionPanel order={order} attemptCount={attemptCount} />
       </div>
 

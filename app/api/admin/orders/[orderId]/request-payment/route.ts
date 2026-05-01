@@ -61,7 +61,10 @@ export async function POST(
           quantity: 1,
         },
       ],
-      metadata: { order_id: params.orderId },
+      metadata: {
+        order_id: params.orderId,
+        customer_email: order.buyer_email || order.customer_email || "",
+      },
       success_url: `${appUrl}/order/received?orderId=${params.orderId}&status=paid${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
       cancel_url: `${appUrl}/order/received?orderId=${params.orderId}&status=cancelled${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
     });
@@ -74,6 +77,7 @@ export async function POST(
         payment_status: "requested",
         payment_requested_at: now,
         payment_link_url: session.url,
+        stripe_session_id: session.id,
         status: "payment_requested",
         ops_status: "payment_pending",
         updated_at: now,

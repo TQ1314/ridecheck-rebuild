@@ -19,11 +19,17 @@ function paymentBadge(status: string) {
     case "paid":
       return <Badge className="bg-green-100 text-green-800 border-green-200">Paid</Badge>;
     case "requested":
+    case "pending":
+    case "unpaid":
       return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Awaiting Payment</Badge>;
+    case "failed":
+      return <Badge className="bg-red-100 text-red-800 border-red-200">Payment Failed</Badge>;
+    case "refunded":
+      return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Refunded</Badge>;
     case "not_requested":
       return <Badge variant="outline">Not Requested</Badge>;
     default:
-      return <Badge variant="outline">{status}</Badge>;
+      return <Badge variant="outline">{status || "Unknown"}</Badge>;
   }
 }
 
