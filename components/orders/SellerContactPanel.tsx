@@ -116,13 +116,21 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
   const [buyerNotes, setBuyerNotes] = useState("");
   const [buyerSubmitting, setBuyerSubmitting] = useState(false);
 
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenLoading, setReopenLoading] = useState(false);
+
   const platform = detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
   const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
   const isConcierge = order.booking_type === "concierge";
   const isSelfArranged = order.booking_type === "self_arrange";
   const contactStatus = order.seller_contact_status || "not_started";
-  const attemptCount = attempts.length;
+  // Only count real seller contact attempts — exclude buyer_message channel
+  const attemptCount = attempts.filter((a) => a.channel !== "buyer_message").length;
 
   useEffect(() => {
     loadAttempts();
@@ -225,6 +233,54 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
       toast({ title: "Message copied to clipboard" });
     } catch {
       toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
+  const handleConfirmDecline = async () => {
+    setOutcomeLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/seller-contact/outcome`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome: "declined", notes: declineReason || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Outcome: Declined" });
+      setDeclineOpen(false);
+      setDeclineReason("");
+      onRefresh();
+    } catch {
+      toast({ title: "Failed to set outcome", variant: "destructive" });
+    } finally {
+      setOutcomeLoading(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    setReopenLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/seller-contact/reopen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reopenReason || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Seller outreach reopened" });
+      setReopenOpen(false);
+      setReopenReason("");
+      onRefresh();
+    } catch {
+      toast({ title: "Failed to reopen", variant: "destructive" });
+    } finally {
+      setReopenLoading(false);
     }
   };
 
@@ -567,7 +623,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleOutcome("declined")}
+                    onClick={() => setDeclineOpen(true)}
                     disabled={outcomeLoading}
                     data-testid="button-mark-declined"
                   >
@@ -579,11 +635,14 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                     size="sm"
                     onClick={() => handleOutcome("no_response")}
                     disabled={outcomeLoading || attemptCount < 3}
-                    title={attemptCount < 3 ? "Need at least 3 attempts before marking no response" : undefined}
+                    title={attemptCount < 3 ? `Need at least 3 seller contact attempts (${attemptCount}/3 logged)` : undefined}
                     data-testid="button-mark-no-response"
                   >
                     <AlertCircle className="h-4 w-4 mr-1" />
                     Mark No Response
+                    {attemptCount < 3 && (
+                      <span className="ml-1 text-[10px] opacity-70">({attemptCount}/3)</span>
+                    )}
                   </Button>
                   <Button
                     variant="destructive"
@@ -595,6 +654,22 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                     Invalid Contact
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Reopen seller outreach — shown when status is a closed outcome */}
+            {["declined", "no_response", "invalid_contact", "accepted"].includes(contactStatus) && (
+              <div className="border-t pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground gap-1.5"
+                  onClick={() => setReopenOpen(true)}
+                  data-testid="button-reopen-outreach"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Reopen Seller Outreach
+                </Button>
               </div>
             )}
           </div>
@@ -694,6 +769,79 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           </div>
         )}
       </CardContent>
+
+      {/* Decline confirmation dialog */}
+      <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm: Mark Seller Declined</DialogTitle>
+            <DialogDescription>
+              This records that the seller declined the inspection request. You can reopen outreach if the situation changes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="mb-2 block text-sm">Reason (optional)</Label>
+              <Textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g. Seller said car is no longer available..."
+                rows={3}
+                data-testid="input-decline-reason"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeclineOpen(false)} disabled={outcomeLoading}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDecline}
+                disabled={outcomeLoading}
+                data-testid="button-confirm-decline"
+              >
+                {outcomeLoading ? "Saving…" : "Confirm Declined"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reopen seller outreach dialog */}
+      <Dialog open={reopenOpen} onOpenChange={setReopenOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reopen Seller Outreach</DialogTitle>
+            <DialogDescription>
+              This resets the seller contact status to "Attempting." Previous attempts and timeline events are preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="mb-2 block text-sm">Reason for reopening (optional)</Label>
+              <Textarea
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+                placeholder="e.g. Buyer provided updated contact info for seller..."
+                rows={3}
+                data-testid="input-reopen-reason"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setReopenOpen(false)} disabled={reopenLoading}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleReopen}
+                disabled={reopenLoading}
+                data-testid="button-confirm-reopen"
+              >
+                {reopenLoading ? "Reopening…" : "Reopen Outreach"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

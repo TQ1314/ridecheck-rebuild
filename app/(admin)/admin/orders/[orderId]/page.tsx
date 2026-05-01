@@ -6,6 +6,8 @@ import type { Order, OrderEvent, AuditLogEntry, ActivityLogEntry } from "@/types
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
 import { OpsReportBuilderPanel } from "@/components/orders/OpsReportBuilderPanel";
+import { AdminBuyerCard } from "@/components/orders/AdminBuyerCard";
+import { NextActionPanel } from "@/components/orders/NextActionPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { Button } from "@/components/ui/button";
 import { formatOrderCode } from "@/lib/utils/format";
@@ -31,17 +33,16 @@ import {
   ArrowLeft,
   RefreshCw,
   UserPlus,
-  Users,
   CreditCard,
-  Copy,
   Clock,
   Shield,
   Send,
   FileCheck,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateTime, formatRelative, statusLabel } from "@/lib/utils/format";
+import { formatRelative, statusLabel } from "@/lib/utils/format";
 
 const OPS_STATUSES = [
   "new",
@@ -70,6 +71,7 @@ export default function AdminOrderDetailPage() {
   const [assignedRc, setAssignedRc] = useState<any>(null);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [attemptCount, setAttemptCount] = useState(0);
 
   const [opsStatusOpen, setOpsStatusOpen] = useState(false);
   const [opsStatus, setOpsStatus] = useState("");
@@ -78,7 +80,6 @@ export default function AdminOrderDetailPage() {
 
   const [assignRcOpen, setAssignRcOpen] = useState(false);
   const [rcSuggestions, setRcSuggestions] = useState<any[]>([]);
-  const [rcPreview, setRcPreview] = useState<{ total: number; available: number; closest: string | null } | null>(null);
   const [selectedRc, setSelectedRc] = useState("");
   const [assignRcLoading, setAssignRcLoading] = useState(false);
 
@@ -92,6 +93,8 @@ export default function AdminOrderDetailPage() {
     if (data.order) {
       setOrder(data.order);
       setOpsStatus(data.order.ops_status || "new");
+      // Pre-populate attempt count from order counter for NextActionPanel
+      setAttemptCount(data.order.seller_contact_attempts ?? 0);
     }
     if (data.events) setEvents(data.events);
     if (data.audit) setAudit(data.audit);
@@ -105,35 +108,12 @@ export default function AdminOrderDetailPage() {
   }, [orderId]);
 
   useEffect(() => {
-    if (order && !assignedRc) {
-      const area = order.vehicle_location || order.inspection_address || "";
-      fetch(`/api/admin/ridecheckers/suggest?area=${encodeURIComponent(area)}&orderId=${orderId}`)
-        .then((r) => r.json())
-        .then((data) => {
-          const suggestions = data.suggestions || [];
-          setRcPreview({
-            total: suggestions.length,
-            available: suggestions.filter((s: any) => s.active_jobs < (s.max_daily_jobs ?? 5)).length,
-            closest: suggestions.length > 0 ? suggestions[0].full_name : null,
-          });
-        })
-        .catch(() => {
-          setRcPreview({ total: 0, available: 0, closest: null });
-        });
-    }
-  }, [order, orderId, assignedRc]);
-
-  useEffect(() => {
     if (assignRcOpen && order) {
       const area = order.vehicle_location || order.inspection_address || "";
       fetch(`/api/admin/ridecheckers/suggest?area=${encodeURIComponent(area)}&orderId=${orderId}`)
         .then((r) => r.json())
-        .then((data) => {
-          setRcSuggestions(data.suggestions || []);
-        })
-        .catch(() => {
-          setRcSuggestions([]);
-        });
+        .then((data) => setRcSuggestions(data.suggestions || []))
+        .catch(() => setRcSuggestions([]));
     }
   }, [assignRcOpen, order, orderId]);
 
@@ -225,20 +205,10 @@ export default function AdminOrderDetailPage() {
     }
   };
 
-
-  const copyToClipboard = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({ title: `${label} copied to clipboard` });
-    } catch {
-      toast({ title: "Failed to copy", variant: "destructive" });
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -251,57 +221,49 @@ export default function AdminOrderDetailPage() {
     );
   }
 
+  const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
+
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
+      {/* Top bar: back + title + status badges */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Link href="/admin/orders">
-          <Button variant="ghost" data-testid="button-back">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/orders">
+            <Button variant="ghost" size="sm" data-testid="button-back">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Orders
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-base font-semibold leading-tight">{vehicleLabel}</h1>
+            <p className="text-xs text-muted-foreground font-mono">{order.id.slice(0, 8).toUpperCase()}</p>
+          </div>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ops-status">
-            Ops: {statusLabel(order.ops_status || "new")}
+            {statusLabel(order.ops_status || "new")}
           </Badge>
           {assignedRc && (
             <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ridechecker">
-              RideChecker: {assignedRc.full_name}
+              RC: {assignedRc.full_name}
+            </Badge>
+          )}
+          {order.report_status && (
+            <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
+              <FileCheck className="h-3 w-3 mr-1" />
+              {order.report_status}
             </Badge>
           )}
         </div>
       </div>
 
-      {!assignedRc && rcPreview && (
-        <Card className="border-dashed">
-          <CardContent className="py-3 px-4">
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Active RideCheckers:</span>
-                <span className="font-medium" data-testid="text-rc-total">{rcPreview.total}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-muted-foreground">Available now:</span>
-                <span className="font-medium" data-testid="text-rc-available">{rcPreview.available}</span>
-              </div>
-              {rcPreview.closest && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">Top match:</span>
-                  <span className="font-medium" data-testid="text-rc-closest">{rcPreview.closest}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Action toolbar */}
+      <div className="flex items-center gap-2 flex-wrap border rounded-lg bg-muted/30 px-3 py-2">
         <Dialog open={opsStatusOpen} onOpenChange={setOpsStatusOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-update-ops-status">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Update Ops Status
+            <Button variant="outline" size="sm" data-testid="button-update-ops-status">
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Update Status
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -334,14 +296,8 @@ export default function AdminOrderDetailPage() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setOpsStatusOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleOpsStatusUpdate}
-                  disabled={opsLoading}
-                  data-testid="button-confirm-ops-status"
-                >
+                <Button variant="outline" onClick={() => setOpsStatusOpen(false)}>Cancel</Button>
+                <Button onClick={handleOpsStatusUpdate} disabled={opsLoading} data-testid="button-confirm-ops-status">
                   {opsLoading ? "Updating..." : "Update"}
                 </Button>
               </div>
@@ -351,8 +307,8 @@ export default function AdminOrderDetailPage() {
 
         <Dialog open={assignRcOpen} onOpenChange={setAssignRcOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-assign-ridechecker">
-              <UserPlus className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" data-testid="button-assign-ridechecker">
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
               Assign RideChecker
             </Button>
           </DialogTrigger>
@@ -364,7 +320,12 @@ export default function AdminOrderDetailPage() {
               {rcSuggestions.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground mb-2">No active RideCheckers found.</p>
-                  <p className="text-xs text-muted-foreground">Add RideCheckers from the <Link href="/admin/inspectors" className="text-primary hover:underline">RideCheckers page</Link>.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Add RideCheckers from the{" "}
+                    <Link href="/admin/inspectors" className="text-primary hover:underline">
+                      RideCheckers page
+                    </Link>.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -403,9 +364,7 @@ export default function AdminOrderDetailPage() {
                 </>
               )}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setAssignRcOpen(false)}>
-                  Cancel
-                </Button>
+                <Button variant="outline" onClick={() => setAssignRcOpen(false)}>Cancel</Button>
                 <Button
                   onClick={handleAssignRidechecker}
                   disabled={assignRcLoading || !selectedRc}
@@ -419,33 +378,17 @@ export default function AdminOrderDetailPage() {
         </Dialog>
 
         {order.booking_type === "concierge" && order.payment_status !== "paid" && (
-          <Button
-            variant="outline"
-            onClick={handleRequestPayment}
-            data-testid="button-request-payment"
-          >
-            <CreditCard className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleRequestPayment} data-testid="button-request-payment">
+            <CreditCard className="h-3.5 w-3.5 mr-1.5" />
             Request Payment
           </Button>
         )}
 
         {order.report_status === "approved" && (
-          <Button
-            variant="outline"
-            onClick={handleDeliverReport}
-            disabled={deliverLoading}
-            data-testid="button-deliver-report"
-          >
-            <Send className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleDeliverReport} disabled={deliverLoading} data-testid="button-deliver-report">
+            <Send className="h-3.5 w-3.5 mr-1.5" />
             {deliverLoading ? "Delivering..." : "Deliver Report"}
           </Button>
-        )}
-
-        {order.report_status && (
-          <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">
-            <FileCheck className="h-3 w-3 mr-1" />
-            Report: {order.report_status}
-          </Badge>
         )}
 
         <StatusUpdateDialog
@@ -453,112 +396,100 @@ export default function AdminOrderDetailPage() {
           currentStatus={order.status}
           onUpdate={handleStatusUpdate}
         />
-
-        {order.customer_email && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => copyToClipboard(order.customer_email, "Email")}
-            data-testid="button-copy-email"
-            title="Copy email"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-        )}
-        {order.customer_phone && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => copyToClipboard(order.customer_phone!, "Phone")}
-            data-testid="button-copy-phone"
-            title="Copy phone"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-        )}
       </div>
 
-      <OrderDetailPanel order={order} activities={activities} />
+      {/* ── Control-center top row: Buyer + Next Action ── */}
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
+        <AdminBuyerCard order={order} />
+        <NextActionPanel order={order} attemptCount={attemptCount} />
+      </div>
 
-      <SellerContactPanel order={order} onRefresh={loadData} />
+      {/* ── Main content ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <OrderDetailPanel order={order} activities={activities} />
+          <SellerContactPanel order={order} onRefresh={loadData} />
+        </div>
+        <div className="space-y-4">
+          <OpsReportBuilderPanel order={order} onRefresh={loadData} />
 
-      <OpsReportBuilderPanel order={order} onRefresh={loadData} />
-
-      {events.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              Order Events Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-start gap-3 text-sm"
-                  data-testid={`event-${event.id}`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{statusLabel(event.event_type)}</p>
-                    {event.actor_email && (
-                      <p className="text-muted-foreground text-xs">by {event.actor_email}</p>
-                    )}
-                    {event.details && (
-                      <p className="text-muted-foreground text-xs">
-                        {JSON.stringify(event.details)}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {formatRelative(event.created_at)}
-                  </span>
+          {events.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Order Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-start gap-3 text-sm"
+                      data-testid={`event-${event.id}`}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{statusLabel(event.event_type)}</p>
+                        {event.actor_email && (
+                          <p className="text-muted-foreground text-xs">by {event.actor_email}</p>
+                        )}
+                        {event.details && (
+                          <p className="text-muted-foreground text-xs">
+                            {JSON.stringify(event.details)}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {formatRelative(event.created_at)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
 
-      {audit.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              Audit History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {audit.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 text-sm"
-                  data-testid={`audit-${entry.id}`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground mt-1.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{entry.action}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {entry.actor_email || "System"} ({entry.actor_role || "—"})
-                    </p>
-                    {entry.new_value && (
-                      <p className="text-muted-foreground text-xs truncate max-w-md">
-                        {JSON.stringify(entry.new_value)}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {formatRelative(entry.created_at)}
-                  </span>
+          {audit.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  Audit History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {audit.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-start gap-3 text-sm"
+                      data-testid={`audit-${entry.id}`}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground mt-1.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{entry.action}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {entry.actor_email || "System"} ({entry.actor_role || "—"})
+                        </p>
+                        {entry.new_value && (
+                          <p className="text-muted-foreground text-xs truncate max-w-md">
+                            {JSON.stringify(entry.new_value)}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {formatRelative(entry.created_at)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

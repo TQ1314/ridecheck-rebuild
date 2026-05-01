@@ -15,7 +15,7 @@ export async function POST(
   { params }: { params: { orderId: string } },
 ) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 
@@ -30,15 +30,33 @@ export async function POST(
     if (outcome === "no_response") {
       const { data: order } = await supabaseAdmin
         .from("orders")
-        .select("booking_type, seller_contact_attempts")
+        .select("booking_type")
         .eq("id", params.orderId)
         .single();
 
-      if (order?.booking_type === "concierge" && (order.seller_contact_attempts || 0) < 3) {
-        return NextResponse.json(
-          { error: "Concierge orders require at least 3 contact attempts before marking no_response" },
-          { status: 400 },
-        );
+      if (order?.booking_type === "concierge") {
+        // Count actual non-buyer_message attempts from the log table — avoids counter drift
+        const { count, error: countErr } = await supabaseAdmin
+          .from("seller_contact_attempts")
+          .select("id", { count: "exact", head: true })
+          .eq("order_id", params.orderId)
+          .neq("channel", "buyer_message");
+
+        const actualCount = count ?? 0;
+        console.log(`[seller-contact/outcome] orderId=${params.orderId} actualCount=${actualCount} outcome=${outcome}`);
+
+        if (countErr) {
+          console.error("[seller-contact/outcome] count error", countErr);
+        }
+
+        if (actualCount < 3) {
+          return NextResponse.json(
+            {
+              error: `Concierge orders require at least 3 seller contact attempts before marking no_response. Found: ${actualCount}`,
+            },
+            { status: 400 },
+          );
+        }
       }
     }
 
@@ -53,6 +71,7 @@ export async function POST(
       .eq("id", params.orderId);
 
     if (updateError) {
+      console.error("[seller-contact/outcome] update error", updateError);
       return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
     }
 
@@ -84,6 +103,7 @@ export async function POST(
       seller_contact_status: outcome,
     });
   } catch (err: any) {
+    console.error("[seller-contact/outcome] unexpected error", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
