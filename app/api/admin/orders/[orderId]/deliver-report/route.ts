@@ -17,7 +17,7 @@ export async function POST(
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, report_status, report_storage_path, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model"
+        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model"
       )
       .eq("id", params.orderId)
       .single();
@@ -26,26 +26,42 @@ export async function POST(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (order.report_status !== "approved") {
+    const deliverableStatuses = ["approved", "generated", "report_ready"];
+    if (!deliverableStatuses.includes(order.report_status ?? "") && !order.report_storage_path && !order.ops_report_url) {
       return NextResponse.json(
-        { error: "Report must be QA-approved before delivery" },
+        { error: "No report available to deliver. Generate the report first." },
         { status: 400 }
       );
     }
 
-    if (!order.report_storage_path) {
+    // Prefer storage path (AI-generated PDF); fall back to ops_report_url
+    const hasStoragePath = !!order.report_storage_path;
+    if (!hasStoragePath && !order.ops_report_url) {
       return NextResponse.json({ error: "No report file found" }, { status: 400 });
     }
 
-    const { data: signedData, error: signedErr } = await supabaseAdmin.storage
-      .from("reports")
-      .createSignedUrl(order.report_storage_path, 7 * 24 * 3600);
+    let reportUrl: string | null = null;
 
-    if (signedErr) {
-      return NextResponse.json({ error: "Failed to create signed URL" }, { status: 500 });
+    if (order.report_storage_path) {
+      const { data: signedData, error: signedErr } = await supabaseAdmin.storage
+        .from("reports")
+        .createSignedUrl(order.report_storage_path, 7 * 24 * 3600);
+      if (signedErr) {
+        console.error("Failed to create signed URL:", signedErr);
+        // Non-fatal — fall back to ops_report_url if available
+      } else {
+        reportUrl = signedData?.signedUrl ?? null;
+      }
     }
 
-    const reportUrl = signedData?.signedUrl;
+    // Fall back to manually-set report URL
+    if (!reportUrl && order.ops_report_url) {
+      reportUrl = order.ops_report_url;
+    }
+
+    if (!reportUrl) {
+      return NextResponse.json({ error: "Could not generate a report link. Check the report file." }, { status: 500 });
+    }
 
     const buyerEmail = order.buyer_email || order.customer_email;
 

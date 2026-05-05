@@ -153,11 +153,13 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   useEffect(() => {
     if (selectedChannel && newAttemptOpen) {
+      const nextAttemptNumber = attemptCount + 1;
       const template = getTemplateForChannel(
         selectedChannel as SellerContactChannel,
         platform,
         vehicleLabel,
-        order.preferred_date
+        order.preferred_date,
+        nextAttemptNumber,
       );
       setMessageBody(template);
     }
@@ -448,20 +450,21 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
         {isConcierge && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
+              {attemptCount < 3 ? (
               <Button
                 variant="outline"
                 onClick={handleNewAttemptOpen}
                 data-testid="button-new-attempt"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                New Attempt
+                Attempt {attemptCount + 1} of 3
               </Button>
-              {attemptCount >= 3 && contactStatus !== "accepted" && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  3 attempts completed. You can now mark No Response.
-                </p>
-              )}
+            ) : contactStatus !== "accepted" ? (
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <CheckCircle className="h-3 w-3 text-amber-500" />
+                3 attempts sent — mark the outcome below.
+              </p>
+            ) : null}
             </div>
 
             <Dialog open={newAttemptOpen} onOpenChange={setNewAttemptOpen}>

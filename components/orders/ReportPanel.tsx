@@ -45,10 +45,12 @@ export function ReportPanel({ order, onRefresh }: ReportPanelProps) {
   const [generating, setGenerating] = useState(false);
   const [delivering, setDelivering] = useState(false);
 
-  const reportUrl = order.ops_report_url;
-  const hasReport = !!reportUrl;
-  const canDeliver = order.report_status === "approved" || order.report_status === "generated";
+  const reportUrl = order.ops_report_url || null;
+  const hasStoredReport = !!order.report_storage_path;
+  const hasReport = !!reportUrl || hasStoredReport;
+  const canDeliver = ["approved", "generated", "report_ready"].includes(order.report_status ?? "") || hasStoredReport;
   const alreadyDelivered = order.report_status === "delivered" || !!order.report_delivered_at;
+  const buyerEmail = (order as any).buyer_email || order.customer_email || null;
 
   async function handleGenerate() {
     setGenerating(true);
@@ -182,7 +184,18 @@ export function ReportPanel({ order, onRefresh }: ReportPanelProps) {
 
         {/* Send to buyer */}
         {hasReport && (
-          <div className="pt-2 border-t">
+          <div className="pt-2 border-t space-y-2">
+            {buyerEmail ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Send className="h-3 w-3" />
+                Will send to: <span className="font-medium text-foreground">{buyerEmail}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3" />
+                No buyer email on file — report cannot be emailed.
+              </p>
+            )}
             <Button
               size="sm"
               className="w-full gap-2"
@@ -197,11 +210,6 @@ export function ReportPanel({ order, onRefresh }: ReportPanelProps) {
                 <><Send className="h-3.5 w-3.5" />{alreadyDelivered ? "Resend to Buyer" : "Send to Buyer"}</>
               )}
             </Button>
-            {!canDeliver && (
-              <p className="text-xs text-muted-foreground mt-1.5 text-center">
-                Requires QA approval before sending
-              </p>
-            )}
           </div>
         )}
       </CardContent>
