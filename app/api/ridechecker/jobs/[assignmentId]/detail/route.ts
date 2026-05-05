@@ -34,7 +34,7 @@ export async function GET(
     const { data: assignment, error: assignErr } = await supabaseAdmin
       .from("ridechecker_job_assignments")
       .select(
-        "id, order_id, status, scheduled_start, scheduled_end, accepted_at, started_at, submitted_at, payout_amount, created_at"
+        "id, order_id, status, scheduled_start, scheduled_end, accepted_at, started_at, submitted_at, payout_amount, expires_at, declined_at, created_at"
       )
       .eq("id", params.assignmentId)
       .eq("ridechecker_id", session.user.id)
@@ -50,13 +50,32 @@ export async function GET(
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_trim, vehicle_location, inspection_address, scheduled_date, scheduled_time, package, booking_type, seller_name, special_instructions, created_at"
+        "id, order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_trim, vehicle_location, inspection_address, scheduled_date, scheduled_time, package, booking_type, seller_name, special_instructions, vehicle_mileage, vehicle_price, base_pay, current_offer, boost_amount, created_at"
       )
       .eq("id", assignment.order_id)
       .maybeSingle();
 
+    // Determine pay amount: use payout_amount from assignment, fallback to order offer/pay
+    const payAmount =
+      assignment.payout_amount ??
+      (order as any)?.current_offer ??
+      (order as any)?.base_pay ??
+      null;
+
+    // Check if expired client-side too
+    const isExpired =
+      assignment.expires_at && new Date(assignment.expires_at) < new Date();
+    const effectiveStatus =
+      assignment.status === "awaiting_acceptance" && isExpired
+        ? "expired"
+        : assignment.status;
+
     return NextResponse.json({
-      assignment,
+      assignment: {
+        ...assignment,
+        status: effectiveStatus,
+        pay_amount: payAmount,
+      },
       order: order
         ? {
             id: order.id,
@@ -73,6 +92,8 @@ export async function GET(
             booking_type: order.booking_type,
             seller_name: order.seller_name || null,
             special_instructions: order.special_instructions || null,
+            vehicle_mileage: (order as any).vehicle_mileage ?? null,
+            vehicle_price: (order as any).vehicle_price ?? null,
           }
         : null,
     });

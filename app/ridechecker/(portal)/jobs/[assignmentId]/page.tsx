@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
@@ -28,10 +28,16 @@ import {
   Clock,
   Camera,
   Wrench,
-  Gauge,
   AlertTriangle,
   ClipboardList,
   Send,
+  DollarSign,
+  Zap,
+  XCircle,
+  Gauge,
+  Star,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface AssignmentDetail {
@@ -44,6 +50,8 @@ interface AssignmentDetail {
   started_at?: string;
   submitted_at?: string;
   payout_amount?: number;
+  expires_at?: string | null;
+  pay_amount?: number | null;
 }
 
 interface OrderDetail {
@@ -60,6 +68,96 @@ interface OrderDetail {
   package?: string;
   booking_type?: string;
   seller_name?: string;
+  vehicle_mileage?: number | null;
+  vehicle_price?: number | null;
+}
+
+// ── Package complexity context ─────────────────────────────────────────────
+function getInspectionContext(pkg: string | undefined, make: string | undefined) {
+  const isExotic = pkg === "exotic";
+  const isPlus = pkg === "plus";
+  const makeLower = (make || "").toLowerCase();
+  const isLuxury = ["bmw", "mercedes", "audi", "lexus", "infiniti", "acura", "cadillac", "lincoln", "volvo", "genesis"].some((b) => makeLower.includes(b));
+  const isEV = ["tesla", "rivian", "lucid", "polestar"].some((b) => makeLower.includes(b));
+
+  if (isEV) {
+    return {
+      tier: "Electric Vehicle",
+      color: "text-blue-700 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+      points: [
+        "Battery health check — record pack size, range estimate, and any degradation",
+        "Charging port inspection — check for damage or corrosion",
+        "OBD-II scan using EV-compatible tool for fault codes",
+        "Regenerative braking feel during test drive",
+        "Software version and any pending updates",
+        "Thermal management system inspection if accessible",
+      ],
+    };
+  }
+  if (isExotic) {
+    return {
+      tier: "Exotic / High-Value",
+      color: "text-purple-700 dark:text-purple-400",
+      bg: "bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800",
+      points: [
+        "Full exterior panel gap and paint depth inspection",
+        "VIN verification on multiple points (dash, door, firewall)",
+        "Exhaust system and catalytic converters",
+        "Suspension — check for aftermarket mods or worn bushings",
+        "Interior — electronics, screens, leather condition",
+        "Test drive — listen carefully for powertrain anomalies",
+        "Fluids: brake, power steering, coolant, transmission",
+      ],
+    };
+  }
+  if (isPlus || isLuxury) {
+    return {
+      tier: "Plus / Luxury",
+      color: "text-indigo-700 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800",
+      points: [
+        "Electronics suite: infotainment, driver assists, cameras",
+        "Sunroof / panoramic roof seal and motor operation",
+        "Heated/cooled seats and interior features",
+        "Air suspension or adaptive shocks (if equipped)",
+        "Full OBD scan — luxury ECUs store more fault data",
+        "Exterior paint and body panel consistency",
+      ],
+    };
+  }
+  return {
+    tier: "Standard",
+    color: "text-slate-700 dark:text-slate-300",
+    bg: "bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700",
+    points: [
+      "VIN plate verification",
+      "OBD-II fault code scan",
+      "Tire tread and brake condition",
+      "Engine bay fluids and visual inspection",
+      "Undercarriage rust and damage check",
+      "Interior and exterior condition notes",
+      "Test drive — brakes, acceleration, handling",
+    ],
+  };
+}
+
+// ── Countdown hook ─────────────────────────────────────────────────────────
+function useCountdown(expiresAt: string | null | undefined) {
+  const [secsLeft, setSecsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => {
+      const diff = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000);
+      setSecsLeft(Math.max(0, diff));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+
+  return secsLeft;
 }
 
 const PHOTO_CHECKLIST = [
@@ -97,65 +195,42 @@ const WHAT_TO_BRING = [
 ];
 
 const INSPECTION_STEPS = [
-  {
-    step: 1,
-    title: "Confirm the vehicle",
-    detail:
-      "Verify the year, make, model, and VIN against the assignment details before starting.",
-  },
-  {
-    step: 2,
-    title: "Take required photos",
-    detail:
-      "VIN plate, odometer, engine bay, and undercarriage. Take extras if you see anything worth documenting.",
-  },
-  {
-    step: 3,
-    title: "Check tires & brakes",
-    detail:
-      "Measure tread depth on all four tires. Note brake condition (good / fair / poor).",
-  },
-  {
-    step: 4,
-    title: "Run OBD-II scan",
-    detail:
-      "Plug in your scanner with ignition on. Record all codes — cleared or active.",
-  },
-  {
-    step: 5,
-    title: "Inspect exterior & interior",
-    detail:
-      "Note any dents, rust, cracks, stains, odors, or non-functional controls.",
-  },
-  {
-    step: 6,
-    title: "Test drive",
-    detail:
-      "At least 10–15 minutes. Note any unusual sounds, vibrations, or handling issues.",
-  },
-  {
-    step: 7,
-    title: "Flag immediate concerns",
-    detail:
-      "Anything safety-critical or deal-breaking must be called out clearly in the submission.",
-  },
+  { step: 1, title: "Confirm the vehicle", detail: "Verify the year, make, model, and VIN against the assignment details before starting." },
+  { step: 2, title: "Take required photos", detail: "VIN plate, odometer, engine bay, and undercarriage. Take extras if you see anything worth documenting." },
+  { step: 3, title: "Check tires & brakes", detail: "Measure tread depth on all four tires. Note brake condition (good / fair / poor)." },
+  { step: 4, title: "Run OBD-II scan", detail: "Plug in your scanner with ignition on. Record all codes — cleared or active." },
+  { step: 5, title: "Inspect exterior & interior", detail: "Note any dents, rust, cracks, stains, odors, or non-functional controls." },
+  { step: 6, title: "Test drive", detail: "At least 10–15 minutes. Note any unusual sounds, vibrations, or handling issues." },
+  { step: 7, title: "Flag immediate concerns", detail: "Anything safety-critical or deal-breaking must be called out clearly in the submission." },
+];
+
+const DECLINE_REASONS = [
+  { value: "too_far", label: "Location is too far" },
+  { value: "not_available", label: "I'm not available at this time" },
+  { value: "vehicle_type", label: "Vehicle type outside my expertise" },
+  { value: "scheduling_conflict", label: "Scheduling conflict" },
+  { value: "other", label: "Other reason" },
 ];
 
 function statusBadge(status: string) {
   const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+    awaiting_acceptance: "outline",
     assigned: "outline",
     accepted: "secondary",
     in_progress: "secondary",
     submitted: "default",
     approved: "default",
     paid: "default",
+    declined: "destructive",
+    expired: "destructive",
     rejected: "destructive",
   };
   return variants[status] || "outline";
 }
 
 function formatStatus(s: string) {
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const labels: Record<string, string> = { awaiting_acceptance: "Awaiting Your Response" };
+  return labels[s] ?? s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function JobDetailPage() {
@@ -173,59 +248,69 @@ export default function JobDetailPage() {
   const [msgText, setMsgText] = useState("");
   const [msgSending, setMsgSending] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/auth/login");
-        return;
-      }
+  const [showDecline, setShowDecline] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineNote, setDeclineNote] = useState("");
 
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
+  const [briefOpen, setBriefOpen] = useState(false);
 
-      if (!prof || !["ridechecker_active", "owner"].includes(prof.role)) {
-        router.push("/auth/login");
-        return;
-      }
+  const secsLeft = useCountdown(
+    assignment?.status === "awaiting_acceptance" ? assignment.expires_at : null
+  );
 
-      try {
-        const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/detail`);
-        if (res.ok) {
-          const data = await res.json();
-          setAssignment(data.assignment);
-          setOrder(data.order);
-        } else {
-          toast({ title: "Assignment not found", variant: "destructive" });
-          router.push("/ridechecker/jobs");
-        }
-      } catch {
-        toast({ title: "Failed to load assignment", variant: "destructive" });
-      }
-
-      setLoading(false);
+  const loadDetail = useCallback(async () => {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      router.push("/auth/login");
+      return;
     }
-    load();
-  }, [assignmentId]);
+
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!prof || !["ridechecker_active", "owner"].includes(prof.role)) {
+      router.push("/auth/login");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/detail`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssignment(data.assignment);
+        setOrder(data.order);
+      } else {
+        toast({ title: "Assignment not found", variant: "destructive" });
+        router.push("/ridechecker/jobs");
+      }
+    } catch {
+      toast({ title: "Failed to load assignment", variant: "destructive" });
+    }
+
+    setLoading(false);
+  }, [assignmentId, router, toast]);
+
+  useEffect(() => { loadDetail(); }, [loadDetail]);
 
   async function acceptAssignment() {
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/accept`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/accept`, { method: "POST" });
       if (res.ok) {
-        toast({ title: "Assignment accepted!" });
+        toast({ title: "Job accepted!", description: "You're confirmed for this inspection." });
         setAssignment((prev) => prev ? { ...prev, status: "accepted" } : prev);
       } else {
         const d = await res.json();
         toast({ title: d.error || "Failed to accept", variant: "destructive" });
+        if (res.status === 410) {
+          setAssignment((prev) => prev ? { ...prev, status: "expired" } : prev);
+        }
       }
     } catch {
       toast({ title: "Failed to accept", variant: "destructive" });
@@ -233,12 +318,35 @@ export default function JobDetailPage() {
     setActionLoading(false);
   }
 
+  async function declineAssignment() {
+    if (!declineReason) {
+      toast({ title: "Please select a reason", variant: "destructive" });
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: declineReason, note: declineNote || null }),
+      });
+      if (res.ok) {
+        toast({ title: "Job declined", description: "Ops has been notified to reassign." });
+        router.push("/ridechecker/jobs");
+      } else {
+        const d = await res.json();
+        toast({ title: d.error || "Failed to decline", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to decline", variant: "destructive" });
+    }
+    setActionLoading(false);
+  }
+
   async function startAssignment() {
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/start`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/start`, { method: "POST" });
       if (res.ok) {
         toast({ title: "Inspection started!" });
         router.push(`/ridechecker/jobs/${assignmentId}/submit`);
@@ -256,14 +364,11 @@ export default function JobDetailPage() {
     if (!msgText.trim()) return;
     setMsgSending(true);
     try {
-      const res = await fetch(
-        `/api/ridechecker/jobs/${assignmentId}/message-ops`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: msgText.trim() }),
-        }
-      );
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/message-ops`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msgText.trim() }),
+      });
       if (res.ok) {
         toast({ title: "Message sent to ops team!" });
         setMsgText("");
@@ -290,14 +395,24 @@ export default function JobDetailPage() {
 
   if (!assignment) return null;
 
-  const canAccept = assignment.status === "assigned";
+  const isPendingAcceptance = assignment.status === "awaiting_acceptance";
+  const isExpired = assignment.status === "expired" || (secsLeft !== null && secsLeft === 0 && isPendingAcceptance);
+  const canAccept = isPendingAcceptance && !isExpired;
   const canStart = assignment.status === "accepted";
   const canSubmit = assignment.status === "in_progress";
   const isSubmitted = ["submitted", "approved", "paid"].includes(assignment.status);
+  const isDeclined = ["declined", "rejected"].includes(assignment.status);
+
+  const ctx = getInspectionContext(order?.package, order?.vehicle_make);
+  const payAmount = assignment.pay_amount ?? assignment.payout_amount;
+
+  const minsLeft = secsLeft !== null ? Math.floor(secsLeft / 60) : null;
+  const sLeft = secsLeft !== null ? secsLeft % 60 : null;
 
   return (
     <AppShell>
-      <div className="p-4 sm:p-6 space-y-5 max-w-2xl mx-auto pb-10">
+      <div className="p-4 sm:p-6 space-y-4 max-w-2xl mx-auto pb-32">
+        {/* ── Header ─────────────────────────────────────────── */}
         <div className="flex items-center gap-3">
           <Link href="/ridechecker/jobs">
             <Button size="icon" variant="ghost" data-testid="button-back">
@@ -312,14 +427,72 @@ export default function JobDetailPage() {
             </h1>
             <p className="text-sm text-muted-foreground">Assignment brief</p>
           </div>
-          <Badge
-            variant={statusBadge(assignment.status)}
-            data-testid="badge-assignment-status"
-          >
+          <Badge variant={statusBadge(assignment.status)} data-testid="badge-assignment-status">
             {formatStatus(assignment.status)}
           </Badge>
         </div>
 
+        {/* ── Action Required Banner ──────────────────────────── */}
+        {isPendingAcceptance && !isExpired && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-600 flex-shrink-0" />
+              <p className="font-bold text-amber-800 dark:text-amber-300">Job Offer — Response Required</p>
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Review the details below, then accept or decline. If no response is received in time, the offer will expire automatically.
+            </p>
+            {secsLeft !== null && (
+              <div className={`inline-flex items-center gap-2 font-bold text-lg px-3 py-1 rounded-lg ${
+                secsLeft < 180
+                  ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              }`} data-testid="text-countdown">
+                <Clock className="h-5 w-5" />
+                {minsLeft}m {sLeft! < 10 ? "0" : ""}{sLeft}s remaining
+              </div>
+            )}
+          </div>
+        )}
+
+        {isExpired && (
+          <div className="rounded-xl border border-gray-300 bg-gray-50 dark:bg-gray-900/30 dark:border-gray-700 p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-gray-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-gray-700 dark:text-gray-300">Offer Expired</p>
+              <p className="text-sm text-muted-foreground">This job offer has expired. Contact ops if you'd like to be reassigned.</p>
+            </div>
+          </div>
+        )}
+
+        {isDeclined && (
+          <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 p-4 flex items-start gap-3">
+            <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-700 dark:text-red-400">Job Declined</p>
+              <p className="text-sm text-muted-foreground">You declined this job. Ops has been notified to reassign.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Pay ──────────────────────────────────────────────── */}
+        {payAmount != null && (
+          <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
+                <DollarSign className="h-5 w-5 text-green-700 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Pay</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-400" data-testid="text-pay-amount">
+                  ${payAmount}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Vehicle ──────────────────────────────────────────── */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
@@ -332,15 +505,50 @@ export default function JobDetailPage() {
               {order?.vehicle_year} {order?.vehicle_make} {order?.vehicle_model}
               {order?.vehicle_trim ? ` — ${order.vehicle_trim}` : ""}
             </p>
-            {order?.package && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Package className="h-3.5 w-3.5" />
-                <span className="capitalize">{order.package} Package</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3 flex-wrap text-sm text-muted-foreground">
+              {order?.package && (
+                <div className="flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5" />
+                  <span className="capitalize">{order.package} Package</span>
+                </div>
+              )}
+              {order?.vehicle_mileage != null && (
+                <div className="flex items-center gap-1.5">
+                  <Gauge className="h-3.5 w-3.5" />
+                  <span>{order.vehicle_mileage.toLocaleString()} mi</span>
+                </div>
+              )}
+              {order?.vehicle_price != null && (
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  <span>${order.vehicle_price.toLocaleString()} asking</span>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
+        {/* ── Inspection Complexity ─────────────────────────────── */}
+        <Card className={`border ${ctx.bg}`}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-sm font-semibold flex items-center gap-2 uppercase tracking-wide ${ctx.color}`}>
+              <Star className="h-4 w-4" />
+              What This Inspection Involves — {ctx.tier}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1.5">
+              {ctx.points.map((point) => (
+                <li key={point} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={`h-4 w-4 flex-shrink-0 mt-0.5 ${ctx.color}`} />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* ── Location & Schedule ───────────────────────────────── */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
@@ -385,6 +593,7 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
 
+        {/* ── Seller ───────────────────────────────────────────── */}
         {order?.seller_name && (
           <Card>
             <CardHeader className="pb-2">
@@ -394,93 +603,46 @@ export default function JobDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="font-medium" data-testid="text-seller-name">
-                {order.seller_name}
-              </p>
+              <p className="font-medium" data-testid="text-seller-name">{order.seller_name}</p>
               <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                 <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-700 dark:text-amber-300">
-                  Do not contact the seller directly. If you need to reach them,
-                  message the ops team below and they will coordinate.
+                  Do not contact the seller directly. Message the ops team below if needed.
                 </p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
-              <ClipboardList className="h-4 w-4" />
-              What to Bring
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {WHAT_TO_BRING.map((item) => (
-                <li key={item} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        {/* ── Inspection Brief (collapsible when in pending mode) ─ */}
+        {(canAccept || isExpired) ? (
+          <Card>
+            <button
+              className="w-full flex items-center justify-between p-4 text-left"
+              onClick={() => setBriefOpen((v) => !v)}
+              data-testid="button-toggle-brief"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                <ClipboardList className="h-4 w-4" />
+                Inspection Brief
+              </span>
+              {briefOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {briefOpen && (
+              <CardContent className="pt-0 space-y-4">
+                <InspectionBriefContent />
+              </CardContent>
+            )}
+          </Card>
+        ) : (
+          <>
+            <WhatToBringCard />
+            <RequiredPhotosCard />
+            <InspectionStepsCard />
+          </>
+        )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
-              <Camera className="h-4 w-4" />
-              Required Photos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {PHOTO_CHECKLIST.map((p) => (
-                <div
-                  key={p.label}
-                  className="flex items-start gap-3 p-3 bg-muted/40 rounded-lg"
-                >
-                  <span className="text-xl leading-none mt-0.5">{p.icon}</span>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm">{p.label}</p>
-                    <p className="text-xs text-muted-foreground">{p.where}</p>
-                    <p className="text-xs text-primary mt-0.5">
-                      Tip: {p.tip}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
-              <Wrench className="h-4 w-4" />
-              Inspection Steps
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="space-y-3">
-              {INSPECTION_STEPS.map((s) => (
-                <li key={s.step} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
-                    {s.step}
-                  </span>
-                  <div className="min-w-0 pt-0.5">
-                    <p className="font-medium text-sm">{s.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {s.detail}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-
+        {/* ── Message Ops ──────────────────────────────────────── */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
@@ -490,8 +652,7 @@ export default function JobDetailPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Questions about this job? Send a message — the ops team will
-              follow up with you directly.
+              Questions about this job? The ops team will follow up directly.
             </p>
             {!msgOpen && (
               <Button
@@ -527,10 +688,7 @@ export default function JobDetailPage() {
                   </Button>
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      setMsgOpen(false);
-                      setMsgText("");
-                    }}
+                    onClick={() => { setMsgOpen(false); setMsgText(""); }}
                     data-testid="button-cancel-message"
                   >
                     Cancel
@@ -541,17 +699,102 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
 
-        <div className="sticky bottom-4 pt-2">
+        {/* ── Decline form (inline) ─────────────────────────────── */}
+        {showDecline && canAccept && (
+          <Card className="border-red-200 dark:border-red-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-red-700 dark:text-red-400 uppercase tracking-wide">
+                <XCircle className="h-4 w-4" />
+                Decline This Job
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Please let us know why so we can improve future assignments.
+              </p>
+              <div className="space-y-2">
+                {DECLINE_REASONS.map((r) => (
+                  <label
+                    key={r.value}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      declineReason === r.value
+                        ? "border-red-400 bg-red-50 dark:bg-red-950/30"
+                        : "border-transparent hover:bg-muted/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="decline-reason"
+                      value={r.value}
+                      checked={declineReason === r.value}
+                      onChange={() => setDeclineReason(r.value)}
+                      className="accent-red-600"
+                      data-testid={`radio-decline-${r.value}`}
+                    />
+                    <span className="text-sm">{r.label}</span>
+                  </label>
+                ))}
+              </div>
+              {declineReason === "other" && (
+                <Textarea
+                  placeholder="Tell us more (optional)…"
+                  value={declineNote}
+                  onChange={(e) => setDeclineNote(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  className="resize-none"
+                  data-testid="textarea-decline-note"
+                />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={declineAssignment}
+                  disabled={actionLoading || !declineReason}
+                  data-testid="button-confirm-decline"
+                >
+                  {actionLoading ? "Declining…" : "Confirm Decline"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => { setShowDecline(false); setDeclineReason(""); setDeclineNote(""); }}
+                  data-testid="button-cancel-decline"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ── Sticky Bottom Actions ─────────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t z-10">
+        <div className="max-w-2xl mx-auto space-y-2">
           {canAccept && (
-            <Button
-              className="w-full h-12 text-base"
-              onClick={acceptAssignment}
-              disabled={actionLoading}
-              data-testid="button-accept-assignment"
-            >
-              <CheckCircle2 className="h-5 w-5 mr-2" />
-              {actionLoading ? "Accepting…" : "Accept Assignment"}
-            </Button>
+            <>
+              <Button
+                className="w-full h-12 text-base bg-green-600 hover:bg-green-700 text-white"
+                onClick={acceptAssignment}
+                disabled={actionLoading}
+                data-testid="button-accept-assignment"
+              >
+                <CheckCircle2 className="h-5 w-5 mr-2" />
+                {actionLoading ? "Accepting…" : "Accept This Job"}
+              </Button>
+              {!showDecline && (
+                <Button
+                  variant="outline"
+                  className="w-full h-10 text-sm border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400"
+                  onClick={() => setShowDecline(true)}
+                  data-testid="button-open-decline"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Decline Job
+                </Button>
+              )}
+            </>
           )}
           {canStart && (
             <Button
@@ -566,10 +809,7 @@ export default function JobDetailPage() {
           )}
           {canSubmit && (
             <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
-              <Button
-                className="w-full h-12 text-base"
-                data-testid="button-go-to-submit"
-              >
+              <Button className="w-full h-12 text-base" data-testid="button-go-to-submit">
                 <ClipboardList className="h-5 w-5 mr-2" />
                 Continue Submission
               </Button>
@@ -584,5 +824,116 @@ export default function JobDetailPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+function InspectionBriefContent() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">What to Bring</p>
+        <ul className="space-y-1.5">
+          {WHAT_TO_BRING.map((item) => (
+            <li key={item} className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Required Photos</p>
+        <div className="space-y-2">
+          {PHOTO_CHECKLIST.map((p) => (
+            <div key={p.label} className="flex items-start gap-2 p-2 bg-muted/40 rounded-lg">
+              <span className="text-lg leading-none mt-0.5">{p.icon}</span>
+              <div>
+                <p className="font-medium text-sm">{p.label}</p>
+                <p className="text-xs text-muted-foreground">{p.where}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhatToBringCard() {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+          <ClipboardList className="h-4 w-4" />
+          What to Bring
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {WHAT_TO_BRING.map((item) => (
+            <li key={item} className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RequiredPhotosCard() {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+          <Camera className="h-4 w-4" />
+          Required Photos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {PHOTO_CHECKLIST.map((p) => (
+            <div key={p.label} className="flex items-start gap-3 p-3 bg-muted/40 rounded-lg">
+              <span className="text-xl leading-none mt-0.5">{p.icon}</span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm">{p.label}</p>
+                <p className="text-xs text-muted-foreground">{p.where}</p>
+                <p className="text-xs text-primary mt-0.5">Tip: {p.tip}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InspectionStepsCard() {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+          <Wrench className="h-4 w-4" />
+          Inspection Steps
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ol className="space-y-3">
+          {INSPECTION_STEPS.map((s) => (
+            <li key={s.step} className="flex items-start gap-3">
+              <span className="flex-shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                {s.step}
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <p className="font-medium text-sm">{s.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
   );
 }

@@ -140,8 +140,8 @@ export interface Order {
   base_pay?: number;
   current_offer?: number;
   boost_amount?: number;
-  // Assignment / seller status (migration 029)
-  assignment_status?: "unassigned" | "assigned" | "accepted" | "en_route" | "completed";
+  // Assignment / seller status (migration 029 + 032)
+  assignment_status?: "unassigned" | "awaiting_acceptance" | "assigned" | "accepted" | "declined" | "expired" | "en_route" | "completed";
   seller_status?: "awaiting" | "confirmed" | "no_response" | "invalid";
   // Manual payment verification (migration 031)
   payment_verification_note?: string | null;

@@ -33,6 +33,8 @@ import {
   XCircle,
   AlertTriangle,
   Send,
+  Zap,
+  Ban,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -54,8 +56,30 @@ interface RideCheckerAssignmentPanelProps {
   onRefresh: () => void;
 }
 
+function useCountdown(expiresAt: string | null | undefined, active: boolean) {
+  const [secsLeft, setSecsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt || !active) {
+      setSecsLeft(null);
+      return;
+    }
+    const tick = () => {
+      const diff = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000);
+      setSecsLeft(Math.max(0, diff));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt, active]);
+
+  return secsLeft;
+}
+
 function assignmentBadge(status: string | undefined) {
   switch (status) {
+    case "awaiting_acceptance":
+      return <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700">Awaiting Acceptance</Badge>;
     case "assigned":
       return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Assigned</Badge>;
     case "accepted":
@@ -100,6 +124,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
   const [selectedDirect, setSelectedDirect] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const [selectedBroadcast, setSelectedBroadcast] = useState<Set<string>>(new Set());
   const [broadcastPay, setBroadcastPay] = useState<string>(
@@ -110,6 +135,12 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
   const [broadcasts, setBroadcasts] = useState<JobBroadcast[]>([]);
   const [bLoading, setBLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Expiry info for awaiting_acceptance — fetched from assignment
+  const [assignmentExpiresAt, setAssignmentExpiresAt] = useState<string | null>(null);
+  const isAwaitingAcceptance = order.assignment_status === "awaiting_acceptance";
+
+  const secsLeft = useCountdown(assignmentExpiresAt, isAwaitingAcceptance);
 
   const loadRidecheckers = useCallback(async () => {
     setRcLoading(true);
@@ -141,10 +172,36 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
     }
   }, [order.id]);
 
+  // Fetch latest assignment to get expires_at
+  const loadAssignmentExpiry = useCallback(async () => {
+    if (!order.assigned_ridechecker_id) return;
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("ridechecker_job_assignments")
+        .select("expires_at, status")
+        .eq("order_id", order.id)
+        .eq("ridechecker_id", order.assigned_ridechecker_id)
+        .in("status", ["awaiting_acceptance", "assigned"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.expires_at) {
+        setAssignmentExpiresAt(data.expires_at);
+      }
+    } catch {
+      /* silent */
+    }
+  }, [order.id, order.assigned_ridechecker_id]);
+
   useEffect(() => {
     loadRidecheckers();
     loadBroadcasts();
-  }, [loadRidecheckers, loadBroadcasts]);
+    if (isAwaitingAcceptance) {
+      loadAssignmentExpiry();
+    }
+  }, [loadRidecheckers, loadBroadcasts, loadAssignmentExpiry, isAwaitingAcceptance]);
 
   async function handleDirectAssign() {
     if (!selectedDirect) return;
@@ -161,8 +218,12 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
         return;
       }
       const rc = ridecheckers.find((r) => r.id === selectedDirect);
-      toast({ title: "RideChecker assigned", description: rc?.full_name });
+      toast({
+        title: "RideChecker notified",
+        description: `${rc?.full_name} has 15 minutes to accept.`,
+      });
       setSelectedDirect("");
+      setAssignmentExpiresAt(data.expires_at ?? null);
       onRefresh();
       loadBroadcasts();
     } catch {
@@ -185,11 +246,30 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
         return;
       }
       toast({ title: "Assignment removed" });
+      setAssignmentExpiresAt(null);
       onRefresh();
     } catch {
       toast({ title: "Unexpected error", variant: "destructive" });
     } finally {
       setRemoving(false);
+    }
+  }
+
+  async function handleCancelAssignment() {
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${order.id}/cancel-assignment`, { method: "POST" });
+      if (!res.ok) {
+        toast({ title: "Failed to cancel assignment", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Assignment cancelled", description: "Order is now unassigned." });
+      setAssignmentExpiresAt(null);
+      onRefresh();
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -257,6 +337,10 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
   const openBroadcasts = broadcasts.filter((b) => b.status === "sent");
   const hasHistory = broadcasts.length > 0;
 
+  const minsLeft = secsLeft !== null ? Math.floor(secsLeft / 60) : null;
+  const sLeft = secsLeft !== null ? secsLeft % 60 : null;
+  const isExpiredCountdown = secsLeft !== null && secsLeft === 0;
+
   return (
     <Card data-testid="card-ridechecker-assignment">
       <CardHeader className="pb-3">
@@ -269,8 +353,67 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Current assignment */}
-        {order.assigned_ridechecker_id && (
+
+        {/* ── Awaiting acceptance status pane ─────────────────── */}
+        {isAwaitingAcceptance && order.assigned_ridechecker_id && (
+          <div className={`rounded-lg border p-3 space-y-2 ${
+            isExpiredCountdown
+              ? "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800"
+              : "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800"
+          }`}>
+            <div className="flex items-center gap-2">
+              <Zap className={`h-4 w-4 flex-shrink-0 ${isExpiredCountdown ? "text-red-500" : "text-amber-600"}`} />
+              <p className={`text-xs font-semibold ${isExpiredCountdown ? "text-red-700 dark:text-red-400" : "text-amber-800 dark:text-amber-300"}`}>
+                {isExpiredCountdown ? "Acceptance window expired — reassign now" : "Awaiting RideChecker acceptance"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate text-foreground">
+                  {currentRc?.full_name ?? "Assigned RideChecker"}
+                </p>
+                {currentRc?.email && (
+                  <p className="text-xs text-muted-foreground truncate">{currentRc.email}</p>
+                )}
+              </div>
+              {secsLeft !== null && !isExpiredCountdown && (
+                <div
+                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${
+                    secsLeft < 180
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                  }`}
+                  data-testid="text-ops-countdown"
+                >
+                  <Clock className="h-3 w-3" />
+                  {minsLeft}m {sLeft! < 10 ? "0" : ""}{sLeft}s
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs flex-1 border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                onClick={handleCancelAssignment}
+                disabled={cancelling}
+                data-testid="button-cancel-assignment"
+              >
+                {cancelling ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Ban className="h-3 w-3 mr-1" />
+                )}
+                Cancel &amp; Reassign
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Accepted / active assignment ─────────────────────── */}
+        {order.assigned_ridechecker_id && !isAwaitingAcceptance && (
           <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-md px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium truncate">
@@ -293,9 +436,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
           </div>
         )}
 
-        {/* Direct assign */}
+        {/* ── Direct assign ───────────────────────────────────── */}
         <div className="space-y-2">
-          <Label className="text-xs font-medium">Direct Assign</Label>
+          <Label className="text-xs font-medium">
+            {isAwaitingAcceptance ? "Reassign to Different RideChecker" : "Direct Assign"}
+          </Label>
           <div className="flex gap-2">
             <Select
               value={selectedDirect}
@@ -341,9 +486,12 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
               ) : (
                 <UserCheck className="h-3.5 w-3.5" />
               )}
-              Assign
+              {isAwaitingAcceptance ? "Reassign" : "Assign"}
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            RideChecker will have 15 minutes to accept before the offer expires.
+          </p>
         </div>
 
         <div className="relative">
@@ -355,7 +503,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
           </div>
         </div>
 
-        {/* Broadcast */}
+        {/* ── Broadcast ───────────────────────────────────────── */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-medium">Broadcast to RideCheckers</Label>
@@ -452,7 +600,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
           )}
         </div>
 
-        {/* Broadcast history */}
+        {/* ── Broadcast history ───────────────────────────────── */}
         {hasHistory && (
           <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
             <CollapsibleTrigger asChild>
