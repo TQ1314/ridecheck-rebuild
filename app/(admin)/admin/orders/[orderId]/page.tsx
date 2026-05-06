@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { formatRelative, statusLabel } from "@/lib/utils/format";
+import { formatRelative, statusLabel, formatEventDetails } from "@/lib/utils/format";
 
 const OPS_STATUSES = [
   "new",
@@ -279,7 +279,7 @@ export default function AdminOrderDetailPage() {
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-update-ops-status">
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-              Update Status
+              Ops Stage
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -451,11 +451,12 @@ export default function AdminOrderDetailPage() {
                         {event.actor_email && (
                           <p className="text-muted-foreground text-xs">by {event.actor_email}</p>
                         )}
-                        {event.details && (
-                          <p className="text-muted-foreground text-xs">
-                            {JSON.stringify(event.details)}
-                          </p>
-                        )}
+                        {event.details && (() => {
+                          const label = formatEventDetails(event.details);
+                          return label ? (
+                            <p className="text-muted-foreground text-xs">{label}</p>
+                          ) : null;
+                        })()}
                       </div>
                       <span className="text-xs text-muted-foreground flex-shrink-0">
                         {formatRelative(event.created_at)}
@@ -489,11 +490,17 @@ export default function AdminOrderDetailPage() {
                         <p className="text-muted-foreground text-xs">
                           {entry.actor_email || "System"} ({entry.actor_role || "—"})
                         </p>
-                        {entry.new_value && (
-                          <p className="text-muted-foreground text-xs truncate max-w-md">
-                            {JSON.stringify(entry.new_value)}
-                          </p>
-                        )}
+                        {entry.new_value && (() => {
+                          const label = formatEventDetails(entry.new_value);
+                          if (label) return <p className="text-muted-foreground text-xs">{label}</p>;
+                          // Fallback: render as compact key→value pairs
+                          const pairs = Object.entries(entry.new_value)
+                            .filter(([, v]) => v != null && typeof v !== "object" && String(v).length < 80)
+                            .map(([k, v]) => `${statusLabel(k)}: ${v}`);
+                          return pairs.length > 0 ? (
+                            <p className="text-muted-foreground text-xs">{pairs.join(" · ")}</p>
+                          ) : null;
+                        })()}
                       </div>
                       <span className="text-xs text-muted-foreground flex-shrink-0">
                         {formatRelative(entry.created_at)}
