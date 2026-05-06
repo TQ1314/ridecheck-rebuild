@@ -1,0 +1,124 @@
+What’s Still Missing (The Real Gaps)
+
+Now let’s get sharp — this is where your next wins are.
+
+1. ❗ Payment Truth Problem (You already felt this pain)
+
+You said:
+
+Stripe shows paid, system says “awaiting payment”
+
+That is not acceptable at scale.
+
+Fix:
+
+You need a single source of truth system
+
+Right now you likely have:
+
+Stripe = truth
+Database = lagging state
+You need:
+Webhook → Supabase sync
+OR manual override (you started this)
+
+👉 Add:
+
+Ops Button:
+
+“Mark as Paid (with evidence upload)”
+
+Audit log:
+
+Who approved it
+Screenshot / reference
+2. ❗ Ops Visibility of Job Acceptance (Critical)
+
+You said:
+
+Ops doesn’t know if a RideChecker accepted
+
+That’s a core marketplace failure if unresolved.
+
+You need:
+
+Real-time job status panel:
+
+Pending
+Accepted
+Declined
+Expired
+
+AND:
+
+Timestamp of acceptance
+Who accepted
+
+👉 This must be visible without refreshing or digging
+
+3. ❗ No SLA / Timing Enforcement
+
+Right now you have flow… but not time discipline.
+
+You need:
+
+“Assignment must be accepted in X minutes”
+“Inspection must be completed within X hours”
+“Report must be delivered within X hours”
+
+👉 Add:
+
+Countdown timers
+Auto-escalation (reassign if late)
+4. ❗ No RideChecker Location Awareness (Important)
+
+You partially solved with directions, but:
+
+You still don’t have:
+
+Distance scoring
+Closest RC auto-priority
+Territory coverage visibility
+
+👉 This matters when scaling in cities like Chicago.
+
+5. ❗ Customer Messaging Is One-Way Structured (Needs Upgrade)
+
+You added ops → buyer messaging ✅
+
+But you still need:
+
+Buyer replies → captured in system
+Thread view per order
+
+👉 Otherwise communication gets fragmented across email/SMS.
+
+6. ❗ Fraud / Seller Risk Layer Missing
+
+From your own SOP gap earlier:
+
+You need a fraud checklist UI
+
+Example flags:
+
+VIN mismatch
+Seller rushing
+Title issues
+Different car than listing
+
+👉 This becomes:
+
+Data advantage
+Legal protection
+Product differentiation
+🔥 Strategic Insight (This is Important)
+
+What you’ve built is shifting from:
+
+“Inspection service”
+
+to:
+
+“Transaction risk management infrastructure”
+
+That’s a completely different company.

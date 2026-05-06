@@ -10,6 +10,7 @@ import { BuyerCard } from "@/components/orders/BuyerCard";
 import { RideCheckerAssignmentPanel } from "@/components/orders/RideCheckerAssignmentPanel";
 import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
+import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
@@ -108,7 +109,14 @@ export default function OpsOrderDetailPage() {
     setLoading(false);
   }, [orderId]);
 
+  // Initial load
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh every 45 s — surfaces RC acceptance / payment changes without manual reload
+  useEffect(() => {
+    const id = setInterval(loadData, 45_000);
+    return () => clearInterval(id);
+  }, [loadData]);
 
   /* ── Handlers ─────────────────────────────────────────────── */
   const handleStatusUpdate = async (newStatus: string) => {
@@ -291,6 +299,39 @@ export default function OpsOrderDetailPage() {
         </div>
       </div>
 
+      {/* ── SLA timing strip ────────────────────────────────── */}
+      {(() => {
+        const milestones: { label: string; ts: string | null | undefined; warnHrs: number; critHrs: number }[] = [
+          { label: "Paid",            ts: order.paid_at,                  warnHrs: 4,  critHrs: 24  },
+          { label: "Assigned",        ts: order.assigned_at,              warnHrs: 2,  critHrs: 8   },
+          { label: "Seller confirmed",ts: order.seller_confirmed_at,      warnHrs: 4,  critHrs: 12  },
+          { label: "Inspected",       ts: order.inspection_completed_at,  warnHrs: 4,  critHrs: 24  },
+          { label: "Report delivered",ts: order.report_delivered_at ?? order.report_sent_at, warnHrs: 2, critHrs: 6 },
+        ].filter((m) => m.ts);
+        if (milestones.length === 0) return null;
+        return (
+          <div className="flex items-center gap-2 flex-wrap" data-testid="strip-sla">
+            {milestones.map((m) => {
+              const hrs = Math.floor((Date.now() - new Date(m.ts!).getTime()) / 3_600_000);
+              const cls =
+                hrs >= m.critHrs ? "text-red-700 bg-red-50 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800" :
+                hrs >= m.warnHrs ? "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800" :
+                "text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800";
+              const display = hrs < 1
+                ? `${Math.floor((Date.now() - new Date(m.ts!).getTime()) / 60_000)}m`
+                : hrs < 24 ? `${hrs}h` : `${Math.floor(hrs / 24)}d`;
+              return (
+                <span key={m.label} className={`inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5 ${cls}`}
+                  data-testid={`sla-${m.label.replace(/\s/g, "-").toLowerCase()}`}>
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {m.label}: <strong>{display} ago</strong>
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* ── 2-column dashboard ──────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
         {/* ── LEFT column ─────────────────────────────────── */}
@@ -305,6 +346,7 @@ export default function OpsOrderDetailPage() {
           <RideCheckerAssignmentPanel order={order} onRefresh={loadData} />
           <PayPanel order={order} onRefresh={loadData} />
           <ReportPanel order={order} onRefresh={loadData} />
+          <RiskFlagsPanel order={order} onRefresh={loadData} />
 
           {/* Package Override */}
           {canOverride && (

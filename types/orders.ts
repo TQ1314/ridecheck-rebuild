@@ -151,6 +151,8 @@ export interface Order {
   payment_verified_at?: string | null;
   payment_amount_verified?: number | null;
   payment_payer_email?: string | null;
+  // Risk / fraud flags (manual ops flags + auto-generated from classification)
+  risk_flags?: Record<string, boolean | string | number> | null;
 }
 
 export interface JobBroadcast {
