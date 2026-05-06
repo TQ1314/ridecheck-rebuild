@@ -38,7 +38,9 @@ import {
   Eye,
   EyeOff,
   Bell,
+  MessageSquare,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
 
@@ -144,6 +146,9 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
   const [assignmentFirstViewed, setAssignmentFirstViewed] = useState<string | null>(null);
   const [assignmentLastNudge, setAssignmentLastNudge] = useState<string | null>(null);
   const [nudging, setNudging] = useState(false);
+  const [rcMsg, setRcMsg] = useState("");
+  const [rcMsgSending, setRcMsgSending] = useState(false);
+  const [rcMsgOpen, setRcMsgOpen] = useState(false);
   const isAwaitingAcceptance = order.assignment_status === "awaiting_acceptance";
 
   const secsLeft = useCountdown(assignmentExpiresAt, isAwaitingAcceptance);
@@ -258,6 +263,36 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
       toast({ title: "Unexpected error", variant: "destructive" });
     } finally {
       setRemoving(false);
+    }
+  }
+
+  async function handleSendRCMessage() {
+    if (!rcMsg.trim()) return;
+    setRcMsgSending(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${order.id}/message-ridechecker`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: rcMsg.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed to send", description: data.error, variant: "destructive" });
+        return;
+      }
+      const sent: string[] = [];
+      if (data.email) sent.push("email");
+      if (data.sms) sent.push("SMS");
+      toast({
+        title: "Message sent to RideChecker",
+        description: sent.length > 0 ? `Delivered via ${sent.join(" & ")}` : "Message dispatched.",
+      });
+      setRcMsg("");
+      setRcMsgOpen(false);
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setRcMsgSending(false);
     }
   }
 
@@ -480,25 +515,76 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
 
         {/* ── Accepted / active assignment ─────────────────────── */}
         {order.assigned_ridechecker_id && !isAwaitingAcceptance && (
-          <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-md px-3 py-2">
-            <div className="min-w-0">
-              <p className="text-xs font-medium truncate">
-                {currentRc?.full_name ?? "Assigned RideChecker"}
-              </p>
-              {currentRc?.email && (
-                <p className="text-xs text-muted-foreground truncate">{currentRc.email}</p>
-              )}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-md px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">
+                  {currentRc?.full_name ?? "Assigned RideChecker"}
+                </p>
+                {currentRc?.email && (
+                  <p className="text-xs text-muted-foreground truncate">{currentRc.email}</p>
+                )}
+                {currentRc?.phone && (
+                  <p className="text-xs text-muted-foreground truncate">{currentRc.phone}</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-muted-foreground hover:text-destructive shrink-0"
+                onClick={handleRemoveAssignment}
+                disabled={removing}
+                data-testid="button-remove-assignment"
+              >
+                {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-muted-foreground hover:text-destructive shrink-0"
-              onClick={handleRemoveAssignment}
-              disabled={removing}
-              data-testid="button-remove-assignment"
-            >
-              {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-            </Button>
+
+            {/* Message RC */}
+            {rcMsgOpen ? (
+              <div className="rounded-md border bg-muted/30 p-2.5 space-y-2">
+                <Textarea
+                  value={rcMsg}
+                  onChange={(e) => setRcMsg(e.target.value)}
+                  placeholder="Type a message to the RideChecker…"
+                  rows={3}
+                  className="text-xs resize-none"
+                  data-testid="textarea-rc-message"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs flex-1 gap-1.5"
+                    onClick={handleSendRCMessage}
+                    disabled={rcMsgSending || !rcMsg.trim()}
+                    data-testid="button-send-rc-message"
+                  >
+                    {rcMsgSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                    Send
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => { setRcMsgOpen(false); setRcMsg(""); }}
+                    data-testid="button-cancel-rc-message"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs w-full gap-1.5"
+                onClick={() => setRcMsgOpen(true)}
+                data-testid="button-open-rc-message"
+              >
+                <MessageSquare className="h-3 w-3" />
+                Message RideChecker
+              </Button>
+            )}
           </div>
         )}
 

@@ -446,6 +446,9 @@ export default function JobDetailPage() {
             <p className="text-sm text-amber-700 dark:text-amber-400">
               Review the details below, then accept or decline. If no response is received in time, the offer will expire automatically.
             </p>
+            <div className="text-xs text-amber-600 dark:text-amber-500 border-t border-amber-200 dark:border-amber-700 pt-2 mt-1">
+              <span className="font-semibold">Reminder:</span> 3 declines in 30 days triggers a warning. 5 declines in 30 days results in automatic account suspension.
+            </div>
             {secsLeft !== null && (
               <div className={`inline-flex items-center gap-2 font-bold text-lg px-3 py-1 rounded-lg ${
                 secsLeft < 180
@@ -562,7 +565,7 @@ export default function JobDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {(order?.inspection_address || order?.vehicle_location) && (
-              <div className="space-y-0.5">
+              <div className="space-y-1.5">
                 <p className="font-medium" data-testid="text-inspection-address">
                   {order.inspection_address || order.vehicle_location}
                 </p>
@@ -572,17 +575,31 @@ export default function JobDetailPage() {
                       Vehicle listed at: {order.vehicle_location}
                     </p>
                   )}
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(
-                    order.inspection_address || order.vehicle_location || ""
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary underline underline-offset-2"
-                  data-testid="link-maps"
-                >
-                  Open in Maps
-                </a>
+                <div className="flex gap-2 flex-wrap">
+                  <a
+                    href={`https://maps.google.com/maps?daddr=${encodeURIComponent(
+                      order.inspection_address || order.vehicle_location || ""
+                    )}&saddr=My+Location`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-white bg-[#22774F] hover:bg-[#1a5e3e] px-3 py-1.5 rounded-md"
+                    data-testid="link-directions"
+                  >
+                    <MapPin className="h-3 w-3" />
+                    Get Directions from My Location
+                  </a>
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(
+                      order.inspection_address || order.vehicle_location || ""
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground border rounded-md px-2 py-1.5 hover:bg-muted"
+                    data-testid="link-maps"
+                  >
+                    View on Map
+                  </a>
+                </div>
               </div>
             )}
             {(order?.scheduled_date || assignment.scheduled_start) && (
