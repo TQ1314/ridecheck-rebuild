@@ -705,3 +705,22 @@ COMMENT ON COLUMN public.ridechecker_job_assignments.expires_at
 
 COMMENT ON COLUMN public.ridechecker_job_assignments.declined_at
   IS 'Timestamp when the RideChecker declined the assignment';
+
+
+-- ============================================================
+-- MIGRATION 033: Assignment comms tracking
+-- first_viewed_at: when RC first opened the job detail page
+-- last_nudge_at:   when ops last re-sent the notification
+-- ============================================================
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ridechecker_job_assignments' AND column_name='first_viewed_at') THEN
+    ALTER TABLE public.ridechecker_job_assignments ADD COLUMN first_viewed_at TIMESTAMPTZ NULL;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ridechecker_job_assignments' AND column_name='last_nudge_at') THEN
+    ALTER TABLE public.ridechecker_job_assignments ADD COLUMN last_nudge_at TIMESTAMPTZ NULL;
+  END IF;
+END $$;

@@ -81,39 +81,50 @@ export async function POST(
     try {
       const { data: rcs } = await supabaseAdmin
         .from("profiles")
-        .select("id, email, full_name")
+        .select("id, email, full_name, phone")
         .in("id", ridechecker_ids);
 
       if (rcs && rcs.length > 0) {
         const { sendEmail } = await import("@/lib/notifications/email");
+        const { sendSMS } = await import("@/lib/notifications/sms");
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
+        const jobUrl = `${appUrl}/ridechecker/dashboard`;
 
         await Promise.allSettled(
-          rcs.map((rc) =>
-            sendEmail({
-              to: rc.email,
-              subject: "New RideCheck Job Available — Quick Response Needed",
-              html: `
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-                  <div style="text-align:center;margin-bottom:20px;">
-                    <h1 style="color:#22774F;margin:0;font-size:24px;">RideCheck</h1>
-                    <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Field Inspection Network</p>
-                  </div>
-                  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px;margin-bottom:20px;">
-                    <p style="font-weight:700;color:#166534;margin:0 0 4px;font-size:16px;">A new job is available near you</p>
-                    <p style="color:#15803d;margin:0;font-size:13px;">First to accept wins the job. Act fast.</p>
-                  </div>
-                  <p style="color:#1e293b;">Hi ${rc.full_name?.split(" ")[0] || "there"},</p>
-                  <p style="color:#475569;line-height:1.6;">A new vehicle assessment job has been sent to you. The offered pay is <strong>$${offered_pay}</strong>. Log in to your RideCheck dashboard to view details and accept.</p>
-                  <p style="text-align:center;margin:24px 0;">
-                    <a href="${appUrl}/ridechecker/jobs" style="display:inline-block;background:#22774F;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;font-weight:700;">View &amp; Accept Job</a>
-                  </p>
-                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 12px;" />
-                  <p style="color:#94a3b8;font-size:12px;text-align:center;">RideCheck — Pre-Car-Purchase Intelligence<br/>Questions? <a href="mailto:support@ridecheckauto.com" style="color:#22774F;">support@ridecheckauto.com</a></p>
+          rcs.flatMap((rc) => {
+            const firstName = rc.full_name?.split(" ")[0] || "there";
+            const emailHtml = `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <div style="text-align:center;margin-bottom:20px;">
+                  <h1 style="color:#22774F;margin:0;font-size:24px;">RideCheck</h1>
+                  <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Field Inspection Network</p>
                 </div>
-              `,
-            })
-          )
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px;margin-bottom:20px;">
+                  <p style="font-weight:700;color:#166534;margin:0 0 4px;font-size:16px;">A new job is available near you</p>
+                  <p style="color:#15803d;margin:0;font-size:13px;">First to accept wins the job. Act fast.</p>
+                </div>
+                <p style="color:#1e293b;">Hi ${firstName},</p>
+                <p style="color:#475569;line-height:1.6;">A new vehicle assessment job has been sent to you. The offered pay is <strong>$${offered_pay}</strong>. Log in to your RideCheck dashboard to view details and accept.</p>
+                <p style="text-align:center;margin:24px 0;">
+                  <a href="${jobUrl}" style="display:inline-block;background:#22774F;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;font-weight:700;">View &amp; Accept Job</a>
+                </p>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 12px;" />
+                <p style="color:#94a3b8;font-size:12px;text-align:center;">RideCheck — Pre-Car-Purchase Intelligence<br/>Questions? <a href="mailto:support@ridecheckauto.com" style="color:#22774F;">support@ridecheckauto.com</a></p>
+              </div>
+            `;
+            const notifs: Promise<any>[] = [
+              sendEmail({
+                to: rc.email,
+                subject: "New RideCheck Job Available — Quick Response Needed",
+                html: emailHtml,
+              }),
+            ];
+            if ((rc as any).phone) {
+              const smsBody = `RideCheck: Hi ${firstName}, a new job ($${offered_pay}) is available near you — first to accept wins. Check your dashboard: ${jobUrl}`;
+              notifs.push(sendSMS({ to: (rc as any).phone, body: smsBody }));
+            }
+            return notifs;
+          })
         );
       }
     } catch {

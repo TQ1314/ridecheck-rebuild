@@ -285,6 +285,10 @@ export default function JobDetailPage() {
         const data = await res.json();
         setAssignment(data.assignment);
         setOrder(data.order);
+        // Stamp first_viewed_at when RC opens a pending offer (best-effort)
+        if (data.assignment?.status === "awaiting_acceptance") {
+          fetch(`/api/ridechecker/jobs/${assignmentId}/mark-viewed`, { method: "POST" }).catch(() => {});
+        }
       } else {
         toast({ title: "Assignment not found", variant: "destructive" });
         router.push("/ridechecker/jobs");

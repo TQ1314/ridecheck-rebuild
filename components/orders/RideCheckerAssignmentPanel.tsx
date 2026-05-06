@@ -35,6 +35,9 @@ import {
   Send,
   Zap,
   Ban,
+  Eye,
+  EyeOff,
+  Bell,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -138,6 +141,9 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
 
   // Expiry info for awaiting_acceptance — fetched from assignment
   const [assignmentExpiresAt, setAssignmentExpiresAt] = useState<string | null>(null);
+  const [assignmentFirstViewed, setAssignmentFirstViewed] = useState<string | null>(null);
+  const [assignmentLastNudge, setAssignmentLastNudge] = useState<string | null>(null);
+  const [nudging, setNudging] = useState(false);
   const isAwaitingAcceptance = order.assignment_status === "awaiting_acceptance";
 
   const secsLeft = useCountdown(assignmentExpiresAt, isAwaitingAcceptance);
@@ -172,7 +178,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
     }
   }, [order.id]);
 
-  // Fetch latest assignment to get expires_at
+  // Fetch latest assignment to get expires_at, first_viewed_at, last_nudge_at
   const loadAssignmentExpiry = useCallback(async () => {
     if (!order.assigned_ridechecker_id) return;
     try {
@@ -180,16 +186,16 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
       const supabase = createClient();
       const { data } = await supabase
         .from("ridechecker_job_assignments")
-        .select("expires_at, status")
+        .select("expires_at, status, first_viewed_at, last_nudge_at")
         .eq("order_id", order.id)
         .eq("ridechecker_id", order.assigned_ridechecker_id)
         .in("status", ["awaiting_acceptance", "assigned"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (data?.expires_at) {
-        setAssignmentExpiresAt(data.expires_at);
-      }
+      if (data?.expires_at) setAssignmentExpiresAt(data.expires_at);
+      setAssignmentFirstViewed(data?.first_viewed_at ?? null);
+      setAssignmentLastNudge(data?.last_nudge_at ?? null);
     } catch {
       /* silent */
     }
@@ -252,6 +258,30 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
       toast({ title: "Unexpected error", variant: "destructive" });
     } finally {
       setRemoving(false);
+    }
+  }
+
+  async function handleNudge() {
+    setNudging(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${order.id}/nudge-ridechecker`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Nudge failed", description: data.error, variant: "destructive" });
+        return;
+      }
+      const channels: string[] = [];
+      if (data.sms_sent) channels.push("SMS");
+      if (data.email_sent) channels.push("email");
+      toast({
+        title: "Reminder sent",
+        description: channels.length > 0 ? `Sent via ${channels.join(" & ")}` : "Notification dispatched.",
+      });
+      setAssignmentLastNudge(new Date().toISOString());
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setNudging(false);
     }
   }
 
@@ -392,7 +422,43 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
               )}
             </div>
 
+            {/* Seen / Not opened indicator */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {assignmentFirstViewed ? (
+                <span className="flex items-center gap-1 text-green-700 dark:text-green-400 font-medium">
+                  <Eye className="h-3 w-3" />
+                  Opened {formatRelative(assignmentFirstViewed)}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <EyeOff className="h-3 w-3" />
+                  Not yet opened
+                </span>
+              )}
+              {assignmentLastNudge && (
+                <span className="text-muted-foreground ml-2">
+                  · Last nudged {formatRelative(assignmentLastNudge)}
+                </span>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs flex-1 border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                onClick={handleNudge}
+                disabled={nudging || isExpiredCountdown}
+                data-testid="button-nudge-ridechecker"
+                title="Re-send SMS + email reminder to the RideChecker"
+              >
+                {nudging ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Bell className="h-3 w-3 mr-1" />
+                )}
+                Nudge
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
