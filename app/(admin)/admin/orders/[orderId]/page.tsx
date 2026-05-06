@@ -40,6 +40,7 @@ import {
   Send,
   FileCheck,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -257,7 +258,7 @@ export default function AdminOrderDetailPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ops-status">
-            {statusLabel(order.ops_status || "new")}
+            Stage: {statusLabel(order.ops_status || "new")}
           </Badge>
           {assignedRc && (
             <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-ridechecker">
@@ -413,6 +414,22 @@ export default function AdminOrderDetailPage() {
           onUpdate={handleStatusUpdate}
         />
       </div>
+
+      {/* ── Payment status mismatch warning ── */}
+      {["payment_received", "assigned", "active", "inspection_complete", "report_ready", "delivered"].includes(order.ops_status || "") &&
+        !["paid", "paid_manual_verified"].includes(order.payment_status || "") && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm" data-testid="alert-payment-mismatch">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-800 dark:text-amber-300">Payment status mismatch</p>
+            <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
+              The ops stage is set to <strong>{statusLabel(order.ops_status || "")}</strong> but the actual payment status is{" "}
+              <strong>{statusLabel(order.payment_status || "unknown")}</strong>. No Stripe payment has been confirmed.
+              Use <em>Manually Verify Payment</em> if payment was received outside Stripe, or correct the ops stage.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Control-center top row: Buyer + Next Action ── */}
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 items-start">
