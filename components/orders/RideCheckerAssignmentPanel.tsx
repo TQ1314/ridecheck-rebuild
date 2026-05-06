@@ -53,6 +53,7 @@ interface RideCheckerSuggestion {
   rating: number;
   active_jobs: number;
   max_daily_jobs: number;
+  decline_count_30d: number;
   score: number;
 }
 
@@ -146,6 +147,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
   const [assignmentFirstViewed, setAssignmentFirstViewed] = useState<string | null>(null);
   const [assignmentLastNudge, setAssignmentLastNudge] = useState<string | null>(null);
   const [nudging, setNudging] = useState(false);
+  const [nudgeCount, setNudgeCount] = useState(0);
   const [rcMsg, setRcMsg] = useState("");
   const [rcMsgSending, setRcMsgSending] = useState(false);
   const [rcMsgOpen, setRcMsgOpen] = useState(false);
@@ -201,6 +203,14 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
       if (data?.expires_at) setAssignmentExpiresAt(data.expires_at);
       setAssignmentFirstViewed(data?.first_viewed_at ?? null);
       setAssignmentLastNudge(data?.last_nudge_at ?? null);
+
+      // Count nudge events for this order
+      const { count } = await supabase
+        .from("order_events")
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", order.id)
+        .eq("event_type", "ridechecker_nudged");
+      setNudgeCount(count ?? 0);
     } catch {
       /* silent */
     }
@@ -472,7 +482,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
               )}
               {assignmentLastNudge && (
                 <span className="text-muted-foreground ml-2">
-                  · Last nudged {formatRelative(assignmentLastNudge)}
+                  · Nudged {nudgeCount > 0 ? `${nudgeCount}×` : ""} {formatRelative(assignmentLastNudge)}
                 </span>
               )}
             </div>
@@ -614,10 +624,13 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                         <Star className="h-2.5 w-2.5" />
                         {rc.rating.toFixed(1)}
                       </span>
-                      <span className="text-muted-foreground flex items-center gap-1">
+                      <span className={`flex items-center gap-1 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500" : "text-muted-foreground"}`}>
                         <Briefcase className="h-2.5 w-2.5" />
-                        {rc.active_jobs}
+                        {rc.active_jobs}/{rc.max_daily_jobs}
                       </span>
+                      {rc.decline_count_30d >= 3 && (
+                        <span className="text-amber-600">⚠ {rc.decline_count_30d}d</span>
+                      )}
                     </span>
                   </SelectItem>
                 ))}
@@ -690,7 +703,19 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                     data-testid={`checkbox-broadcast-${rc.id}`}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{rc.full_name}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-medium truncate">{rc.full_name}</p>
+                      {rc.decline_count_30d >= 4 && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4" title="High decline rate in last 30 days">
+                          {rc.decline_count_30d} declines
+                        </span>
+                      )}
+                      {rc.decline_count_30d === 3 && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-amber-100 text-amber-700 border border-amber-200 leading-4" title="Has received a warning for declines">
+                          3 declines
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {rc.service_area || rc.email}
                     </p>
@@ -700,7 +725,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                       <Star className="h-2.5 w-2.5" />
                       {rc.rating.toFixed(1)}
                     </span>
-                    <span className="flex items-center gap-0.5">
+                    <span className={`flex items-center gap-0.5 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500 font-medium" : ""}`}>
                       <Briefcase className="h-2.5 w-2.5" />
                       {rc.active_jobs}/{rc.max_daily_jobs}
                     </span>

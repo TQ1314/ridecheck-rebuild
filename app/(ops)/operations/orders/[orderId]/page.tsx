@@ -29,6 +29,7 @@ import {
   Send,
   ShieldCheck,
   Loader2,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +41,19 @@ const PACKAGE_OPTIONS = [
   { value: "plus",     label: "Plus — $169" },
   { value: "exotic",   label: "Exotic — $299" },
 ];
+
+function formatAge(isoDate: string | undefined | null): { label: string; color: string } | null {
+  if (!isoDate) return null;
+  const ms = Date.now() - new Date(isoDate).getTime();
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return { label: `${mins}m at this stage`, color: "text-green-700 bg-green-50 border-green-200" };
+  if (hrs < 12)  return { label: `${hrs}h at this stage`, color: "text-green-700 bg-green-50 border-green-200" };
+  if (hrs < 24)  return { label: `${hrs}h at this stage`, color: "text-amber-700 bg-amber-50 border-amber-200" };
+  if (hrs < 48)  return { label: `${hrs}h at this stage`, color: "text-amber-700 bg-amber-50 border-amber-200" };
+  const days = Math.floor(hrs / 24);
+  return { label: `${days}d ${hrs % 24}h at this stage`, color: "text-red-700 bg-red-50 border-red-200" };
+}
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
@@ -220,6 +234,19 @@ export default function OpsOrderDetailPage() {
                   {order.ops_status.replace(/_/g, " ")}
                 </Badge>
               )}
+              {(() => {
+                const age = formatAge(order.updated_at);
+                return age ? (
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium border rounded px-1.5 py-0.5 ${age.color}`}
+                    data-testid="badge-order-age"
+                    title="Time since last status change"
+                  >
+                    <Clock className="h-3 w-3" />
+                    {age.label}
+                  </span>
+                ) : null;
+              })()}
             </div>
             {vehicle && (
               <p className="text-sm text-muted-foreground truncate">{vehicle}</p>

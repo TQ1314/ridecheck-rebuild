@@ -29,18 +29,37 @@ export async function GET(req: NextRequest) {
   }
 
   const rcIds = activeRidecheckers.map((rc: any) => rc.id);
-  const { data: activeJobs } = await supabaseAdmin
-    .from("orders")
-    .select("assigned_inspector_id")
-    .in("assigned_inspector_id", rcIds)
-    .not("inspector_status", "eq", "completed")
-    .not("ops_status", "in", '("completed","cancelled","delivered")');
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [activeJobsRes, declinesRes] = await Promise.all([
+    supabaseAdmin
+      .from("orders")
+      .select("assigned_inspector_id")
+      .in("assigned_inspector_id", rcIds)
+      .not("inspector_status", "eq", "completed")
+      .not("ops_status", "in", '("completed","cancelled","delivered")'),
+    supabaseAdmin
+      .from("ridechecker_job_assignments")
+      .select("ridechecker_id")
+      .in("ridechecker_id", rcIds)
+      .eq("status", "declined")
+      .gte("declined_at", thirtyDaysAgo),
+  ]);
 
   const loadMap: Record<string, number> = {};
-  if (activeJobs) {
-    for (const job of activeJobs) {
+  if (activeJobsRes.data) {
+    for (const job of activeJobsRes.data) {
       if (job.assigned_inspector_id) {
         loadMap[job.assigned_inspector_id] = (loadMap[job.assigned_inspector_id] || 0) + 1;
+      }
+    }
+  }
+
+  const declineMap: Record<string, number> = {};
+  if (declinesRes.data) {
+    for (const row of declinesRes.data) {
+      if (row.ridechecker_id) {
+        declineMap[row.ridechecker_id] = (declineMap[row.ridechecker_id] || 0) + 1;
       }
     }
   }
@@ -48,6 +67,7 @@ export async function GET(req: NextRequest) {
   const scored = activeRidecheckers.map((rc: any) => {
     let score = 0;
     const currentLoad = loadMap[rc.id] || 0;
+    const declineCount = declineMap[rc.id] || 0;
 
     if (serviceArea && rc.service_area) {
       const area = rc.service_area.toLowerCase();
@@ -61,6 +81,7 @@ export async function GET(req: NextRequest) {
     score += rating * 5;
 
     score -= currentLoad * 10;
+    score -= declineCount * 8; // penalize frequent decliners
 
     return {
       id: rc.id,
@@ -71,6 +92,7 @@ export async function GET(req: NextRequest) {
       rating,
       active_jobs: currentLoad,
       max_daily_jobs: rc.ridechecker_max_daily_jobs ?? 5,
+      decline_count_30d: declineCount,
       score,
     };
   });

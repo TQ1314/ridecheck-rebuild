@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Order } from "@/types/orders";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +23,17 @@ import {
 } from "@/components/ui/select";
 import {
   User, Mail, Phone, Package, CreditCard, Send, CheckCircle2,
-  Loader2, MessageSquare, Smartphone,
+  Loader2, MessageSquare, Smartphone, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { packageLabel } from "@/lib/utils/format";
+
+interface BuyerMessage {
+  id: string;
+  created_at: string;
+  details: { message?: string; channel?: string };
+}
 
 interface BuyerCardProps {
   order: Order;
@@ -64,6 +71,17 @@ function paymentBadge(status: string) {
   }
 }
 
+function formatRelativeShort(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
   const { toast } = useToast();
   const [delivering, setDelivering] = useState(false);
@@ -72,6 +90,23 @@ export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
   const [channel, setChannel] = useState<"both" | "email" | "sms">("both");
   const [sending, setSending] = useState(false);
   const [templateKey, setTemplateKey] = useState("");
+  const [msgHistory, setMsgHistory] = useState<BuyerMessage[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const supabase = createClient();
+
+  const loadMsgHistory = useCallback(async () => {
+    const { data } = await supabase
+      .from("order_events")
+      .select("id, created_at, details")
+      .eq("order_id", order.id)
+      .eq("event_type", "buyer_message_sent")
+      .order("created_at", { ascending: false })
+      .limit(8);
+    if (data) setMsgHistory(data as BuyerMessage[]);
+  }, [order.id]);
+
+  useEffect(() => { loadMsgHistory(); }, [loadMsgHistory]);
 
   const canDeliver = order.report_status === "approved" || order.report_status === "generated" || order.report_status === "report_ready" || !!order.report_storage_path || !!order.ops_report_url;
   const alreadyDelivered = !!order.report_delivered_at;
@@ -126,6 +161,7 @@ export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
       setMsgText("");
       setTemplateKey("");
       setMsgOpen(false);
+      loadMsgHistory();
     } catch {
       toast({ title: "Unexpected error", variant: "destructive" });
     } finally {
@@ -188,6 +224,36 @@ export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
           <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded px-2 py-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
             <span>Report delivered</span>
+          </div>
+        )}
+
+        {/* Message history */}
+        {msgHistory.length > 0 && (
+          <div className="pt-1 border-t space-y-1.5">
+            <button
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground w-full transition-colors"
+              onClick={() => setHistoryOpen((o) => !o)}
+              data-testid="button-toggle-msg-history"
+            >
+              {historyOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              <MessageSquare className="h-3 w-3" />
+              {msgHistory.length} message{msgHistory.length !== 1 ? "s" : ""} sent
+            </button>
+            {historyOpen && (
+              <div className="rounded-md border divide-y max-h-40 overflow-y-auto" data-testid="list-msg-history">
+                {msgHistory.map((m) => (
+                  <div key={m.id} className="px-2.5 py-2 space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
+                        {m.details?.channel === "sms" ? "SMS" : m.details?.channel === "email" ? "Email" : "Email + SMS"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{formatRelativeShort(m.created_at)}</span>
+                    </div>
+                    <p className="text-xs text-foreground line-clamp-2">{m.details?.message || "—"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
