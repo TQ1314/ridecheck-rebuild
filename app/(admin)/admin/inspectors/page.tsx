@@ -21,8 +21,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Pencil, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatRelative } from "@/lib/utils/format";
 
 interface RideCheckerForm {
   full_name: string;
@@ -64,6 +73,18 @@ export default function RideCheckersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<RideCheckerForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  // Connecteam state
+  const [ctOpen, setCtOpen] = useState(false);
+  const [ctRc, setCtRc] = useState<RideCheckerRow | null>(null);
+  const [ctLoading, setCtLoading] = useState(false);
+  const [ctSaving, setCtSaving] = useState(false);
+  const [ctLastNotified, setCtLastNotified] = useState<string | null>(null);
+  const [ctForm, setCtForm] = useState({
+    connecteam_name: "",
+    connecteam_status: "active",
+    notes: "",
+  });
 
   async function loadRidecheckers() {
     try {
@@ -148,6 +169,51 @@ export default function RideCheckersPage() {
     toast({ title: editingId ? "RideChecker updated" : "RideChecker created" });
     setDialogOpen(false);
     loadRidecheckers();
+  };
+
+  const openConnecteam = async (rc: RideCheckerRow) => {
+    setCtRc(rc);
+    setCtForm({ connecteam_name: "", connecteam_status: "active", notes: "" });
+    setCtLastNotified(null);
+    setCtOpen(true);
+    setCtLoading(true);
+    try {
+      const res = await fetch(`/api/admin/inspectors/${rc.id}/connecteam`);
+      if (res.ok) {
+        const data = await res.json();
+        setCtLastNotified(data.last_notified_at ?? null);
+        if (data.mapping) {
+          setCtForm({
+            connecteam_name: data.mapping.connecteam_name || "",
+            connecteam_status: data.mapping.connecteam_status || "active",
+            notes: data.mapping.notes || "",
+          });
+        }
+      }
+    } finally {
+      setCtLoading(false);
+    }
+  };
+
+  const saveConnecteam = async () => {
+    if (!ctRc) return;
+    setCtSaving(true);
+    try {
+      const res = await fetch(`/api/admin/inspectors/${ctRc.id}/connecteam`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ctForm),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Connecteam settings saved" });
+      setCtOpen(false);
+    } finally {
+      setCtSaving(false);
+    }
   };
 
   const toggleActive = async (rc: RideCheckerRow) => {
@@ -262,6 +328,91 @@ export default function RideCheckersPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Connecteam Settings Dialog */}
+        <Dialog open={ctOpen} onOpenChange={setCtOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Connecteam — {ctRc?.full_name}
+              </DialogTitle>
+            </DialogHeader>
+            {ctLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : (
+              <div className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-3 text-sm p-3 rounded-md bg-muted/40 border">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Added to Connecteam</p>
+                    <p className="font-medium">
+                      {ctForm.connecteam_name ? "Yes" : "Not yet"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Last Notified</p>
+                    <p className="font-medium text-xs">
+                      {ctLastNotified ? formatRelative(ctLastNotified) : "Never"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">Connecteam Name</Label>
+                  <Input
+                    value={ctForm.connecteam_name}
+                    onChange={(e) => setCtForm({ ...ctForm, connecteam_name: e.target.value })}
+                    placeholder="Name as it appears in Connecteam"
+                    data-testid="input-connecteam-name"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">Connecteam Status</Label>
+                  <Select
+                    value={ctForm.connecteam_status}
+                    onValueChange={(v) => setCtForm({ ...ctForm, connecteam_status: v })}
+                  >
+                    <SelectTrigger data-testid="select-connecteam-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active — currently in Connecteam</SelectItem>
+                      <SelectItem value="inactive">Inactive — not participating</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">Notes (optional)</Label>
+                  <Textarea
+                    value={ctForm.notes}
+                    onChange={(e) => setCtForm({ ...ctForm, notes: e.target.value })}
+                    placeholder="e.g. Added May 2026, prefers morning tasks..."
+                    className="resize-none"
+                    rows={2}
+                    data-testid="textarea-connecteam-notes"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setCtOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveConnecteam}
+                    disabled={ctSaving}
+                    data-testid="button-save-connecteam"
+                  >
+                    {ctSaving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       {error ? (
@@ -284,6 +435,7 @@ export default function RideCheckersPage() {
                 <TableHead>Region</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Capacity</TableHead>
+                <TableHead>Connecteam</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -305,6 +457,18 @@ export default function RideCheckersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">{rc.max_daily_capacity}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-2"
+                      onClick={() => openConnecteam(rc)}
+                      data-testid={`button-connecteam-${rc.id}`}
+                    >
+                      <Users className="h-3.5 w-3.5 mr-1" />
+                      Settings
+                    </Button>
+                  </TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"

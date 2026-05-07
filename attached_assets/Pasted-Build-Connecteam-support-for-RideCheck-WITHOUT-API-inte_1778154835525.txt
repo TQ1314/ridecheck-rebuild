@@ -1,0 +1,110 @@
+Build Connecteam support for RideCheck WITHOUT API integration for now.
+
+IMPORTANT:
+- Connecteam free plan does NOT include API access
+- Do NOT attempt API calls
+- Do NOT build webhook logic yet
+- Do NOT replace RideCheck auth
+- Do NOT rewrite middleware.ts
+- Do NOT change roles
+- RideCheck remains source of truth
+
+Goal:
+Use Connecteam as RideCheck’s internal field communication and coordination platform while RideCheck manages orders, reports, payments, users, and customer communication.
+
+PHASE 1 — DATABASE
+
+Create table if not exists:
+
+connecteam_logs
+- id uuid primary key default gen_random_uuid()
+- order_id uuid nullable
+- ridechecker_id uuid nullable
+- action text
+- notes text nullable
+- created_by uuid nullable
+- created_at timestamptz default now()
+
+Actions:
+- ridechecker_added
+- ridechecker_notified
+- task_created
+- task_reassigned
+- escalation_sent
+- inspection_completed_notice
+
+Create table if not exists:
+
+connecteam_mappings
+- id uuid primary key default gen_random_uuid()
+- profile_id uuid references profiles(id)
+- connecteam_name text
+- connecteam_status text default 'active'
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+PHASE 2 — OPS ORDER PANEL
+
+Add “Internal Communication” panel to Ops order detail page.
+
+Show:
+- Assigned RideChecker
+- Connecteam status
+- Last internal communication timestamp
+- Buttons:
+  - Copy Connecteam task
+  - Mark RideChecker notified
+  - Mark task created
+  - Mark reassigned
+  - Open Connecteam
+
+PHASE 3 — TASK TEMPLATE GENERATOR
+
+Generate professional Connecteam-ready task text automatically.
+
+Template should include:
+- Order number
+- Vehicle
+- Inspection address
+- Requested date/time
+- Seller contact instructions
+- RideChecker assigned
+- Required inspection reminders
+- Safety reminders
+- RideCheck order URL
+
+PHASE 4 — RIDECHECKER PROFILE SUPPORT
+
+Add Connecteam section to RideChecker profiles:
+- Connecteam name
+- Active/inactive
+- Added to Connecteam yes/no
+- Notes
+- Last notified timestamp
+
+PHASE 5 — SAFETY RULES
+
+Do not send:
+- buyer payment info
+- Stripe data
+- private ops notes
+- customer complaint history
+
+Allowed:
+- inspection logistics
+- vehicle details
+- seller contact info when assigned
+- operational reminders
+
+PHASE 6 — ACCEPTANCE TESTS
+
+Test:
+1. Ops can generate Connecteam-ready tasks
+2. Ops can track internal notifications
+3. Reassignments are logged
+4. RideChecker profiles show Connecteam participation
+5. Existing RideCheck workflows remain unchanged
+6. No middleware/auth breakage
+7. No customer communication moved into Connecteam
+
+Return summary of files changed.

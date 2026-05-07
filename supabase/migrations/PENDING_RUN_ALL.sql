@@ -724,3 +724,73 @@ DO $$ BEGIN
     ALTER TABLE public.ridechecker_job_assignments ADD COLUMN last_nudge_at TIMESTAMPTZ NULL;
   END IF;
 END $$;
+
+-- ============================================================
+-- MIGRATION 034: Connecteam integration support
+-- connecteam_logs   – audit trail of internal comms actions
+-- connecteam_mappings – links RideCheck profiles to Connecteam
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.connecteam_logs (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id       uuid REFERENCES public.orders(id) ON DELETE SET NULL,
+  ridechecker_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  action         text NOT NULL,
+  notes          text,
+  created_by     uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at     timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_connecteam_logs_order_id
+  ON public.connecteam_logs (order_id);
+
+CREATE INDEX IF NOT EXISTS idx_connecteam_logs_ridechecker_id
+  ON public.connecteam_logs (ridechecker_id);
+
+CREATE TABLE IF NOT EXISTS public.connecteam_mappings (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id        uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+  connecteam_name   text,
+  connecteam_status text NOT NULL DEFAULT 'active',
+  notes             text,
+  created_at        timestamptz DEFAULT now(),
+  updated_at        timestamptz DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_connecteam_mappings_profile_id
+  ON public.connecteam_mappings (profile_id);
+
+ALTER TABLE public.connecteam_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.connecteam_mappings ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'connecteam_logs' AND policyname = 'ops_manage_connecteam_logs'
+  ) THEN
+    CREATE POLICY ops_manage_connecteam_logs ON public.connecteam_logs
+      FOR ALL TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.profiles
+          WHERE id = auth.uid()
+            AND role IN ('owner','admin','operations_lead','operations')
+        )
+      );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'connecteam_mappings' AND policyname = 'ops_manage_connecteam_mappings'
+  ) THEN
+    CREATE POLICY ops_manage_connecteam_mappings ON public.connecteam_mappings
+      FOR ALL TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.profiles
+          WHERE id = auth.uid()
+            AND role IN ('owner','admin','operations_lead','operations')
+        )
+      );
+  END IF;
+END $$;

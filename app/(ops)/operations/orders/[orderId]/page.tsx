@@ -11,6 +11,7 @@ import { RideCheckerAssignmentPanel } from "@/components/orders/RideCheckerAssig
 import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
 import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
+import { ConnecteamPanel } from "@/components/orders/ConnecteamPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
@@ -347,6 +348,7 @@ export default function OpsOrderDetailPage() {
           <PayPanel order={order} onRefresh={loadData} />
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />
+          <ConnecteamPanel order={order} onRefresh={loadData} />
 
           {/* Package Override */}
           {canOverride && (
