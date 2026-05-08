@@ -8,7 +8,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
-  const result = await requireRole(["owner", "operations_lead", "operations", "admin"]);
+  const result = await requireRole(["owner", "operations_lead", "ops_lead", "operations", "admin"]);
   if (!isAuthorized(result)) return result.error;
 
   const { orderId } = params;

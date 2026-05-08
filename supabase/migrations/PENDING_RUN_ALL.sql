@@ -897,3 +897,36 @@ END $$;
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_available boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS availability_updated_at timestamptz;
+
+-- ── Migration 037: Repair & Backfill ridechecker_job_assignments ──────────────
+-- Finds every order that has assigned_ridechecker_id set but no matching
+-- non-cancelled ridechecker_job_assignments row and creates the missing row.
+-- Safe to run multiple times (ON CONFLICT DO NOTHING + WHERE NOT EXISTS guard).
+
+DO $$
+DECLARE
+  v_count INT := 0;
+BEGIN
+  INSERT INTO public.ridechecker_job_assignments
+    (order_id, ridechecker_id, status, created_at)
+  SELECT
+    o.id,
+    o.assigned_ridechecker_id,
+    COALESCE(
+      NULLIF(o.assignment_status, 'unassigned'),
+      'awaiting_acceptance'
+    ),
+    COALESCE(o.assigned_at, o.updated_at, NOW())
+  FROM public.orders o
+  WHERE o.assigned_ridechecker_id IS NOT NULL
+    AND COALESCE(o.assignment_status, '') NOT IN ('unassigned', '')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.ridechecker_job_assignments rja
+      WHERE rja.order_id          = o.id
+        AND rja.ridechecker_id    = o.assigned_ridechecker_id
+        AND rja.status NOT IN ('cancelled', 'declined', 'expired', 'rejected')
+    );
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE 'ridechecker_job_assignments backfill: % row(s) inserted', v_count;
+END $$;

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
 
     let data: any[] | null = null;
@@ -68,7 +68,7 @@ const createRideCheckerSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const result = await requireRole(["operations_lead", "owner"]);
+    const result = await requireRole(["operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 

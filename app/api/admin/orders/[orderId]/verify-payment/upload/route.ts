@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: { orderId: string } }
 ) {
   try {
-    const result = await requireRole(["owner", "operations_lead"]);
+    const result = await requireRole(["owner", "operations_lead", "ops_lead"]);
     if (!isAuthorized(result)) return result.error;
 
     const formData = await req.formData();

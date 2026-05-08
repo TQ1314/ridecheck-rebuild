@@ -38,7 +38,7 @@ const inviteSchema = z.object({
   role: z.enum([
     "customer",
     "operations",
-    "operations_lead",
+    "operations_lead", "ops_lead",
     "ridechecker",
     "ridechecker_active",
     "inspector",
@@ -52,7 +52,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const result = await requireRole(["operations_lead", "owner"]);
+    const result = await requireRole(["operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const result = await requireRole(["operations_lead", "owner"]);
+    const result = await requireRole(["operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
 
     const { data, error } = await supabaseAdmin

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const result = await requireRole(["operations_lead", "owner"]);
+    const result = await requireRole(["operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
 
     const { data, error } = await supabaseAdmin

@@ -10,7 +10,7 @@ export async function POST(
 ) {
   try {
     // Strictly owner and operations_lead only — no admin or ops
-    const result = await requireRole(["owner", "operations_lead"]);
+    const result = await requireRole(["owner", "operations_lead", "ops_lead"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 

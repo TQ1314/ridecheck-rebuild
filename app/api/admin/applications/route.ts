@@ -11,7 +11,7 @@ import { getAppUrl } from "@/lib/app-url";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(["admin", "owner", "operations_lead", "operations"]);
+  const auth = await requireRole(["admin", "owner", "operations_lead", "ops_lead", "operations"]);
   if ("error" in auth) return auth.error;
 
   const { searchParams } = new URL(req.url);
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireRole(["admin", "owner", "operations_lead", "operations"]);
+  const auth = await requireRole(["admin", "owner", "operations_lead", "ops_lead", "operations"]);
   if ("error" in auth) return auth.error;
 
   let body: Record<string, unknown>;

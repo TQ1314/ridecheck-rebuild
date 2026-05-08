@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: { orderId: string } },
 ) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "owner"]);
+    const result = await requireRole(["operations", "operations_lead", "ops_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
 
     const [orderRes, eventsRes, auditRes] = await Promise.all([

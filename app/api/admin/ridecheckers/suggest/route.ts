@@ -8,7 +8,7 @@ const BASE_SELECT = "id, full_name, email, phone, service_area, ridechecker_rati
 const AVAIL_SELECT = BASE_SELECT + ", is_available, availability_updated_at";
 
 export async function GET(req: NextRequest) {
-  const result = await requireRole(["owner", "operations_lead", "operations"]);
+  const result = await requireRole(["owner", "operations_lead", "ops_lead", "operations"]);
   if (!isAuthorized(result)) return result.error;
 
   const { searchParams } = new URL(req.url);

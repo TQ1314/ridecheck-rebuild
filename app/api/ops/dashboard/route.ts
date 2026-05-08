@@ -69,7 +69,7 @@ function computeNextAction(order: any): NextAction {
 
 export async function GET() {
   try {
-    const result = await requireRole(["operations", "operations_lead", "admin", "owner", "ops"]);
+    const result = await requireRole(["operations", "operations_lead", "ops_lead", "admin", "owner", "ops"]);
     if (!isAuthorized(result)) return result.error;
 
     const today = new Date().toISOString().split("T")[0];

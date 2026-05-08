@@ -49,7 +49,7 @@ function detectBottleneck(
 }
 
 export async function GET(_req: NextRequest) {
-  const result = await requireRole(["owner", "operations_lead", "operations", "admin"]);
+  const result = await requireRole(["owner", "operations_lead", "ops_lead", "operations", "admin"]);
   if (!isAuthorized(result)) return result.error;
 
   const notIn = `(${DONE_STATUSES.map((s) => `'${s}'`).join(",")})`;
