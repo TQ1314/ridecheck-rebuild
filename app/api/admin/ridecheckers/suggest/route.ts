@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const { data: activeRidecheckers, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs")
+    .select("id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at")
     .eq("role", "ridechecker_active")
     .eq("is_active", true)
     .order("ridechecker_rating", { ascending: false });
@@ -94,6 +94,8 @@ export async function GET(req: NextRequest) {
       max_daily_jobs: rc.ridechecker_max_daily_jobs ?? 5,
       decline_count_30d: declineCount,
       score,
+      is_available: rc.is_available ?? false,
+      availability_updated_at: rc.availability_updated_at ?? null,
     };
   });
 

@@ -51,7 +51,7 @@ export async function GET() {
     try {
       const { data: assignmentData } = await supabaseAdmin
         .from("ridechecker_job_assignments")
-        .select("id, order_id, status, scheduled_start, scheduled_end, accepted_at, started_at, submitted_at, approved_at, rejected_at, rejection_reason, job_score, payout_amount, payout_status, created_at")
+        .select("id, order_id, status, expires_at, scheduled_start, scheduled_end, accepted_at, started_at, submitted_at, approved_at, rejected_at, declined_at, rejection_reason, job_score, payout_amount, payout_status, created_at")
         .eq("ridechecker_id", session.user.id)
         .order("created_at", { ascending: false });
 

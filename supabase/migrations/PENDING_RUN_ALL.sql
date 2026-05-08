@@ -892,3 +892,8 @@ DO $$ BEGIN
       USING (auth.role() = 'service_role');
   END IF;
 END $$;
+
+-- ── Migration 036: RideChecker simple availability toggle ─────────────────────
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS is_available boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS availability_updated_at timestamptz;

@@ -55,6 +55,8 @@ interface RideCheckerSuggestion {
   max_daily_jobs: number;
   decline_count_30d: number;
   score: number;
+  is_available: boolean;
+  availability_updated_at: string | null;
 }
 
 interface RideCheckerAssignmentPanelProps {
@@ -619,6 +621,7 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                 {ridecheckers.map((rc) => (
                   <SelectItem key={rc.id} value={rc.id} className="text-xs">
                     <span className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${rc.is_available ? "bg-green-500" : "bg-gray-300"}`} />
                       <span className="font-medium">{rc.full_name}</span>
                       <span className="text-muted-foreground flex items-center gap-1">
                         <Star className="h-2.5 w-2.5" />
@@ -654,6 +657,20 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
               {isAwaitingAcceptance ? "Reassign" : "Assign"}
             </Button>
           </div>
+          {selectedDirect && (() => {
+            const selectedRc = ridecheckers.find((r) => r.id === selectedDirect);
+            if (selectedRc && !selectedRc.is_available) {
+              return (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    <strong>{selectedRc.full_name}</strong> is currently marked unavailable. You can still assign them, but they may not respond promptly.
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <p className="text-xs text-muted-foreground">
             RideChecker will have 15 minutes to accept before the offer expires.
           </p>
@@ -704,7 +721,13 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${rc.is_available ? "bg-green-500" : "bg-gray-300"}`} title={rc.is_available ? "Available" : "Unavailable"} />
                       <p className="text-xs font-medium truncate">{rc.full_name}</p>
+                      {!rc.is_available && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-gray-100 text-gray-600 border border-gray-200 leading-4">
+                          Unavailable
+                        </span>
+                      )}
                       {rc.decline_count_30d >= 4 && (
                         <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4" title="High decline rate in last 30 days">
                           {rc.decline_count_30d} declines

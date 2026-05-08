@@ -57,6 +57,54 @@ export async function GET() {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const supabase = createRouteHandlerSupabaseClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!profile || !["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const is_available = !!body.is_available;
+    const now = new Date().toISOString();
+
+    const { data: updated, error } = await supabaseAdmin
+      .from("profiles")
+      .update({ is_available, availability_updated_at: now })
+      .eq("id", session.user.id)
+      .select("is_available, availability_updated_at")
+      .single();
+
+    if (error) {
+      console.error("[availability PATCH error]", error);
+      return NextResponse.json({ error: "Failed to update availability" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      is_available: updated?.is_available ?? is_available,
+      availability_updated_at: updated?.availability_updated_at ?? now,
+    });
+  } catch (err: any) {
+    console.error("[availability PATCH error]", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = createRouteHandlerSupabaseClient();

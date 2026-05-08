@@ -210,6 +210,9 @@ export default function RideCheckerDashboardPage() {
   const [availForm, setAvailForm] = useState({ date: "", start_time: "09:00", end_time: "17:00", max_jobs: 3 });
   const [availSubmitting, setAvailSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isAvailable, setIsAvailable] = useState(false);
+  const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string | null>(null);
+  const [availToggleLoading, setAvailToggleLoading] = useState(false);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -248,6 +251,11 @@ export default function RideCheckerDashboardPage() {
     if (referralsData?.referralCode) setReferralCode(referralsData.referralCode);
     if (referralsData?.stats) setReferralStats(referralsData.stats);
     if (availData?.availability) setAvailability(availData.availability);
+
+    if (prof) {
+      setIsAvailable(!!prof.is_available);
+      if (prof.availability_updated_at) setAvailabilityUpdatedAt(prof.availability_updated_at);
+    }
 
     setLoading(false);
     setRefreshing(false);
@@ -309,6 +317,30 @@ export default function RideCheckerDashboardPage() {
     setActionLoading(null);
   };
 
+  const handleToggleAvailability = async () => {
+    setAvailToggleLoading(true);
+    const newValue = !isAvailable;
+    try {
+      const res = await fetch("/api/ridechecker/availability", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_available: newValue }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setIsAvailable(d.is_available);
+        if (d.availability_updated_at) setAvailabilityUpdatedAt(d.availability_updated_at);
+        toast({ title: newValue ? "You are now available for inspections" : "You are now marked unavailable" });
+      } else {
+        const d = await res.json().catch(() => ({}));
+        toast({ title: d.error || "Failed to update availability", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error updating availability", variant: "destructive" });
+    }
+    setAvailToggleLoading(false);
+  };
+
   const handleAddAvailability = async () => {
     if (!availForm.date) { toast({ title: "Please select a date", variant: "destructive" }); return; }
     setAvailSubmitting(true);
@@ -349,8 +381,12 @@ export default function RideCheckerDashboardPage() {
 
   // Partition assignments by status
   const pendingAcceptance = assignments.filter((a) => a.status === "awaiting_acceptance");
-  const activeAssignments = assignments.filter((a) => ["accepted", "in_progress", "submitted"].includes(a.status));
-  const pastAssignments = assignments.filter((a) => ["approved", "paid", "declined", "expired", "cancelled", "rejected"].includes(a.status));
+  const activeAssignments = assignments.filter((a) =>
+    ["accepted", "in_progress", "submitted", "en_route", "arrived", "inspection_started", "photos_uploading", "report_pending", "escalated"].includes(a.status)
+  );
+  const pastAssignments = assignments.filter((a) =>
+    ["approved", "paid", "declined", "expired", "cancelled", "rejected", "reassigned"].includes(a.status)
+  );
 
   const next14Days: string[] = [];
   const today = new Date();
@@ -401,6 +437,50 @@ export default function RideCheckerDashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   Your application is being reviewed. Once approved, you'll receive and complete vehicle assessment jobs.
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Inspection Availability Toggle ──────────────────────────── */}
+        {isActive && (
+          <Card className={isAvailable
+            ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20"
+            : "border-muted bg-muted/30"
+          }>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`h-3 w-3 rounded-full flex-shrink-0 ${isAvailable ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm" data-testid="text-availability-label">
+                      Inspection Availability
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-availability-status">
+                      {isAvailable
+                        ? "You are available for new RideCheck inspection assignments."
+                        : "You are currently unavailable for new RideCheck assignments."}
+                    </p>
+                    {availabilityUpdatedAt && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Updated {formatRelative(availabilityUpdatedAt)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={isAvailable ? "outline" : "default"}
+                  onClick={handleToggleAvailability}
+                  disabled={availToggleLoading}
+                  data-testid="button-toggle-availability"
+                  className={isAvailable
+                    ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                    : "bg-green-600 hover:bg-green-700 text-white"
+                  }
+                >
+                  {availToggleLoading ? "Saving..." : isAvailable ? "Turn Unavailable" : "Turn Available"}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -752,7 +832,7 @@ export default function RideCheckerDashboardPage() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Plus className="h-4 w-4 text-muted-foreground" />
-                      Add / Update Availability
+                      Advanced Availability Schedule
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
