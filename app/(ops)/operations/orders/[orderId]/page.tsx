@@ -12,6 +12,7 @@ import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
 import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
 import { ConnecteamPanel } from "@/components/orders/ConnecteamPanel";
+import { JobStatusPanel } from "@/components/orders/JobStatusPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
 import { Button } from "@/components/ui/button";
@@ -345,6 +346,7 @@ export default function OpsOrderDetailPage() {
         <div className="space-y-4">
           <BuyerCard order={order} onRefresh={loadData} />
           <RideCheckerAssignmentPanel order={order} onRefresh={loadData} />
+          <JobStatusPanel order={order} onRefresh={loadData} />
           <PayPanel order={order} onRefresh={loadData} />
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />

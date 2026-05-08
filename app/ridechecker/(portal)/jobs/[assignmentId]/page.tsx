@@ -254,6 +254,9 @@ export default function JobDetailPage() {
 
   const [briefOpen, setBriefOpen] = useState(false);
 
+  const [showEscalate, setShowEscalate] = useState(false);
+  const [escalateNote, setEscalateNote] = useState("");
+
   const secsLeft = useCountdown(
     assignment?.status === "awaiting_acceptance" ? assignment.expires_at : null
   );
@@ -364,6 +367,62 @@ export default function JobDetailPage() {
     setActionLoading(false);
   }
 
+  async function updateStatus(newStatus: string, notes?: string) {
+    setActionLoading(true);
+    try {
+      // Capture GPS when going en_route
+      if (newStatus === "en_route" && typeof navigator !== "undefined" && "geolocation" in navigator) {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              await fetch(`/api/ridechecker/jobs/${assignmentId}/location`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              }).catch(() => {});
+              resolve();
+            },
+            () => resolve(),
+            { timeout: 5000 }
+          );
+        });
+      }
+
+      const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_status: newStatus, notes: notes ?? null }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const labels: Record<string, string> = {
+          en_route:           "You're on your way! Ops has been notified.",
+          arrived:            "Arrival confirmed. Start your inspection when ready.",
+          inspection_started: "Inspection started. Complete each step carefully.",
+          photos_uploading:   "Photo upload stage marked. Keep going!",
+          report_pending:     "Report marked as pending. Ops will be notified.",
+          escalated:          "Issue reported. Ops has been alerted.",
+        };
+        toast({ title: labels[newStatus] ?? "Status updated." });
+        setAssignment((prev) =>
+          prev ? { ...prev, status: data.assignment?.status ?? newStatus } : prev
+        );
+        setShowEscalate(false);
+        setEscalateNote("");
+        if (newStatus === "inspection_started") {
+          router.push(`/ridechecker/jobs/${assignmentId}/submit`);
+        }
+      } else {
+        const d = await res.json();
+        toast({ title: d.error || "Failed to update status", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    }
+    setActionLoading(false);
+  }
+
   async function sendMessage() {
     if (!msgText.trim()) return;
     setMsgSending(true);
@@ -402,10 +461,23 @@ export default function JobDetailPage() {
   const isPendingAcceptance = assignment.status === "awaiting_acceptance";
   const isExpired = assignment.status === "expired" || (secsLeft !== null && secsLeft === 0 && isPendingAcceptance);
   const canAccept = isPendingAcceptance && !isExpired;
-  const canStart = assignment.status === "accepted";
-  const canSubmit = assignment.status === "in_progress";
+
+  // New granular lifecycle flags
+  const canEnRoute         = assignment.status === "accepted";
+  const canMarkArrived     = assignment.status === "en_route";
+  const canStartInspection = assignment.status === "arrived";
+  const canMarkUploading   = assignment.status === "inspection_started";
+  const canMarkPending     = assignment.status === "photos_uploading";
+
+  const canSubmit = ["in_progress", "report_pending"].includes(assignment.status);
   const isSubmitted = ["submitted", "approved", "paid"].includes(assignment.status);
   const isDeclined = ["declined", "rejected"].includes(assignment.status);
+  const isEscalated = assignment.status === "escalated";
+
+  const canEscalate = [
+    "accepted", "en_route", "arrived", "inspection_started",
+    "photos_uploading", "report_pending", "in_progress",
+  ].includes(assignment.status);
 
   const ctx = getInspectionContext(order?.package, order?.vehicle_make);
   const payAmount = assignment.pay_amount ?? assignment.payout_amount;
@@ -790,9 +862,54 @@ export default function JobDetailPage() {
         )}
       </div>
 
+      {/* ── Escalate Form ────────────────────────────────────── */}
+      {showEscalate && canEscalate && (
+        <Card className="border-red-200 dark:border-red-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-red-700 dark:text-red-400 uppercase tracking-wide">
+              <AlertTriangle className="h-4 w-4" />
+              Report an Issue
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Describe the issue so ops can take action. This escalates your assignment immediately.
+            </p>
+            <Textarea
+              placeholder="e.g. Seller not responding, vehicle not at listed location, safety concern…"
+              value={escalateNote}
+              onChange={(e) => setEscalateNote(e.target.value)}
+              rows={3}
+              maxLength={600}
+              className="resize-none"
+              data-testid="textarea-escalate-note"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => updateStatus("escalated", escalateNote || undefined)}
+                disabled={actionLoading || !escalateNote.trim()}
+                data-testid="button-confirm-escalate"
+              >
+                {actionLoading ? "Reporting…" : "Report Issue to Ops"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => { setShowEscalate(false); setEscalateNote(""); }}
+                data-testid="button-cancel-escalate"
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Sticky Bottom Actions ─────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t z-10">
         <div className="max-w-2xl mx-auto space-y-2">
+          {/* Accept / Decline */}
           {canAccept && (
             <>
               <Button
@@ -817,10 +934,38 @@ export default function JobDetailPage() {
               )}
             </>
           )}
-          {canStart && (
+
+          {/* En Route */}
+          {canEnRoute && (
+            <Button
+              className="w-full h-12 text-base bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => updateStatus("en_route")}
+              disabled={actionLoading}
+              data-testid="button-mark-en-route"
+            >
+              <Navigation className="h-5 w-5 mr-2" />
+              {actionLoading ? "Updating…" : "I'm On My Way"}
+            </Button>
+          )}
+
+          {/* Arrived */}
+          {canMarkArrived && (
+            <Button
+              className="w-full h-12 text-base bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={() => updateStatus("arrived")}
+              disabled={actionLoading}
+              data-testid="button-mark-arrived"
+            >
+              <MapPin className="h-5 w-5 mr-2" />
+              {actionLoading ? "Updating…" : "I've Arrived"}
+            </Button>
+          )}
+
+          {/* Start Inspection */}
+          {canStartInspection && (
             <Button
               className="w-full h-12 text-base"
-              onClick={startAssignment}
+              onClick={() => updateStatus("inspection_started")}
               disabled={actionLoading}
               data-testid="button-start-inspection"
             >
@@ -828,6 +973,50 @@ export default function JobDetailPage() {
               {actionLoading ? "Starting…" : "Start Inspection"}
             </Button>
           )}
+
+          {/* Uploading Photos */}
+          {canMarkUploading && (
+            <div className="space-y-2">
+              <Button
+                className="w-full h-12 text-base bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={() => updateStatus("photos_uploading")}
+                disabled={actionLoading}
+                data-testid="button-mark-uploading"
+              >
+                <Camera className="h-5 w-5 mr-2" />
+                {actionLoading ? "Updating…" : "Now Uploading Photos"}
+              </Button>
+              <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
+                <Button variant="outline" className="w-full h-10 text-sm" data-testid="button-go-submit-early">
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Go to Submission Form
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Report Pending */}
+          {canMarkPending && (
+            <div className="space-y-2">
+              <Button
+                className="w-full h-12 text-base bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => updateStatus("report_pending")}
+                disabled={actionLoading}
+                data-testid="button-mark-report-pending"
+              >
+                <ClipboardList className="h-5 w-5 mr-2" />
+                {actionLoading ? "Updating…" : "Mark Report Pending"}
+              </Button>
+              <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
+                <Button variant="outline" className="w-full h-10 text-sm" data-testid="button-go-submit-pending">
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Go to Submission Form
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Continue Submission (legacy in_progress / report_pending) */}
           {canSubmit && (
             <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
               <Button className="w-full h-12 text-base" data-testid="button-go-to-submit">
@@ -836,11 +1025,35 @@ export default function JobDetailPage() {
               </Button>
             </Link>
           )}
+
+          {/* Submitted */}
           {isSubmitted && (
             <div className="flex items-center justify-center gap-2 h-12 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 font-medium">
               <CheckCircle2 className="h-5 w-5" />
               Submitted — awaiting QA review
             </div>
+          )}
+
+          {/* Escalated */}
+          {isEscalated && (
+            <div className="flex items-center justify-center gap-2 h-12 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 font-medium">
+              <AlertTriangle className="h-5 w-5" />
+              Issue Reported — ops has been alerted
+            </div>
+          )}
+
+          {/* Escalate button (secondary, shown in active states) */}
+          {canEscalate && !showEscalate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full h-9 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+              onClick={() => setShowEscalate(true)}
+              data-testid="button-open-escalate"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+              Report Issue / Delay
+            </Button>
           )}
         </div>
       </div>

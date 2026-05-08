@@ -794,3 +794,101 @@ DO $$ BEGIN
       );
   END IF;
 END $$;
+
+-- ============================================================
+-- MIGRATION 035 — Live Inspection Execution System
+-- ============================================================
+
+-- 1. Extend status constraint to include new lifecycle stages
+ALTER TABLE public.ridechecker_job_assignments
+  DROP CONSTRAINT IF EXISTS chk_assignment_status;
+
+ALTER TABLE public.ridechecker_job_assignments
+  ADD CONSTRAINT chk_assignment_status CHECK (
+    status IN (
+      'awaiting_acceptance', 'assigned', 'accepted', 'declined', 'expired',
+      'en_route', 'arrived', 'inspection_started', 'photos_uploading',
+      'report_pending', 'in_progress', 'submitted', 'approved', 'rejected',
+      'paid', 'cancelled', 'escalated', 'reassigned'
+    )
+  );
+
+-- 2. Add new timestamp and operational columns
+ALTER TABLE public.ridechecker_job_assignments
+  ADD COLUMN IF NOT EXISTS en_route_at             TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS arrived_at              TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS inspection_started_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS photos_uploading_at     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS report_pending_at       TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS escalated_at            TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS last_status_update_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS delay_notes             TEXT,
+  ADD COLUMN IF NOT EXISTS escalation_notes        TEXT,
+  ADD COLUMN IF NOT EXISTS last_known_lat          DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS last_known_lng          DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS last_location_update_at TIMESTAMPTZ;
+
+-- 3. Job status history log table
+CREATE TABLE IF NOT EXISTS public.ridechecker_job_status_log (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  assignment_id  UUID        REFERENCES public.ridechecker_job_assignments(id) ON DELETE CASCADE,
+  order_id       UUID        REFERENCES public.orders(id) ON DELETE SET NULL,
+  ridechecker_id UUID        REFERENCES public.profiles(id) ON DELETE SET NULL,
+  old_status     TEXT,
+  new_status     TEXT        NOT NULL,
+  notes          TEXT,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_status_log_assignment
+  ON public.ridechecker_job_status_log (assignment_id);
+
+CREATE INDEX IF NOT EXISTS idx_job_status_log_order
+  ON public.ridechecker_job_status_log (order_id);
+
+ALTER TABLE public.ridechecker_job_status_log ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'ridechecker_job_status_log'
+      AND policyname = 'ops_read_job_status_log'
+  ) THEN
+    CREATE POLICY ops_read_job_status_log
+      ON public.ridechecker_job_status_log
+      FOR SELECT TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.profiles
+          WHERE id = auth.uid()
+            AND role IN ('owner','admin','operations_lead','operations')
+        )
+      );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'ridechecker_job_status_log'
+      AND policyname = 'rc_read_own_status_log'
+  ) THEN
+    CREATE POLICY rc_read_own_status_log
+      ON public.ridechecker_job_status_log
+      FOR SELECT TO authenticated
+      USING (ridechecker_id = auth.uid());
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'ridechecker_job_status_log'
+      AND policyname = 'service_manage_job_status_log'
+  ) THEN
+    CREATE POLICY service_manage_job_status_log
+      ON public.ridechecker_job_status_log
+      FOR ALL
+      USING (auth.role() = 'service_role');
+  END IF;
+END $$;
