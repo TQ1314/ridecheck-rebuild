@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -213,6 +213,7 @@ export default function RideCheckerDashboardPage() {
   const [isAvailable, setIsAvailable] = useState(false);
   const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string | null>(null);
   const [availToggleLoading, setAvailToggleLoading] = useState(false);
+  const availToggleInFlightRef = useRef(false);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -252,7 +253,7 @@ export default function RideCheckerDashboardPage() {
     if (referralsData?.stats) setReferralStats(referralsData.stats);
     if (availData?.availability) setAvailability(availData.availability);
 
-    if (prof) {
+    if (prof && !availToggleInFlightRef.current) {
       setIsAvailable(!!prof.is_available);
       if (prof.availability_updated_at) setAvailabilityUpdatedAt(prof.availability_updated_at);
     }
@@ -318,6 +319,7 @@ export default function RideCheckerDashboardPage() {
   };
 
   const handleToggleAvailability = async () => {
+    availToggleInFlightRef.current = true;
     setAvailToggleLoading(true);
     const newValue = !isAvailable;
     try {
@@ -337,8 +339,10 @@ export default function RideCheckerDashboardPage() {
       }
     } catch {
       toast({ title: "Network error updating availability", variant: "destructive" });
+    } finally {
+      availToggleInFlightRef.current = false;
+      setAvailToggleLoading(false);
     }
-    setAvailToggleLoading(false);
   };
 
   const handleAddAvailability = async () => {

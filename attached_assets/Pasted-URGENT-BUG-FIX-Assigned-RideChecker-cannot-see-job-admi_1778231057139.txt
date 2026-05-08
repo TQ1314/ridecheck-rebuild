@@ -1,0 +1,107 @@
+URGENT BUG FIX — Assigned RideChecker cannot see job + admin status update forbidden.
+
+Observed:
+- Ops order page shows order assigned to RideChecker: Jabbar Treize.
+- RideChecker portal logged in as Jabbar Treize shows “No Jobs Assigned.”
+- Admin/Ops “Update Status” returns red toast: Error Forbidden.
+- Active RideCheckers page also showed “Failed to load RideCheckers” after recent changes.
+
+IMPORTANT:
+- Do NOT rewrite auth
+- Do NOT rewrite middleware.ts
+- Do NOT change role system
+- Do NOT break buyer/seller communication
+- Do NOT break Stripe/payment logic
+- Fix assignment visibility and permissions only
+
+PHASE 1 — IDENTIFY ASSIGNMENT SOURCE OF TRUTH
+
+Inspect the assignment flow:
+- Assign RideChecker button/action
+- Orders table fields related to assigned RideChecker
+- ridechecker_job_assignments table
+- RideChecker “My Jobs” query
+- RideChecker dashboard job count query
+
+Determine whether assignment is currently saved only on the order record but not inserted into ridechecker_job_assignments.
+
+If yes:
+- Fix assignment action so assigning a RideChecker also creates or updates ridechecker_job_assignments.
+- The RideChecker portal must query the same source of truth used by ops assignment.
+
+Expected:
+When ops assigns Jabbar Treize to order B0D2EFA9, Jabbar should immediately see that job in:
+- /ridechecker/jobs
+- /ridechecker/dashboard My Jobs tab
+- dashboard job counts
+
+PHASE 2 — FIX RIDECHECKER JOB QUERY
+
+Inspect:
+- /ridechecker/jobs
+- /ridechecker/dashboard
+
+Ensure they match assignments by the correct identifier:
+- profile_id vs user_id vs ridechecker_id
+
+Common bug to check:
+Ops may store assigned_ridechecker_id as profile.id or ridecheckers.id, while RideChecker portal filters by auth.users.id.
+
+Fix so the mapping is consistent.
+
+PHASE 3 — FIX ADMIN/OPS STATUS UPDATE FORBIDDEN
+
+The logged-in user is showing as Operations Lead, but Update Status returns Forbidden.
+
+Inspect the route/action used by:
+- admin order page Update Status
+- ops order page Update Status
+
+Confirm authorized roles include:
+- owner
+- admin
+- ops_lead
+
+If the user’s role is ops_lead but route only allows admin/owner, add ops_lead.
+
+Do not loosen permission to customers, sellers, or RideCheckers.
+
+PHASE 4 — FIX ACTIVE RIDECHECKERS FAILED LOAD
+
+Inspect:
+- /admin/inspectors
+- API route used to load active RideCheckers
+
+Likely caused by recent Connecteam mapping join, missing migration table, RLS issue, or failed select.
+
+Make page resilient:
+- If connecteam_mappings table is missing or empty, Active RideCheckers page should still load.
+- Connecteam info should be optional.
+- Do not let Connecteam feature break RideChecker management.
+
+PHASE 5 — BACKFILL EXISTING ASSIGNMENT
+
+For existing order B0D2EFA9:
+- Ensure it has a matching ridechecker_job_assignments row for Jabbar Treize.
+- Preserve current order stage/status.
+- Do not duplicate if assignment already exists.
+
+PHASE 6 — ACCEPTANCE TESTS
+
+Test:
+1. Assign Jabbar Treize to B0D2EFA9.
+2. Jabbar sees job under /ridechecker/jobs.
+3. Jabbar dashboard job count updates.
+4. Jabbar can open assigned job detail.
+5. Jabbar can accept job.
+6. Jabbar can progress lifecycle after accepting.
+7. Ops/admin/owner can update order status without Forbidden.
+8. ops_lead can update order status without Forbidden.
+9. Active RideCheckers page loads even if Connecteam mapping is missing.
+10. Existing auth, middleware.ts, roles, Stripe, buyer/seller messages remain unchanged.
+
+Return:
+- root cause
+- files changed
+- whether assignment source of truth is orders table or ridechecker_job_assignments
+- test results

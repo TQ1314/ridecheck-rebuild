@@ -4,24 +4,47 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+const BASE_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs";
+const AVAIL_SELECT = BASE_SELECT + ", is_available, availability_updated_at";
+
 export async function GET(req: NextRequest) {
   const result = await requireRole(["owner", "operations_lead", "operations"]);
   if (!isAuthorized(result)) return result.error;
 
   const { searchParams } = new URL(req.url);
   const serviceArea = searchParams.get("area") || "";
-  const orderId = searchParams.get("orderId") || "";
 
-  const { data: activeRidecheckers, error } = await supabaseAdmin
+  // Try with availability columns first; fall back gracefully if Migration 036 not yet run
+  let activeRidecheckers: any[] | null = null;
+  let availabilityColumnsPresent = true;
+
+  const { data: d1, error: e1 } = await supabaseAdmin
     .from("profiles")
-    .select("id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at")
+    .select(AVAIL_SELECT)
     .eq("role", "ridechecker_active")
     .eq("is_active", true)
     .order("ridechecker_rating", { ascending: false });
 
-  if (error) {
-    console.error("[suggest ridecheckers error]", error);
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+  if (e1) {
+    if (e1.code === "42703") {
+      availabilityColumnsPresent = false;
+      const { data: d2, error: e2 } = await supabaseAdmin
+        .from("profiles")
+        .select(BASE_SELECT)
+        .eq("role", "ridechecker_active")
+        .eq("is_active", true)
+        .order("ridechecker_rating", { ascending: false });
+      if (e2) {
+        console.error("[suggest ridecheckers error]", e2);
+        return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+      }
+      activeRidecheckers = d2 ?? [];
+    } else {
+      console.error("[suggest ridecheckers error]", e1);
+      return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    }
+  } else {
+    activeRidecheckers = d1 ?? [];
   }
 
   if (!activeRidecheckers || activeRidecheckers.length === 0) {
@@ -81,7 +104,9 @@ export async function GET(req: NextRequest) {
     score += rating * 5;
 
     score -= currentLoad * 10;
-    score -= declineCount * 8; // penalize frequent decliners
+    score -= declineCount * 8;
+
+    const isAvailable = availabilityColumnsPresent ? (rc.is_available ?? false) : false;
 
     return {
       id: rc.id,
@@ -94,8 +119,8 @@ export async function GET(req: NextRequest) {
       max_daily_jobs: rc.ridechecker_max_daily_jobs ?? 5,
       decline_count_30d: declineCount,
       score,
-      is_available: rc.is_available ?? false,
-      availability_updated_at: rc.availability_updated_at ?? null,
+      is_available: isAvailable,
+      availability_updated_at: availabilityColumnsPresent ? (rc.availability_updated_at ?? null) : null,
     };
   });
 
