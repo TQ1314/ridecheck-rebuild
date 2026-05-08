@@ -189,7 +189,11 @@ export default function RideCheckersPage() {
             notes: data.mapping.notes || "",
           });
         }
+      } else {
+        toast({ title: "Could not load Connecteam settings", variant: "destructive" });
       }
+    } catch {
+      toast({ title: "Network error loading Connecteam settings", variant: "destructive" });
     } finally {
       setCtLoading(false);
     }
