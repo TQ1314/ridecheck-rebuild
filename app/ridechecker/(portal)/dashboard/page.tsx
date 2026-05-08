@@ -491,7 +491,7 @@ export default function RideCheckerDashboardPage() {
         )}
 
         {/* ── ACTION REQUIRED — always at top ─────────────────────────── */}
-        {isActive && pendingAcceptance.length > 0 && (
+        {pendingAcceptance.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-amber-600" />
@@ -512,7 +512,7 @@ export default function RideCheckerDashboardPage() {
         )}
 
         {/* ── Active job flow ─────────────────────────────────────────── */}
-        {isActive && activeAssignments.length > 0 && (
+        {activeAssignments.length > 0 && (
           <div className="space-y-2">
             <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Active Jobs</h2>
             {activeAssignments.map((a) => (

@@ -30,7 +30,7 @@ export async function POST(
       .from("ridechecker_job_assignments")
       .update({ status: "cancelled", updated_at: now })
       .eq("order_id", params.orderId)
-      .in("status", ["awaiting_acceptance", "assigned", "accepted"]);
+      .in("status", ["awaiting_acceptance", "assigned", "accepted", "en_route", "arrived", "inspection_started", "photos_uploading", "report_pending", "escalated", "in_progress"]);
 
     // Reset order to unassigned
     const { error: updateErr } = await supabaseAdmin

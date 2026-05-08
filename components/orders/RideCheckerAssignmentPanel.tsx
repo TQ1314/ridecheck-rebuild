@@ -600,6 +600,31 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
           </div>
         )}
 
+        {/* ── Recall / Cancel — always visible when RC is assigned ── */}
+        {order.assigned_ridechecker_id && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-destructive">Recall Assignment</p>
+            <p className="text-xs text-muted-foreground">
+              Cancels this assignment and returns the order to unassigned. The RideChecker will be notified.
+            </p>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 text-xs w-full gap-1.5 mt-1"
+              onClick={handleCancelAssignment}
+              disabled={cancelling}
+              data-testid="button-recall-assignment"
+            >
+              {cancelling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Ban className="h-3 w-3" />
+              )}
+              Recall &amp; Unassign
+            </Button>
+          </div>
+        )}
+
         {/* ── Direct assign ───────────────────────────────────── */}
         <div className="space-y-2">
           <Label className="text-xs font-medium">
