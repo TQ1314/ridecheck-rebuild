@@ -50,8 +50,8 @@ export async function PATCH(
       if (rcErr || !rc) {
         return NextResponse.json({ error: "RideChecker not found" }, { status: 404 });
       }
-      if (!["ridechecker_active", "owner", "developer"].includes(rc.role)) {
-        return NextResponse.json({ error: "User is not an active RideChecker" }, { status: 400 });
+      if (!["ridechecker", "ridechecker_active", "owner", "developer"].includes(rc.role)) {
+        return NextResponse.json({ error: "User is not a RideChecker" }, { status: 400 });
       }
       rcName = rc.full_name;
     }
@@ -103,6 +103,15 @@ export async function PATCH(
 
       if (insertErr) {
         console.error("[ridechecker-assign insert error]", insertErr);
+        // Roll back the order update so ops and RC stay in sync
+        await supabaseAdmin
+          .from("orders")
+          .update({ assigned_ridechecker_id: null, assignment_status: "unassigned", updated_at: nowIso })
+          .eq("id", params.orderId);
+        return NextResponse.json(
+          { error: `Failed to create job assignment record: ${insertErr.message}` },
+          { status: 500 }
+        );
       } else {
         assignmentId = newAssignment?.id ?? null;
       }

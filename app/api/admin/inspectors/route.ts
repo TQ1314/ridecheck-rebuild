@@ -10,14 +10,30 @@ export async function GET() {
     const result = await requireRole(["operations", "operations_lead", "owner"]);
     if (!isAuthorized(result)) return result.error;
 
-    const { data, error } = await supabaseAdmin
+    let data: any[] | null = null;
+
+    // Attempt full select with ridechecker-specific columns; fall back if missing (pre-migration)
+    const fullSelect = await supabaseAdmin
       .from("profiles")
       .select("id, full_name, email, phone, service_area, role, is_active, ridechecker_max_daily_jobs, ridechecker_rating, ridechecker_quality_score, ridechecker_on_time_pct, created_at, updated_at")
       .in("role", ["ridechecker", "ridechecker_active"])
       .order("full_name", { ascending: true });
 
-    if (error) {
+    if (fullSelect.error && (fullSelect.error as any).code === "42703") {
+      // Missing ridechecker-specific columns — fall back to base columns
+      const baseSelect = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email, phone, service_area, role, is_active, created_at, updated_at")
+        .in("role", ["ridechecker", "ridechecker_active"])
+        .order("full_name", { ascending: true });
+      if (baseSelect.error) {
+        return NextResponse.json({ error: "Failed to fetch RideCheckers" }, { status: 500 });
+      }
+      data = baseSelect.data;
+    } else if (fullSelect.error) {
       return NextResponse.json({ error: "Failed to fetch RideCheckers" }, { status: 500 });
+    } else {
+      data = fullSelect.data;
     }
 
     const ridecheckers = (data || []).map((p: any) => ({
@@ -28,9 +44,9 @@ export async function GET() {
       region: p.service_area || null,
       is_active: p.role === "ridechecker_active",
       max_daily_capacity: p.ridechecker_max_daily_jobs ?? 5,
-      rating: p.ridechecker_rating,
-      quality_score: p.ridechecker_quality_score,
-      on_time_pct: p.ridechecker_on_time_pct,
+      rating: p.ridechecker_rating ?? null,
+      quality_score: p.ridechecker_quality_score ?? null,
+      on_time_pct: p.ridechecker_on_time_pct ?? null,
       role: p.role,
       created_at: p.created_at,
       updated_at: p.updated_at,

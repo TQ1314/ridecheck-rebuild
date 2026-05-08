@@ -79,6 +79,47 @@ export async function GET() {
     } catch {
     }
 
+    // Fallback: also surface orders directly assigned via assigned_ridechecker_id
+    // that have no ridechecker_job_assignments row (e.g. legacy or silent-insert-fail cases)
+    try {
+      const assignedOrderIds = new Set(assignments.map((a: any) => a.order_id));
+      const { data: directOrders } = await supabaseAdmin
+        .from("orders")
+        .select(SAFE_COLUMNS + ", id, assignment_status, assigned_ridechecker_id")
+        .eq("assigned_ridechecker_id", session.user.id)
+        .not("assignment_status", "in", '("unassigned","cancelled","completed")');
+
+      if (directOrders) {
+        for (const o of directOrders as any[]) {
+          if (!assignedOrderIds.has(o.id)) {
+            // Synthesise a minimal assignment record so the dashboard renders it
+            assignments.push({
+              id: null,
+              order_id: o.id,
+              status: o.assignment_status || "assigned",
+              expires_at: null,
+              scheduled_start: null,
+              scheduled_end: null,
+              accepted_at: null,
+              started_at: null,
+              submitted_at: null,
+              approved_at: null,
+              rejected_at: null,
+              declined_at: null,
+              rejection_reason: null,
+              job_score: null,
+              payout_amount: null,
+              payout_status: null,
+              created_at: o.created_at,
+              order: o,
+              _direct_assign_fallback: true,
+            });
+          }
+        }
+      }
+    } catch {
+    }
+
     const activeStatuses = ["en_route", "on_site", "inspecting", "wrapping_up"];
     const stats = {
       totalJobs: jobs.length + assignments.length,
