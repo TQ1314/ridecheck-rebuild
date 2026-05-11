@@ -29,14 +29,20 @@ export default async function RideCheckerLayout({
 
     const vStatus = profile?.verification_status as string | null;
 
-    if (vStatus === "pending_verification") {
-      redirect("/ridechecker/verify");
-    }
-    if (vStatus === "submitted") {
-      redirect("/ridechecker/verification-pending");
-    }
-    if (vStatus === "rejected") {
-      redirect("/ridechecker/verify?status=rejected");
+    if (vStatus === "pending_verification" || vStatus === "submitted" || vStatus === "rejected") {
+      // Allow through if RC has an active/pending assignment — they need to act on it
+      const { count: activeCount } = await supabaseAdmin
+        .from("ridechecker_job_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("ridechecker_id", actor.userId)
+        .in("status", ["awaiting_acceptance", "assigned", "accepted", "en_route", "arrived", "inspection_started", "in_progress", "photos_uploading", "report_pending"]);
+
+      if (!activeCount || activeCount === 0) {
+        if (vStatus === "pending_verification") redirect("/ridechecker/verify");
+        if (vStatus === "submitted") redirect("/ridechecker/verification-pending");
+        if (vStatus === "rejected") redirect("/ridechecker/verify?status=rejected");
+      }
+      // Has active assignments → fall through so they can see and act on the job
     }
     // null = legacy ridechecker accounts (old flow before verification was introduced)
     // fall through to dashboard which shows "pending approval" banner

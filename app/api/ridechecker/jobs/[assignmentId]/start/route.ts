@@ -24,7 +24,7 @@ export async function POST(
       .eq("id", session.user.id)
       .maybeSingle();
 
-    if (!profile || !["ridechecker_active", "owner"].includes(profile.role)) {
+    if (!profile || !["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
