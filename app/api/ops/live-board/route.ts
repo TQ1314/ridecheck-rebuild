@@ -74,8 +74,8 @@ export async function GET(_req: NextRequest) {
   }
 
   const activeJobs = (assignments ?? []).map((a) => {
-    const rc  = a.ridechecker as Record<string, unknown> | null;
-    const ord = a.order       as Record<string, unknown> | null;
+    const rc  = (a.ridechecker as unknown) as Record<string, unknown> | null;
+    const ord = (a.order       as unknown) as Record<string, unknown> | null;
     const col = STATUS_AT_COL[a.status];
     const statusSince = (col ? (a as Record<string, unknown>)[col] : null) as string | null
       ?? a.last_status_update_at

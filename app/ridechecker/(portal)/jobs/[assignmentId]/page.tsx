@@ -36,6 +36,7 @@ import {
   Star,
   ChevronDown,
   ChevronUp,
+  Navigation,
 } from "lucide-react";
 
 interface AssignmentDetail {
