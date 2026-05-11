@@ -70,6 +70,19 @@ function getStatusLabel(status: string): string {
     declined: "Declined",
     no_response: "No Response",
     invalid_contact: "Invalid Contact",
+    // seller_status operational values
+    awaiting: "Awaiting Contact",
+    seller_not_contacted: "Not Contacted",
+    seller_contacted: "Contacted",
+    awaiting_seller_response: "Awaiting Response",
+    seller_confirmed: "Seller Confirmed",
+    seller_reschedule_requested: "Reschedule Requested",
+    seller_declined: "Seller Declined",
+    seller_no_response: "No Response",
+    vehicle_sold: "Vehicle Sold",
+    unsafe_location_flagged: "Unsafe Location",
+    confirmed: "Confirmed",
+    invalid: "Invalid",
   };
   return labels[status] || status;
 }

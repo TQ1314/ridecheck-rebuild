@@ -1,0 +1,421 @@
+Rebuild and stabilize the RideCheck dispatch + inspection workflow.
+
+IMPORTANT RULES:
+- DO NOT rewrite auth
+- DO NOT break middleware.ts
+- DO NOT remove existing Stripe, booking, report, or email systems
+- DO NOT remove existing roles
+- Extend current architecture only
+- Preserve owner, operations_lead, operations, ridechecker_active logic
+- Use additive migrations only
+- Use IF NOT EXISTS for DB changes
+- Keep existing report generation pipeline intact
+- Do not expose service role keys client-side
+- Maintain production-safe patterns already implemented
+
+GOAL:
+Create a complete operational workflow for RideCheck from booking → seller coordination → RideChecker assignment → inspection → report processing → buyer notification.
+
+The system must behave like a professional dispatch operation.
+
+====================================================
+PHASE 1 — ORDER + SELLER OPERATIONS LAYER
+====================================================
+
+In the Ops/Admin order detail page:
+
+Separate buyer and seller information into dedicated sections/cards.
+
+BUYER CARD:
+- buyer full name
+- buyer phone
+- buyer email
+- order id
+- vehicle year/make/model
+- VIN
+- payment status
+- listing URL if available
+
+SELLER CARD:
+- seller name
+- seller phone
+- seller email
+- inspection address
+- seller notes
+- seller communication history
+- seller confirmation status
+- inspection scheduling status
+
+Seller statuses:
+- seller_not_contacted
+- seller_contacted
+- awaiting_seller_response
+- seller_confirmed
+- seller_reschedule_requested
+- seller_declined
+- seller_no_response
+- vehicle_sold
+- unsafe_location_flagged
+
+Ops must be able to:
+- update seller address
+- update seller notes
+- log calls/messages
+- mark seller confirmed
+- mark seller unavailable
+- reschedule inspection
+
+Create activity logs for all seller interactions.
+
+====================================================
+PHASE 2 — RIDECHECKER AVAILABILITY SYSTEM
+====================================================
+
+Add operational availability controls.
+
+Each RideChecker must have:
+- availability_status
+- availability_updated_at
+- suspended_until
+- rejection_count_30d
+- current_active_jobs
+- max_active_jobs
+- max_distance_miles
+- current_lat
+- current_lng
+
+availability_status values:
+- available
+- unavailable
+- busy
+- suspended
+
+RideChecker portal:
+Add simple controls:
+- "I am available"
+- "I am unavailable"
+
+Rules:
+- unavailable RideCheckers do not appear in assignment lists
+- suspended RideCheckers cannot mark themselves available
+- busy RideCheckers cannot exceed max_active_jobs
+- owner/ops override allowed
+
+====================================================
+PHASE 3 — ASSIGNMENT ENGINE
+====================================================
+
+Fix assignment visibility and reliability completely.
+
+Current issue:
+Assigned jobs are not reliably appearing to RideCheckers.
+
+Implement stable assignment workflow.
+
+Assignment statuses:
+- unassigned
+- awaiting_acceptance
+- accepted
+- expired
+- en_route
+- arrived
+- inspecting
+- report_processing
+- completed
+- cancelled
+- fraud_hold
+- unsafe_hold
+
+Ops assignment panel should ONLY show RideCheckers who:
+- role = ridechecker_active
+- is_active = true
+- availability_status = available
+- suspended_until is null or expired
+- current_active_jobs < max_active_jobs
+
+Display:
+- RideChecker name
+- city/region
+- current workload
+- rejection count
+- suspension status
+- estimated distance
+- estimated travel time
+- inspection capability/type
+- availability status
+
+Allow:
+- direct assignment
+- broadcast assignment if existing broadcast system exists
+
+When assigning:
+- create assignment record
+- assignment.status = awaiting_acceptance
+- assigned_at timestamp
+- response_deadline = now + 15 minutes default
+- notify RideChecker
+
+====================================================
+PHASE 4 — OFFER / ACCEPT / REJECT / EXPIRE
+====================================================
+
+RideChecker dashboard/jobs page must reliably show:
+- awaiting_acceptance
+- accepted
+- en_route
+- arrived
+- inspecting
+
+For awaiting_acceptance jobs show:
+- vehicle details
+- inspection area
+- estimated drive distance
+- estimated pay if available
+- requested inspection timing
+- accept button
+- reject button
+
+ACCEPT:
+- assignment.status = accepted
+- order.status = inspection_scheduled
+- accepted_at = now
+- RideChecker availability_status = busy
+- increment active jobs
+- notify Ops
+- notify seller with ETA placeholder
+
+REJECT:
+- assignment.status = cancelled
+- rejected_at = now
+- rejection_reason optional
+- increment rejection_count_30d
+- notify Ops immediately
+- remove assignment from RideChecker queue
+
+EXPIRE:
+If no response by response_deadline:
+- assignment.status = expired
+- notify Ops
+- reopen assignment pool
+- allow reassignment
+
+====================================================
+PHASE 5 — REJECTION DISCIPLINE + TEMP SUSPENSION
+====================================================
+
+If RideChecker rejects 3 jobs within rolling 30-day window:
+- availability_status = suspended
+- suspended_until = now + 72 hours
+- prevent accepting jobs
+- show suspension notice in dashboard
+
+Suspension message:
+"Your RideChecker access has been temporarily paused due to repeated declined assignments. Access restores automatically on [date]."
+
+Ops/Admin dashboard should show:
+- rejection history
+- suspension reason
+- suspension expiration
+
+Owner/operations_lead may manually clear suspension.
+
+DO NOT permanently deactivate automatically.
+
+====================================================
+PHASE 6 — ETA / EN ROUTE / ARRIVAL
+====================================================
+
+After acceptance:
+
+RideChecker can:
+- enter ETA
+- update travel status
+
+Statuses:
+accepted
+→ en_route
+→ arrived
+→ inspecting
+
+Ops must see:
+- ETA
+- current assignment status
+- timestamps
+
+Seller communication:
+Ops can send:
+- RideChecker assigned
+- RideChecker en route
+- RideChecker arrived
+- reschedule updates
+
+If automated messaging exists:
+send seller notifications automatically.
+
+Otherwise:
+generate copyable templates.
+
+====================================================
+PHASE 7 — INSPECTION PORTAL + REPORTING
+====================================================
+
+RideChecker may only access report portal if:
+- assigned to order
+- assignment.status in:
+  - accepted
+  - en_route
+  - arrived
+  - inspecting
+
+Buttons:
+- Start Inspection
+- Report Issue
+- Submit Inspection
+
+START INSPECTION:
+- assignment.status = inspecting
+- order.status = inspection_in_progress
+- started_at timestamp
+
+REPORT ISSUE:
+RideChecker can flag:
+- unsafe_location
+- hostile_seller
+- VIN_mismatch
+- suspected_fraud
+- police_issue
+- inaccessible_vehicle
+- weather_delay
+- vehicle_not_present
+
+Issue flags should:
+- notify Ops immediately
+- create activity log
+- optionally freeze workflow
+
+SUBMIT INSPECTION:
+RideChecker uploads:
+- checklist
+- photos
+- notes
+- damage notes
+- OBD scan if available
+- recommendations
+
+After submission:
+- assignment.status = report_processing
+- order.status = report_processing
+- completed_at timestamp
+- RideChecker active job count decremented
+- RideChecker availability auto returns to available unless manually unavailable
+- notify Ops
+- notify buyer
+
+====================================================
+PHASE 8 — REPORT QA + BUYER DELIVERY
+====================================================
+
+Do NOT auto-deliver reports immediately after submission.
+
+Workflow:
+inspection complete
+→ report_processing
+→ QA review
+→ report approved
+→ buyer delivery
+
+Ops/Admin may:
+- approve report
+- request revisions
+- reject incomplete reports
+
+Buyer notification:
+"Your RideCheck inspection has been completed and your report is currently being finalized."
+
+Use:
+RideCheck <support@ridecheckauto.com>
+
+====================================================
+PHASE 9 — ACTIVITY LOG + TIMELINE
+====================================================
+
+Create complete operational timeline.
+
+Log:
+- order created
+- payment received
+- seller contacted
+- seller confirmed
+- seller declined
+- address added
+- RideChecker assigned
+- RideChecker accepted
+- RideChecker rejected
+- assignment expired
+- RideChecker suspended
+- ETA updated
+- en route
+- arrived
+- inspection started
+- inspection completed
+- report processing
+- buyer notified
+- report delivered
+
+Display timeline on Ops order detail page.
+
+====================================================
+PHASE 10 — SECURITY + OPS CONTROLS
+====================================================
+
+Ensure:
+- RideCheckers cannot access orders not assigned to them
+- Buyers cannot access internal Ops notes
+- Sellers are not exposed unnecessarily
+- Service role remains server-side only
+- RLS policies enforced
+
+Do NOT expose seller phone/email publicly.
+
+Ops remains communication control layer.
+
+====================================================
+PHASE 11 — QA + END-TO-END TESTING
+====================================================
+
+Run full workflow test:
+
+1. Create order
+2. Verify buyer/seller cards
+3. Add seller address
+4. Mark seller confirmed
+5. Assign RideChecker
+6. Verify RideChecker sees assignment
+7. Accept assignment
+8. Update ETA
+9. Mark en_route
+10. Mark arrived
+11. Start inspection
+12. Submit report
+13. Move to report_processing
+14. Notify buyer
+15. Approve report
+16. Deliver report
+17. Test 3 rejections → suspension
+18. Test expired assignment
+19. Test unsafe/fraud escalation
+
+====================================================
+FINAL OUTPUT
+====================================================
+
+Return:
+1. Files changed
+2. DB migrations created
+3. Assignment states implemented
+4. Any remaining risks
+5. Confirmation:
+   - npm run build passes
+   - middleware.ts untouched
+   - no TypeScript errors
+   - production-safe YES/NO

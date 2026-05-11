@@ -930,3 +930,66 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'ridechecker_job_assignments backfill: % row(s) inserted', v_count;
 END $$;
+
+-- ── Migration 038: Dispatch workflow stabilization ────────────────────────────
+-- Additive only. IF NOT EXISTS / DROP+RECREATE constraints safely.
+
+-- ── 038-A: Profiles — availability_status, suspended_until, max_active_jobs ──
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS availability_status   TEXT NOT NULL DEFAULT 'available',
+  ADD COLUMN IF NOT EXISTS suspended_until       TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS max_active_jobs       INT NOT NULL DEFAULT 5;
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS chk_profiles_availability_status;
+ALTER TABLE public.profiles
+  ADD CONSTRAINT chk_profiles_availability_status
+  CHECK (availability_status IN ('available','unavailable','busy','suspended'));
+
+-- ── 038-B: orders.assignment_status — expand constraint ───────────────────────
+ALTER TABLE public.orders
+  DROP CONSTRAINT IF EXISTS chk_orders_assignment_status;
+ALTER TABLE public.orders
+  ADD CONSTRAINT chk_orders_assignment_status CHECK (
+    assignment_status IN (
+      'unassigned','assigned','awaiting_acceptance','accepted',
+      'declined','expired','en_route','arrived',
+      'inspection_started','inspecting','report_processing',
+      'fraud_hold','unsafe_hold','completed','cancelled'
+    )
+  );
+
+-- ── 038-C: orders.seller_status — expand to full operational enum ─────────────
+ALTER TABLE public.orders
+  DROP CONSTRAINT IF EXISTS chk_orders_seller_status;
+ALTER TABLE public.orders
+  ADD CONSTRAINT chk_orders_seller_status CHECK (
+    seller_status IN (
+      'awaiting',
+      'seller_not_contacted','seller_contacted','awaiting_seller_response',
+      'seller_confirmed','seller_reschedule_requested','seller_declined',
+      'seller_no_response','vehicle_sold','unsafe_location_flagged',
+      'confirmed','no_response','invalid'
+    )
+  );
+
+-- ── 038-D: ridechecker_job_assignments.status — add new lifecycle statuses ────
+ALTER TABLE public.ridechecker_job_assignments
+  DROP CONSTRAINT IF EXISTS chk_assignment_status;
+ALTER TABLE public.ridechecker_job_assignments
+  ADD CONSTRAINT chk_assignment_status CHECK (
+    status IN (
+      'awaiting_acceptance','assigned','accepted','declined','expired',
+      'en_route','arrived','inspection_started','inspecting',
+      'photos_uploading','report_pending','report_processing',
+      'in_progress','submitted','approved','rejected',
+      'paid','cancelled','escalated','reassigned',
+      'fraud_hold','unsafe_hold'
+    )
+  );
+
+-- ── 038-E: ridechecker_job_assignments — issue_flag columns ──────────────────
+ALTER TABLE public.ridechecker_job_assignments
+  ADD COLUMN IF NOT EXISTS flag_type    TEXT,
+  ADD COLUMN IF NOT EXISTS flag_notes   TEXT,
+  ADD COLUMN IF NOT EXISTS flagged_at   TIMESTAMPTZ;

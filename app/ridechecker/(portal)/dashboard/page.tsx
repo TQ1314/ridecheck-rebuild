@@ -214,6 +214,8 @@ export default function RideCheckerDashboardPage() {
   const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string | null>(null);
   const [availToggleLoading, setAvailToggleLoading] = useState(false);
   const availToggleInFlightRef = useRef(false);
+  const [isSuspended, setIsSuspended] = useState(false);
+  const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -256,6 +258,10 @@ export default function RideCheckerDashboardPage() {
     if (prof && !availToggleInFlightRef.current) {
       setIsAvailable(!!prof.is_available);
       if (prof.availability_updated_at) setAvailabilityUpdatedAt(prof.availability_updated_at);
+      const until = prof.suspended_until ?? null;
+      const suspended = prof.availability_status === "suspended" && until !== null && new Date(until) > new Date();
+      setIsSuspended(suspended);
+      setSuspendedUntil(until);
     }
 
     setLoading(false);
@@ -430,6 +436,39 @@ export default function RideCheckerDashboardPage() {
             </Badge>
           </div>
         </div>
+
+        {/* ── Availability suspension banner ──────────────────────────── */}
+        {isSuspended && suspendedUntil && (
+          <Card className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
+            <CardContent className="flex items-start gap-4 p-6">
+              <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1" data-testid="text-suspension-title">
+                  Availability Temporarily Paused
+                </h3>
+                <p className="text-sm text-red-700 dark:text-red-400" data-testid="text-suspension-message">
+                  Your RideChecker access has been temporarily paused due to repeated declined assignments.
+                  Access restores automatically on{" "}
+                  <strong>
+                    {new Date(suspendedUntil).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </strong>.
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-1">
+                  Questions? Contact{" "}
+                  <a href="mailto:support@ridecheckauto.com" className="underline">
+                    support@ridecheckauto.com
+                  </a>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Pending approval notice ─────────────────────────────────── */}
         {isPending && (

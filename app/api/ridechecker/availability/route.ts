@@ -70,7 +70,7 @@ export async function PATCH(request: Request) {
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role")
+      .select("role, availability_status, suspended_until")
       .eq("id", session.user.id)
       .maybeSingle();
 
@@ -79,14 +79,37 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const is_available = !!body.is_available;
+    const wantsAvailable = !!body.is_available;
     const now = new Date().toISOString();
+
+    // Check suspension — block setting available if still within suspension window
+    const suspendedUntil = profile.suspended_until ? new Date(profile.suspended_until) : null;
+    const isSuspended = (profile.availability_status as string) === "suspended" && suspendedUntil !== null && suspendedUntil > new Date();
+
+    if (wantsAvailable && isSuspended) {
+      return NextResponse.json({
+        error: "Your availability is suspended until " + suspendedUntil!.toLocaleString(),
+        suspended_until: profile.suspended_until,
+      }, { status: 403 });
+    }
+
+    // Auto-clear expired suspension
+    const updatePayload: Record<string, unknown> = {
+      is_available: wantsAvailable,
+      availability_updated_at: now,
+      availability_status: wantsAvailable ? "available" : "unavailable",
+    };
+
+    if (!isSuspended && (profile.availability_status as string) === "suspended") {
+      // Suspension expired — clear it
+      updatePayload.suspended_until = null;
+    }
 
     const { data: updated, error } = await supabaseAdmin
       .from("profiles")
-      .update({ is_available, availability_updated_at: now })
+      .update(updatePayload)
       .eq("id", session.user.id)
-      .select("is_available, availability_updated_at")
+      .select("is_available, availability_updated_at, availability_status, suspended_until")
       .single();
 
     if (error) {
@@ -96,8 +119,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({
       success: true,
-      is_available: updated?.is_available ?? is_available,
+      is_available: updated?.is_available ?? wantsAvailable,
       availability_updated_at: updated?.availability_updated_at ?? now,
+      availability_status: updated?.availability_status ?? (wantsAvailable ? "available" : "unavailable"),
     });
   } catch (err: any) {
     console.error("[availability PATCH error]", err);

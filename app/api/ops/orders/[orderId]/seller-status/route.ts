@@ -5,7 +5,21 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-const SELLER_STATUSES = ["awaiting", "confirmed", "no_response", "invalid"] as const;
+const SELLER_STATUSES = [
+  "awaiting",
+  "seller_not_contacted",
+  "seller_contacted",
+  "awaiting_seller_response",
+  "seller_confirmed",
+  "seller_reschedule_requested",
+  "seller_declined",
+  "seller_no_response",
+  "vehicle_sold",
+  "unsafe_location_flagged",
+  "confirmed",
+  "no_response",
+  "invalid",
+] as const;
 
 const schema = z.object({
   seller_status: z.enum(SELLER_STATUSES),

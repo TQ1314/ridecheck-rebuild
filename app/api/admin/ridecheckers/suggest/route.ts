@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const BASE_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs";
-const AVAIL_SELECT = BASE_SELECT + ", is_available, availability_updated_at";
+const AVAIL_SELECT = BASE_SELECT + ", is_available, availability_updated_at, availability_status, suspended_until";
 
 export async function GET(req: NextRequest) {
   const result = await requireRole(["owner", "operations_lead", "ops_lead", "operations"]);
@@ -107,6 +107,14 @@ export async function GET(req: NextRequest) {
     score -= declineCount * 8;
 
     const isAvailable = availabilityColumnsPresent ? (rc.is_available ?? false) : false;
+    const availStatus: string = availabilityColumnsPresent ? (rc.availability_status ?? "available") : "available";
+    const suspendedUntil: string | null = availabilityColumnsPresent ? (rc.suspended_until ?? null) : null;
+
+    // Penalise suspended RCs heavily in scoring so they sort to bottom
+    const isSuspended = availStatus === "suspended" &&
+      suspendedUntil !== null &&
+      new Date(suspendedUntil) > new Date();
+    if (isSuspended) score -= 1000;
 
     return {
       id: rc.id,
@@ -120,6 +128,9 @@ export async function GET(req: NextRequest) {
       decline_count_30d: declineCount,
       score,
       is_available: isAvailable,
+      availability_status: availStatus,
+      suspended_until: suspendedUntil,
+      is_suspended: isSuspended,
       availability_updated_at: availabilityColumnsPresent ? (rc.availability_updated_at ?? null) : null,
     };
   });
