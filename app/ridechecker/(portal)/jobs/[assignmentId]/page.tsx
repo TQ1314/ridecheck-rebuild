@@ -976,35 +976,58 @@ export default function JobDetailPage() {
             </Button>
           )}
 
-          {/* Start Inspection */}
+          {/* Start Inspection — Wizard is primary, status update is secondary */}
           {canStartInspection && (
-            <Button
-              className="w-full h-12 text-base"
-              onClick={() => updateStatus("inspection_started")}
-              disabled={actionLoading}
-              data-testid="button-start-inspection"
-            >
-              <Camera className="h-5 w-5 mr-2" />
-              {actionLoading ? "Starting…" : "Start Inspection"}
-            </Button>
+            <div className="space-y-2">
+              <Link href={`/ridechecker/jobs/${assignmentId}/inspect`}>
+                <Button
+                  className="w-full h-14 text-base font-semibold text-white"
+                  style={{ background: "#22774F" }}
+                  data-testid="button-start-wizard"
+                >
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  Start Guided Inspection Wizard
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                className="w-full h-10 text-sm"
+                onClick={() => updateStatus("inspection_started")}
+                disabled={actionLoading}
+                data-testid="button-start-inspection"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                {actionLoading ? "Updating…" : "Just update status (no wizard)"}
+              </Button>
+            </div>
           )}
 
-          {/* Uploading Photos */}
+          {/* Uploading Photos — show wizard as primary option */}
           {canMarkUploading && (
             <div className="space-y-2">
+              <Link href={`/ridechecker/jobs/${assignmentId}/inspect`}>
+                <Button
+                  className="w-full h-14 text-base font-semibold text-white"
+                  style={{ background: "#22774F" }}
+                  data-testid="button-continue-wizard"
+                >
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  Continue Guided Inspection Wizard
+                </Button>
+              </Link>
               <Button
-                className="w-full h-12 text-base bg-cyan-600 hover:bg-cyan-700 text-white"
+                className="w-full h-10 text-sm bg-cyan-600 hover:bg-cyan-700 text-white"
                 onClick={() => updateStatus("photos_uploading")}
                 disabled={actionLoading}
                 data-testid="button-mark-uploading"
               >
-                <Camera className="h-5 w-5 mr-2" />
-                {actionLoading ? "Updating…" : "Now Uploading Photos"}
+                <Camera className="h-4 w-4 mr-2" />
+                {actionLoading ? "Updating…" : "Mark: Now Uploading Photos"}
               </Button>
               <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
-                <Button variant="outline" className="w-full h-10 text-sm" data-testid="button-go-submit-early">
-                  <ClipboardList className="h-4 w-4 mr-2" />
-                  Go to Submission Form
+                <Button variant="outline" className="w-full h-9 text-xs" data-testid="button-go-submit-early">
+                  <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
+                  Use old submission form
                 </Button>
               </Link>
             </div>
@@ -1031,14 +1054,26 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Continue Submission (legacy in_progress / report_pending) */}
+          {/* Continue Submission (in_progress / report_pending) */}
           {canSubmit && (
-            <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
-              <Button className="w-full h-12 text-base" data-testid="button-go-to-submit">
-                <ClipboardList className="h-5 w-5 mr-2" />
-                Continue Submission
-              </Button>
-            </Link>
+            <div className="space-y-2">
+              <Link href={`/ridechecker/jobs/${assignmentId}/inspect`}>
+                <Button
+                  className="w-full h-14 text-base font-semibold text-white"
+                  style={{ background: "#22774F" }}
+                  data-testid="button-continue-wizard-submit"
+                >
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  Continue Guided Inspection Wizard
+                </Button>
+              </Link>
+              <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
+                <Button variant="outline" className="w-full h-9 text-xs" data-testid="button-go-to-submit">
+                  <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
+                  Use old submission form
+                </Button>
+              </Link>
+            </div>
           )}
 
           {/* Submitted */}

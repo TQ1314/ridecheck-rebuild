@@ -1,0 +1,448 @@
+Yes — this is the correct direction.
+
+The RideChecker dashboard should not feel like a blank form. It should feel like a **guided field mission**:
+
+**Step 1 → take required photo → answer simple question → next step.**
+
+Not:
+“Inspect the car and write notes.”
+
+Use this prompt for Replit:
+
+```text
+Build a mobile-first Guided RideCheck Inspection Wizard for RideCheckers.
+
+IMPORTANT RULES:
+- Do NOT break middleware.ts
+- Do NOT rewrite auth
+- Do NOT change existing role gates
+- Do NOT break order assignment, accept/reject, or report processing flow
+- Extend existing RideChecker report/inspection portal only
+- Use existing assignment and order IDs
+- Use additive DB changes only with IF NOT EXISTS
+- Do not auto-send final report to buyer
+- Inspection submission must move order to report_processing for Ops QA
+
+GOAL:
+RideCheckers may not be mechanics, so the inspection must be standardized, guided, and impossible to freestyle.
+
+The RideChecker should see a click-by-click guided workflow on mobile:
+- clear instruction
+- sample/example guidance
+- required photo upload
+- simple pass / concern / not accessible answer
+- optional note
+- next button
+
+Each major inspection item should require 2 photos where possible:
+1. Wide context photo
+2. Close-up detail photo
+
+This improves quality and gives Ops enough evidence to review.
+
+====================================================
+PHASE 1 — INSPECTION WIZARD ROUTE
+====================================================
+
+Create or update the RideChecker inspection route:
+
+/ridechecker/jobs/[assignmentId]/inspect
+
+Access:
+- assigned RideChecker only
+- owner/admin override allowed
+- assignment.status must be:
+  - accepted
+  - en_route
+  - arrived
+  - inspecting
+
+If unauthorized:
+- return clear error
+- do not expose order data
+
+If assignment not ready:
+- show message:
+  “This RideCheck is not ready for inspection yet.”
+
+====================================================
+PHASE 2 — INSPECTION SESSION DATA
+====================================================
+
+Create additive tables if not existing:
+
+ridecheck_inspection_sessions
+- id uuid primary key
+- assignment_id uuid
+- order_id uuid
+- ridechecker_id uuid
+- status text default 'in_progress'
+- started_at timestamptz
+- submitted_at timestamptz
+- created_at timestamptz
+- updated_at timestamptz
+
+ridecheck_inspection_steps
+- id uuid primary key
+- session_id uuid
+- step_key text
+- section text
+- title text
+- instruction text
+- answer text
+  values: pass, concern, not_accessible, skipped
+- severity text nullable
+  values: low, medium, high, critical
+- note text nullable
+- wide_photo_url text nullable
+- close_photo_url text nullable
+- completed boolean default false
+- completed_at timestamptz nullable
+- created_at timestamptz
+- updated_at timestamptz
+
+If an existing inspection/report table exists, integrate instead of duplicating, but keep the wizard step structure.
+
+====================================================
+PHASE 3 — STANDARDIZED STEP FLOW
+====================================================
+
+Create the first MVP guided checklist.
+
+Each step should show:
+- section
+- title
+- why it matters
+- exact instruction
+- required photos
+- answer buttons:
+  - Looks OK
+  - Concern
+  - Not Accessible
+- optional note
+
+Use this MVP step list:
+
+SECTION 1 — Identity & Paperwork
+1. VIN dashboard
+Instruction: Take a clear photo of the VIN visible through the windshield.
+Photos:
+- wide: windshield/dashboard area
+- close: VIN plate
+
+2. Odometer
+Instruction: Start vehicle if allowed and photograph odometer mileage.
+Photos:
+- wide: dashboard
+- close: odometer reading
+
+3. Title / paperwork if available
+Instruction: If seller allows, photograph title or paperwork without exposing unnecessary private info.
+Photos:
+- wide: document context
+- close: VIN/title area
+Allow Not Accessible.
+
+SECTION 2 — Exterior & Body
+4. Front exterior
+Photos:
+- wide: full front 3/4 vehicle
+- close: front bumper/headlights damage area if any
+
+5. Rear exterior
+Photos:
+- wide: full rear 3/4 vehicle
+- close: rear bumper/tailgate/trunk area
+
+6. Driver side
+Photos:
+- wide: full driver side
+- close: rocker panel / lower door area
+
+7. Passenger side
+Photos:
+- wide: full passenger side
+- close: rocker panel / lower door area
+
+8. Rust / body damage
+Instruction: Photograph any rust, dents, mismatched paint, panel gaps, or damage.
+Photos:
+- wide: location context
+- close: damage detail
+Allow Not Accessible only if no visible damage.
+
+SECTION 3 — Tires & Wheels
+9. Front tire condition
+Photos:
+- wide: full wheel/tire
+- close: tread / sidewall / date code if visible
+
+10. Rear tire condition
+Photos:
+- wide: full wheel/tire
+- close: tread / sidewall / date code if visible
+
+SECTION 4 — Interior & Electronics
+11. Driver seat / interior wear
+Photos:
+- wide: front interior
+- close: driver seat bolster / pedals / wear area
+
+12. Dashboard warning lights
+Instruction: With ignition on or engine running, photograph dashboard lights.
+Photos:
+- wide: dashboard
+- close: warning light cluster
+
+13. Basic controls
+Instruction: Check lights, windows, horn, wipers, AC/heat if seller allows.
+Photos:
+- wide: dashboard/control area
+- close: any failed control or warning
+Allow pass/concern/not accessible.
+
+SECTION 5 — Engine Bay
+14. Engine bay overview
+Photos:
+- wide: full engine bay
+- close: any leaks, corrosion, missing covers, or obvious concern
+
+15. Oil cap / dipstick
+Instruction: If accessible and safe, photograph oil cap underside and dipstick condition.
+Photos:
+- wide: oil cap/dipstick location
+- close: oil cap underside or dipstick
+Allow Not Accessible.
+
+16. Fluids / visible leaks
+Photos:
+- wide: engine bay lower area
+- close: visible leak/fluid stain if present
+
+SECTION 6 — Underbody / Rust
+17. Front underbody
+Photos:
+- wide: front underside
+- close: rust/leak/suspension concern if visible
+
+18. Rear underbody
+Photos:
+- wide: rear underside
+- close: rust/leak/exhaust/suspension concern if visible
+
+SECTION 7 — OBD / Diagnostic Capture
+19. OBD scan result
+Instruction: Plug in scanner if available. Photograph scanner/app result.
+Photos:
+- wide: scanner connected
+- close: result screen
+Allow Not Accessible if scanner unavailable or seller refuses.
+
+20. Readiness / cleared codes
+Instruction: If scanner shows readiness monitors or cleared codes, photograph it.
+Photos:
+- wide: scanner/app screen
+- close: readiness/code details
+Allow Not Accessible.
+
+SECTION 8 — Final Summary
+21. RideChecker field summary
+Require:
+- overall field note
+- any safety concern
+- any seller issue
+- any access limitation
+- final recommendation to Ops only:
+  - no obvious concern
+  - needs review
+  - urgent review
+
+Important:
+RideChecker should NOT tell buyer “buy” or “do not buy.”
+Final verdict belongs to Ops/RideCheck review.
+
+====================================================
+PHASE 4 — PHOTO REQUIREMENTS
+====================================================
+
+Each step should enforce:
+- 2 photos when required:
+  - wide photo
+  - close photo
+- If Not Accessible selected, photos may be optional but note is required
+- If Concern selected, note is required
+- If Critical severity selected, note required and Ops alert triggered
+
+Compress images client-side if possible before upload.
+Use Supabase Storage bucket:
+ridechecker-photos
+
+Organize path:
+orders/{orderId}/assignments/{assignmentId}/{stepKey}/wide.jpg
+orders/{orderId}/assignments/{assignmentId}/{stepKey}/close.jpg
+
+Do not expose storage paths publicly unless signed URLs are used.
+
+====================================================
+PHASE 5 — CLICK-AND-GO UX
+====================================================
+
+Mobile-first UI requirements:
+- large buttons
+- sticky progress bar
+- step counter: “Step 5 of 21”
+- save progress automatically
+- next button disabled until required data present
+- previous button allowed
+- show “Not Accessible” option
+- show “Report Issue” button always visible
+
+Each step should have:
+- plain English instruction
+- “Why this matters” short explanation
+- photo upload buttons:
+  - Take wide photo
+  - Take close photo
+- answer buttons:
+  - Looks OK
+  - Concern
+  - Not Accessible
+- optional note box
+
+Do not use dense mechanic language.
+
+====================================================
+PHASE 6 — AUTO-SAVE + RESUME
+====================================================
+
+Inspection wizard must auto-save after each step.
+
+If RideChecker leaves and returns:
+- resume same inspection session
+- completed steps stay completed
+- photos remain attached
+- progress percentage displayed
+
+====================================================
+PHASE 7 — REPORT ISSUE / ESCALATION
+====================================================
+
+Always show a red “Report Issue” button.
+
+Issue types:
+- unsafe_location
+- hostile_seller
+- vehicle_not_present
+- seller_refused_access
+- VIN_mismatch
+- suspected_fraud
+- weather_delay
+- police_issue
+- other
+
+Submitting issue:
+- creates assignment flag
+- logs activity
+- notifies Ops
+- if unsafe_location or suspected_fraud or VIN_mismatch:
+  - assignment.status = unsafe_hold or fraud_hold
+  - order.status = on_hold
+  - pause inspection
+
+====================================================
+PHASE 8 — SUBMIT INSPECTION
+====================================================
+
+Before final submit:
+Show review screen:
+- completed steps count
+- missing required steps
+- concerns count
+- not accessible count
+- uploaded photo count
+
+Submission allowed only if:
+- all required steps complete
+- all concern steps include notes
+- all not accessible required steps include notes
+
+On submit:
+- session.status = submitted
+- submitted_at = now
+- assignment.status = report_processing
+- order.status = report_processing
+- notify Ops
+- notify buyer:
+  “Your RideCheck inspection is complete and the report is being reviewed.”
+
+Do NOT deliver final report automatically.
+
+====================================================
+PHASE 9 — OPS REVIEW VIEW
+====================================================
+
+Ops/Admin should be able to view submitted wizard data.
+
+Create or update Ops report review page to show:
+- all steps grouped by section
+- answers
+- notes
+- wide + close photos
+- concerns highlighted
+- not accessible items highlighted
+- issue flags
+- final RideChecker field summary
+
+Ops can:
+- approve for report generation
+- request revision
+- mark incomplete
+- escalate internally
+
+====================================================
+PHASE 10 — SAFETY + LEGAL LANGUAGE
+====================================================
+
+Add disclaimer inside RideChecker wizard:
+“RideCheckers document visible and accessible condition signals. Do not make repair promises, purchase recommendations, or guarantees to buyers or sellers.”
+
+At final summary:
+“Do not tell the buyer whether to buy the vehicle. Submit your findings for RideCheck review.”
+
+====================================================
+PHASE 11 — QA TESTS
+====================================================
+
+Run tests:
+
+1. Assigned RideChecker opens inspection wizard
+2. Unauthorized RideChecker blocked
+3. Unassigned customer blocked
+4. Step cannot complete without required photos
+5. Concern requires note
+6. Not Accessible requires note
+7. Auto-save works
+8. Resume works
+9. Report Issue creates flag
+10. unsafe_location pauses workflow
+11. Submit moves assignment/order to report_processing
+12. Ops can view submitted data
+13. Buyer notification sends
+14. npm run build passes
+15. middleware.ts untouched
+
+FINAL OUTPUT:
+Return:
+- files changed
+- DB migrations created
+- storage bucket assumptions
+- route created
+- wizard steps implemented
+- remaining risks
+- confirmation build passes
+- confirmation middleware.ts untouched
+```
+
+This is the right product move.
+
+The wizard makes RideCheck scalable because the **system teaches the RideChecker what to do in the moment**. That is how non-mechanics can produce consistent, reviewable data.
