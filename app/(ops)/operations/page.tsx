@@ -30,6 +30,7 @@ import {
   Circle,
   Calendar,
   ChevronRight,
+  Activity,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -223,6 +224,12 @@ export default function OperationsDashboardPage() {
             <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          <Link href="/operations/live">
+            <Button size="sm" variant="outline" data-testid="button-live-board">
+              <Activity className="h-4 w-4 mr-1.5 text-green-600" />
+              Live Board
+            </Button>
+          </Link>
           <Link href="/operations/orders">
             <Button size="sm" data-testid="button-view-all-orders">
               <ClipboardList className="h-4 w-4 mr-1.5" />

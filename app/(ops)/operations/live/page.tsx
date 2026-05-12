@@ -137,9 +137,9 @@ export default function LiveBoardPage() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
-  // Auto-refresh every 60 s
+  // Auto-refresh every 30 s
   useEffect(() => {
-    const id = setInterval(() => fetchJobs(true), 60000);
+    const id = setInterval(() => fetchJobs(true), 30000);
     return () => clearInterval(id);
   }, [fetchJobs]);
 
