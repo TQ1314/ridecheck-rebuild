@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const SAFE_ORDER_COLUMNS = "order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_location, inspection_address, scheduled_date, scheduled_time, inspector_status, report_status, package, booking_type, created_at";
+// NOTE: production DB uses inspection_datetime; scheduled_date/scheduled_time do NOT exist
+const SAFE_ORDER_COLUMNS = "order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_location, inspection_address, inspection_datetime, inspector_status, report_status, package, booking_type, created_at";
 
 // Full column set — may not be present in all prod DB versions
 const ASSIGNMENT_SELECT_FULL =

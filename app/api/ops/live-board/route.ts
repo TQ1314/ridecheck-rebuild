@@ -63,7 +63,7 @@ export async function GET(_req: NextRequest) {
        last_status_update_at, last_known_lat, last_known_lng,
        last_location_update_at, escalation_notes, created_at,
        ridechecker:profiles!ridechecker_id(id, full_name, phone),
-       order:orders!order_id(id, order_id, vehicle_year, vehicle_make, vehicle_model, inspection_address, scheduled_date, scheduled_time)`
+       order:orders!order_id(id, order_id, vehicle_year, vehicle_make, vehicle_model, inspection_address, inspection_datetime)`
     )
     .not("status", "in", notIn)
     .order("last_status_update_at", { ascending: false, nullsFirst: false });
@@ -92,8 +92,8 @@ export async function GET(_req: NextRequest) {
         ? `${ord.vehicle_year ?? ""} ${ord.vehicle_make ?? ""} ${ord.vehicle_model ?? ""}`.trim()
         : null,
       inspection_address:     ord?.inspection_address ?? null,
-      scheduled_date:         ord?.scheduled_date ?? null,
-      scheduled_time:         ord?.scheduled_time ?? null,
+      scheduled_date:         (ord as any)?.inspection_datetime ? (ord as any).inspection_datetime.split("T")[0] : null,
+      scheduled_time:         (ord as any)?.inspection_datetime ? (ord as any).inspection_datetime.split("T")[1]?.slice(0,5) : null,
       ridechecker_id:         rc?.id ?? null,
       ridechecker_name:       rc?.full_name ?? "Unknown",
       ridechecker_phone:      rc?.phone ?? null,

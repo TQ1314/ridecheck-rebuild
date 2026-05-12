@@ -50,7 +50,7 @@ export async function GET(
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_trim, vehicle_location, inspection_address, scheduled_date, scheduled_time, package, booking_type, seller_name, special_instructions, vehicle_mileage, vehicle_price, base_pay, current_offer, boost_amount, created_at"
+        "id, order_id, vehicle_year, vehicle_make, vehicle_model, vehicle_trim, vehicle_location, inspection_address, inspection_datetime, package, booking_type, seller_name, vehicle_mileage, vehicle_price, base_pay, current_offer, boost_amount, notes_to_inspector, created_at"
       )
       .eq("id", assignment.order_id)
       .maybeSingle();
@@ -86,12 +86,12 @@ export async function GET(
             vehicle_trim: order.vehicle_trim,
             vehicle_location: order.vehicle_location,
             inspection_address: order.inspection_address,
-            scheduled_date: order.scheduled_date,
-            scheduled_time: order.scheduled_time,
+            scheduled_date: (order as any).inspection_datetime ? (order as any).inspection_datetime.split("T")[0] : null,
+            scheduled_time: (order as any).inspection_datetime ? (order as any).inspection_datetime.split("T")[1]?.slice(0, 5) : null,
             package: order.package,
             booking_type: order.booking_type,
             seller_name: order.seller_name || null,
-            special_instructions: order.special_instructions || null,
+            special_instructions: (order as any).notes_to_inspector || null,
             vehicle_mileage: (order as any).vehicle_mileage ?? null,
             vehicle_price: (order as any).vehicle_price ?? null,
           }

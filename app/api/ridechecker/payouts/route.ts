@@ -42,7 +42,7 @@ export async function GET() {
         approved_at,
         paid_at,
         created_at,
-        order:orders!order_id (vehicle_year, vehicle_make, vehicle_model, scheduled_date)
+        order:orders!order_id (vehicle_year, vehicle_make, vehicle_model, inspection_datetime)
       `)
       .eq("ridechecker_id", userId)
       .order("created_at", { ascending: false });
@@ -75,7 +75,7 @@ export async function GET() {
       vehicle_label: p.order
         ? [p.order.vehicle_year, p.order.vehicle_make, p.order.vehicle_model].filter(Boolean).join(" ")
         : null,
-      scheduled_date: p.order?.scheduled_date ?? null,
+      scheduled_date: p.order?.inspection_datetime ? p.order.inspection_datetime.split("T")[0] : null,
     }));
 
     const total_earned = list.reduce((s: number, p: any) => s + p.total_pay, 0);

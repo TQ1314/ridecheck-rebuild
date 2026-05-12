@@ -78,7 +78,7 @@ export async function GET() {
     const [ordersRes, payoutsRes, rcProfilesRes, availabilityRes, assignmentsRes] = await Promise.all([
       supabaseAdmin
         .from("orders")
-        .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, package, status, assignment_status, payment_status, created_at, scheduled_date, assigned_ridechecker_id, current_offer, base_pay")
+        .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, package, status, assignment_status, payment_status, created_at, inspection_datetime, assigned_ridechecker_id, current_offer, base_pay")
         .not("status", "eq", "cancelled")
         .order("created_at", { ascending: false })
         .limit(150),
@@ -145,7 +145,7 @@ export async function GET() {
           status: o.status,
           assignment_status: o.assignment_status ?? "unassigned",
           payment_status: o.payment_status ?? null,
-          scheduled_date: o.scheduled_date ?? null,
+          scheduled_date: (o as any).inspection_datetime ? (o as any).inspection_datetime.split("T")[0] : null,
           created_at: o.created_at,
           next_action: na.label,
           next_action_urgency: na.urgency,
