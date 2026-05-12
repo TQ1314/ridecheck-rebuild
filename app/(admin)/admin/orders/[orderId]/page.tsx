@@ -171,10 +171,11 @@ export default function AdminOrderDetailPage() {
   const handleAssignRidechecker = async () => {
     if (!selectedRc) return;
     setAssignRcLoading(true);
-    const res = await fetch(`/api/orders/${orderId}/assign`, {
+    // Use the ridechecker-assign route so assignment row + notifications are created properly
+    const res = await fetch(`/api/ops/orders/${orderId}/ridechecker-assign`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inspector_id: selectedRc }),
+      body: JSON.stringify({ ridechecker_id: selectedRc }),
     });
     setAssignRcLoading(false);
     if (!res.ok) {
@@ -182,7 +183,7 @@ export default function AdminOrderDetailPage() {
       toast({ title: "Error", description: err.error, variant: "destructive" });
       return;
     }
-    toast({ title: "RideChecker assigned" });
+    toast({ title: "RideChecker assigned — they have 15 min to accept" });
     setAssignRcOpen(false);
     loadData();
   };

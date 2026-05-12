@@ -171,6 +171,24 @@ export async function GET() {
       }
     }
 
+    // ── Legacy fallback: assigned_inspector_id stores profile UUID directly ────
+    // Old admin assignment panel wrote to assigned_inspector_id instead of
+    // assigned_ridechecker_id. Surface those orders so nothing is lost.
+    const { data: legacyOrders } = await supabaseAdmin
+      .from("orders")
+      .select(SAFE_ORDER_COLUMNS + ", id, assignment_status, assigned_inspector_id")
+      .eq("assigned_inspector_id", session.user.id)
+      .not("ops_status", "in", '("completed","cancelled","delivered")');
+
+    if (legacyOrders) {
+      for (const o of legacyOrders as any[]) {
+        if (!assignedOrderIds.has(o.id)) {
+          assignments.push(buildFallbackAssignment(o));
+          assignedOrderIds.add(o.id);
+        }
+      }
+    }
+
     const activeStatuses = ["en_route", "on_site", "inspecting", "wrapping_up"];
     const stats = {
       totalJobs: jobs.length + assignments.length,
