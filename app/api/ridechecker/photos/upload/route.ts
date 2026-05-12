@@ -4,23 +4,17 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const BUCKET = "ridechecker-photos";
-const MAX_SIZE = 20 * 1024 * 1024;
+const BUCKET        = "ridechecker-photos";
+const MAX_SIZE      = 20 * 1024 * 1024;
 const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
+  "image/jpeg", "image/jpg", "image/png",
+  "image/webp", "image/heic", "image/heif",
 ];
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = createRouteHandlerSupabaseClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,33 +26,33 @@ export async function POST(req: NextRequest) {
       .eq("id", session.user.id)
       .maybeSingle();
 
-    if (!profile || !["ridechecker_active", "owner"].includes(profile.role)) {
+    if (!profile || !["ridechecker_active", "owner", "admin"].includes(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
+    const formData     = await req.formData();
+    const file         = formData.get("file") as File | null;
     const assignmentId = (formData.get("assignmentId") as string) || "misc";
+    const orderId      = (formData.get("orderId")      as string) || "";
+    const stepKey      = (formData.get("stepKey")      as string) || "unknown";
+    const slotKey      = (formData.get("slotKey")      as string) || "photo";
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
-
     if (file.size > MAX_SIZE) {
-      return NextResponse.json(
-        { error: "File too large (max 20MB)" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
     }
 
     const mimeType = file.type || "image/jpeg";
     if (!ALLOWED_TYPES.includes(mimeType)) {
       return NextResponse.json(
         { error: "Invalid file type. Use JPEG, PNG, WebP, or HEIC." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
+    // ── Ensure bucket exists ────────────────────────────────────────────────
     try {
       await supabaseAdmin.storage.createBucket(BUCKET, {
         public: true,
@@ -66,38 +60,39 @@ export async function POST(req: NextRequest) {
         allowedMimeTypes: ALLOWED_TYPES,
       });
     } catch {
+      // Bucket likely already exists — safe to ignore
     }
 
-    const ext =
-      file.name.split(".").pop()?.toLowerCase().replace("heic", "jpg").replace("heif", "jpg") ||
-      "jpg";
-    const storagePath = `${session.user.id}/${assignmentId}/${Date.now()}.${ext}`;
+    // ── Structured storage path ─────────────────────────────────────────────
+    // Preferred:  orders/{orderId}/assignments/{assignmentId}/{stepKey}/{slotKey}_{ts}.jpg
+    // Fallback:   {userId}/{assignmentId}/{ts}.jpg  (legacy, if no orderId)
+    const ext = file.name.split(".").pop()
+      ?.toLowerCase()
+      .replace("heic", "jpg")
+      .replace("heif", "jpg") || "jpg";
+
+    const ts = Date.now();
+    const storagePath = orderId
+      ? `orders/${orderId}/assignments/${assignmentId}/${stepKey}/${slotKey}_${ts}.${ext}`
+      : `${session.user.id}/${assignmentId}/${ts}.${ext}`;
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer      = Buffer.from(arrayBuffer);
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: mimeType,
-        upsert: false,
-      });
+      .upload(storagePath, buffer, { contentType: mimeType, upsert: false });
 
     if (uploadError) {
-      console.error("[ridechecker photo upload error]", uploadError);
-      return NextResponse.json(
-        { error: "Upload failed. Please try again." },
-        { status: 500 }
-      );
+      console.error("[photo upload]", uploadError);
+      return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
     }
 
-    const {
-      data: { publicUrl },
-    } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
+    const { data: { publicUrl } } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
 
     return NextResponse.json({ url: publicUrl, path: storagePath });
-  } catch (err: any) {
-    console.error("[ridechecker photo upload error]", err);
+  } catch (err) {
+    console.error("[photo upload]", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
