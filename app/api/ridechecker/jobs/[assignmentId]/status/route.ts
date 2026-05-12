@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
+  assigned:          ["en_route", "escalated"],
   accepted:          ["en_route", "escalated"],
   en_route:          ["arrived", "escalated"],
   arrived:           ["inspection_started", "escalated"],

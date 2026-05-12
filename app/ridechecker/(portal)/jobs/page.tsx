@@ -277,7 +277,7 @@ export default function RideCheckerJobsPage() {
 
   const pendingAcceptance = assignments.filter((a) => a.status === "awaiting_acceptance");
   const activeAssignments = assignments.filter((a) =>
-    ["accepted", "in_progress", "submitted"].includes(a.status)
+    ["assigned", "accepted", "in_progress", "submitted"].includes(a.status)
   );
   const pastAssignments = assignments.filter((a) =>
     ["approved", "paid", "declined", "expired", "cancelled", "rejected"].includes(a.status)

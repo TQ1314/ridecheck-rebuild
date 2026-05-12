@@ -461,8 +461,11 @@ export default function JobDetailPage() {
   const isExpired = assignment.status === "expired" || (secsLeft !== null && secsLeft === 0 && isPendingAcceptance);
   const canAccept = isPendingAcceptance && !isExpired;
 
+  // "assigned" = ops directly assigned without the accept/decline window
+  const isDirectAssign = assignment.status === "assigned";
+
   // New granular lifecycle flags
-  const canEnRoute         = assignment.status === "accepted";
+  const canEnRoute         = ["accepted", "assigned"].includes(assignment.status);
   const canMarkArrived     = assignment.status === "en_route";
   const canStartInspection = assignment.status === "arrived";
   const canMarkUploading   = assignment.status === "inspection_started";
@@ -474,7 +477,7 @@ export default function JobDetailPage() {
   const isEscalated = assignment.status === "escalated";
 
   const canEscalate = [
-    "accepted", "en_route", "arrived", "inspection_started",
+    "assigned", "accepted", "en_route", "arrived", "inspection_started",
     "photos_uploading", "report_pending", "in_progress",
   ].includes(assignment.status);
 
@@ -530,6 +533,19 @@ export default function JobDetailPage() {
                 {minsLeft}m {sLeft! < 10 ? "0" : ""}{sLeft}s remaining
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Direct-assign confirmation banner ───────────────── */}
+        {isDirectAssign && (
+          <div className="rounded-xl border border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-700 p-4 space-y-2" data-testid="banner-direct-assign">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+              <p className="font-bold text-green-800 dark:text-green-300">Job Confirmed — You're All Set</p>
+            </div>
+            <p className="text-sm text-green-700 dark:text-green-400">
+              This job has been assigned to you by the ops team. Review the details below, then tap <strong>On My Way</strong> when you're heading to the inspection location.
+            </p>
           </div>
         )}
 

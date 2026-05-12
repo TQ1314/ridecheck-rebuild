@@ -405,7 +405,7 @@ export default function RideCheckerDashboardPage() {
   // Partition assignments by status
   const pendingAcceptance = assignments.filter((a) => a.status === "awaiting_acceptance");
   const activeAssignments = assignments.filter((a) =>
-    ["accepted", "in_progress", "submitted", "en_route", "arrived", "inspection_started", "photos_uploading", "report_pending", "escalated"].includes(a.status)
+    ["assigned", "accepted", "in_progress", "submitted", "en_route", "arrived", "inspection_started", "photos_uploading", "report_pending", "escalated"].includes(a.status)
   );
   const pastAssignments = assignments.filter((a) =>
     ["approved", "paid", "declined", "expired", "cancelled", "rejected", "reassigned"].includes(a.status)
