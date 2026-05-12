@@ -63,12 +63,16 @@ export async function PATCH(
     const newOrderStatus = ridechecker_id ? "awaiting_acceptance" : "unassigned";
 
     // Cancel any existing open assignments for this order
+    // Note: ridechecker_job_assignments has no updated_at column — do not include it
     if (ridechecker_id) {
-      await supabaseAdmin
+      const { error: cancelErr } = await supabaseAdmin
         .from("ridechecker_job_assignments")
-        .update({ status: "cancelled", updated_at: nowIso })
+        .update({ status: "cancelled" })
         .eq("order_id", params.orderId)
         .in("status", ["awaiting_acceptance", "assigned"]);
+      if (cancelErr) {
+        console.error("[ridechecker-assign cancel error]", cancelErr.message, cancelErr.code);
+      }
     }
 
     // Update order

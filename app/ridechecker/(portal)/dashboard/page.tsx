@@ -210,6 +210,7 @@ export default function RideCheckerDashboardPage() {
   const [availForm, setAvailForm] = useState({ date: "", start_time: "09:00", end_time: "17:00", max_jobs: 3 });
   const [availSubmitting, setAvailSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [jobsApiError, setJobsApiError] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState(false);
   const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState<string | null>(null);
   const [availToggleLoading, setAvailToggleLoading] = useState(false);
@@ -227,12 +228,24 @@ export default function RideCheckerDashboardPage() {
     const { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle();
     if (prof) setProfile(prof);
 
-    const [jobsData, payoutsData, referralsData, availData] = await Promise.all([
-      fetch("/api/ridechecker/jobs").then((r) => r.ok ? r.json() : null).catch(() => null),
+    const [jobsRes, payoutsData, referralsData, availData] = await Promise.all([
+      fetch("/api/ridechecker/jobs").then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, body };
+      }).catch((e) => ({ ok: false, status: 0, body: { error: e?.message || "Network error" } })),
       fetch("/api/ridechecker/payouts").then((r) => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/ridechecker/referrals").then((r) => r.ok ? r.json() : null).catch(() => null),
       fetch("/api/ridechecker/availability").then((r) => r.ok ? r.json() : null).catch(() => null),
     ]);
+
+    if (!jobsRes.ok) {
+      const errMsg = jobsRes.body?.error || `Jobs API returned status ${jobsRes.status}`;
+      setJobsApiError(errMsg);
+    } else {
+      setJobsApiError(null);
+    }
+
+    const jobsData = jobsRes.ok ? jobsRes.body : null;
 
     if (jobsData?.stats) setStats(jobsData.stats);
     if (jobsData?.assignments) {
@@ -436,6 +449,30 @@ export default function RideCheckerDashboardPage() {
             </Badge>
           </div>
         </div>
+
+        {/* ── Jobs API error banner (diagnostic) ──────────────────────── */}
+        {jobsApiError && (
+          <Card className="border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30">
+            <CardContent className="flex items-start gap-4 p-4">
+              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-orange-800 dark:text-orange-300 text-sm">
+                  Unable to load job assignments
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400 mt-0.5 font-mono break-all">
+                  {jobsApiError}
+                </p>
+                <p className="text-xs text-orange-600 dark:text-orange-500 mt-1">
+                  Please screenshot this message and send it to{" "}
+                  <a href="mailto:support@ridecheckauto.com" className="underline">
+                    support@ridecheckauto.com
+                  </a>
+                  , then try clicking Refresh.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Availability suspension banner ──────────────────────────── */}
         {isSuspended && suspendedUntil && (

@@ -1,0 +1,124 @@
+Then do **not keep guessing in the UI**. The assignment is still failing somewhere between:
+
+**Ops assignment → database row → RideChecker jobs API → dashboard render**
+
+Send Replit this exact prompt:
+
+```text
+The deployed fix did NOT resolve the issue.
+
+Production problem:
+Ops Lead assigned the Honda Ridgeline job to RideChecker Jabbar Treize, but Jabbar’s RideChecker dashboard still shows no jobs after refresh.
+
+Do not assume. Diagnose with real data.
+
+IMPORTANT:
+- Do NOT rewrite workflow
+- Do NOT change middleware
+- Do NOT change auth
+- Do NOT add new features
+- Find the exact break point
+
+Run a full trace for this specific assignment:
+
+1. Identify Jabbar’s profile/user record
+Return:
+- auth user id
+- profiles.id
+- profiles.role
+- profiles.is_active
+- profiles.verification_status
+- profiles.workflow_stage
+- profiles.availability_status
+
+2. Identify the Honda Ridgeline order
+Return:
+- order id
+- order status
+- assignment_status
+- assigned_ridechecker_id if present
+- ridechecker_id if present
+- seller/order relevant assignment fields
+
+3. Check ridechecker_job_assignments
+Query by:
+- order_id
+- ridechecker_id = Jabbar profile id
+- ridechecker_id = Jabbar auth user id
+- assignment status values
+
+Return the exact rows.
+
+4. Confirm ID mismatch
+Check whether the assignment uses:
+- auth.users.id
+or
+- profiles.id
+
+Then compare that to what /api/ridechecker/jobs uses for current actor id.
+
+This is likely an ID mismatch between profile.id and auth user id. Verify.
+
+5. Add temporary safe debug logging to /api/ridechecker/jobs
+Log:
+- current auth user id
+- current profile id
+- role
+- query filters used
+- number of assignments returned
+- Supabase errors
+
+Do not log secrets or PII beyond internal ids.
+
+6. Directly test the jobs API as Jabbar
+Return:
+- HTTP status
+- JSON response
+- assignment count
+- any errors
+
+7. Check dashboard rendering
+If API returns jobs but UI shows none:
+- inspect the dashboard filter/render conditions
+- identify which condition hides the job
+
+8. Check production deployment
+Confirm the latest fix is actually deployed to production:
+- commit hash
+- route code in deployed build
+- Vercel/Replit deployment status
+
+Final answer must say exactly where the break is:
+
+A. Assignment row missing
+B. Assignment row exists but wrong ridechecker id
+C. Jobs API query wrong
+D. Jobs API returns job but dashboard hides it
+E. Production deployment did not update
+
+Do not stop until one of A–E is proven with data.
+```
+
+My strongest suspicion now: **ID mismatch**.
+
+Meaning Ops may be writing:
+
+```text
+ridechecker_id = profiles.id
+```
+
+but Jabbar’s dashboard API may be querying with:
+
+```text
+auth.users.id
+```
+
+—or the reverse.
+
+That would perfectly explain why:
+
+* Ops shows him assigned
+* Assignment exists
+* RideChecker sees nothing
+
+The fix must align both sides to the same identifier, preferably `profiles.id` if that is what your operational tables use.
