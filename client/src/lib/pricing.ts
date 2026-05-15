@@ -1,20 +1,24 @@
 import type { BookingType, Package } from "@shared/schema";
 
+export const SELF_ARRANGE_DISCOUNT = 10;
+
 export const PRICING: Record<Package, { full: number; self: number }> = {
-  standard: { full: 139, self: 139 },
-  plus: { full: 169, self: 169 },
-  premium: { full: 189, self: 189 },
-  exotic: { full: 299, self: 299 },
-  comprehensive: { full: 299, self: 299 },
+  standard: { full: 139, self: 129 },
+  plus: { full: 169, self: 159 },
+  premium: { full: 169, self: 159 },
+  exotic: { full: 299, self: 289 },
+  comprehensive: { full: 299, self: 289 },
 };
 
 export function getPrice(pkg: Package, bookingType: BookingType): number {
   const prices = PRICING[pkg];
-  return prices ? prices.full : 0;
+  if (!prices) return 0;
+  const isSelf = bookingType === "self_arrange" || bookingType === "buyer_arranged";
+  return isSelf ? prices.self : prices.full;
 }
 
 export function getDiscount(pkg: Package): number {
-  return 0;
+  return SELF_ARRANGE_DISCOUNT;
 }
 
 export function formatPrice(price: number | string): string {

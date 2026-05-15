@@ -719,9 +719,19 @@ function BookInner() {
                               </button>
                             )}
                           </div>
-                          <span className="text-lg font-bold" data-testid="text-determined-price">
-                            {formatCurrency(classification.basePrice)}
-                          </span>
+                          <div className="text-right">
+                            {isSelfArrange && (
+                              <p className="text-xs line-through text-muted-foreground" data-testid="text-base-price-strikethrough">
+                                {formatCurrency(basePrice)}
+                              </p>
+                            )}
+                            <span className="text-lg font-bold" data-testid="text-determined-price">
+                              {formatCurrency(finalPrice)}
+                            </span>
+                            {isSelfArrange && (
+                              <p className="text-xs text-green-600 dark:text-green-400 font-medium">$10 self-arrange discount</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -104,10 +104,14 @@ export default function PricingPage() {
           <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
             <Card>
               <CardContent className="pt-6">
-                <h4 className="font-semibold mb-2">Buyer-Arranged</h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold">Self-Arranged</h4>
+                  <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 text-xs">$10 off</Badge>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  You schedule the appointment with the seller. We show up,
-                  inspect, and deliver your report.
+                  You coordinate with the seller directly. We show up at the
+                  agreed time, inspect, and deliver your report. Save $10 on
+                  every package.
                 </p>
               </CardContent>
             </Card>

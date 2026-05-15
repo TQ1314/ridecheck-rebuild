@@ -81,7 +81,7 @@ export default function PublicHomePage() {
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <Stat label="Starting at" value="$139" sub="Flat, transparent pricing" />
+              <Stat label="Starting at" value="$129" sub="Self-arranged · $139 concierge" />
               <Stat label="Report turnaround" value="4–6 hrs" sub="After on-site inspection" />
               <Stat label="Report" value="Buyer-ready" sub="Photos + findings" />
             </div>
