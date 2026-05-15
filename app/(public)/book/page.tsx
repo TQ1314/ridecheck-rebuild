@@ -246,7 +246,7 @@ function BookInner() {
       }
 
       const trackParam = data.track_url ? `&track=${encodeURIComponent(data.track_url)}` : "";
-      const confirmUrl = `/order/confirmation?order_id=${data.order.id}&lang=${lang}&method=${isBuyerArranged ? "buyer_arranged" : "concierge"}${trackParam}`;
+      const confirmUrl = `/order/confirmation?order_id=${data.order.id}&lang=${lang}&method=${isBuyerArranged ? "buyer_arranged" : bookingType}${trackParam}`;
       router.push(confirmUrl);
     } catch (err: any) {
       toast({
