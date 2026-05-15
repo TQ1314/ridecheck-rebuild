@@ -101,7 +101,9 @@ function BookInner() {
   const isBuyerArranged = bookingType === "buyer_arranged";
 
   const pkg: PackageType = (classification?.packageTier || "standard") as PackageType;
-  const finalPrice = classification?.basePrice || TIER_PRICES.standard;
+  const isSelfArrange = bookingType === "self_arrange" || bookingType === "buyer_arranged";
+  const basePrice = classification?.basePrice || TIER_PRICES.standard;
+  const finalPrice = isSelfArrange ? Math.max(0, basePrice - 10) : basePrice;
 
   useEffect(() => {
     if (!vehicleMake || !vehicleModel || !vehicleYear) {
@@ -161,6 +163,7 @@ function BookInner() {
       );
     if (step === 1) {
       if (!buyerPhone || buyerPhone.length < 7) return false;
+      if (!buyerEmailInput || !buyerEmailInput.includes("@")) return false;
       if (isBuyerArranged) {
         return !!inspectionAddress && !!inspectionTimeWindow && !!sellerPhone;
       }
@@ -900,7 +903,7 @@ function BookInner() {
               </>
             )}
             <div className="pt-4 border-t space-y-4">
-              <p className="text-sm font-medium text-muted-foreground">Your contact info (for payment link)</p>
+              <p className="text-sm font-medium text-muted-foreground">Your contact info</p>
               <div>
                 <Label htmlFor="buyerPhone">Your Phone Number *</Label>
                 <Input
@@ -914,7 +917,7 @@ function BookInner() {
                 <p className="text-xs text-muted-foreground mt-1">We&apos;ll text you a secure payment link</p>
               </div>
               <div>
-                <Label htmlFor="buyerEmail">Your Email (optional)</Label>
+                <Label htmlFor="buyerEmail">Your Email *</Label>
                 <Input
                   id="buyerEmail"
                   type="email"
@@ -923,6 +926,7 @@ function BookInner() {
                   onChange={(e) => setBuyerEmailInput(e.target.value)}
                   data-testid="input-buyer-email"
                 />
+                <p className="text-xs text-muted-foreground mt-1">We&apos;ll send your order confirmation and seller contact script here</p>
               </div>
             </div>
             <div>
@@ -1036,12 +1040,10 @@ function BookInner() {
                 <span className="text-muted-foreground">Your Phone</span>
                 <span data-testid="text-review-phone">{buyerPhone}</span>
               </div>
-              {buyerEmailInput && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Your Email</span>
-                  <span data-testid="text-review-email">{buyerEmailInput}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Your Email</span>
+                <span data-testid="text-review-email">{buyerEmailInput}</span>
+              </div>
               {preferredDate && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
@@ -1050,7 +1052,19 @@ function BookInner() {
                   <span>{preferredDate}</span>
                 </div>
               )}
-              <div className="border-t pt-3 mt-3">
+              <div className="border-t pt-3 mt-3 space-y-1">
+                {isSelfArrange && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Base price</span>
+                      <span>{formatCurrency(basePrice)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                      <span>Self-arranged discount</span>
+                      <span>-{formatCurrency(10)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between font-bold text-base">
                   <span>{t("booking.total", lang)}</span>
                   <span data-testid="text-review-total">{formatCurrency(finalPrice)}</span>

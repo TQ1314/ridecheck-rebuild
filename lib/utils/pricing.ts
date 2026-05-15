@@ -3,11 +3,13 @@ export type PackageType = "standard" | "plus" | "premium" | "exotic";
 
 export type PackageTier = "standard" | "plus" | "premium" | "exotic";
 
+export const SELF_ARRANGE_DISCOUNT = 10;
+
 export const PRICING: Record<PackageType, { full: number; self: number }> = {
-  standard: { full: 139, self: 139 },
-  plus: { full: 169, self: 169 },
-  premium: { full: 169, self: 169 },
-  exotic: { full: 299, self: 299 },
+  standard: { full: 139, self: 129 },
+  plus: { full: 169, self: 159 },
+  premium: { full: 169, self: 159 },
+  exotic: { full: 299, self: 289 },
 };
 
 export function getPrice(pkg: PackageType, bookingType: BookingType) {
@@ -15,9 +17,10 @@ export function getPrice(pkg: PackageType, bookingType: BookingType) {
   if (!prices) {
     return { basePrice: 0, finalPrice: 0, discountAmount: 0 };
   }
+  const isSelfArrange = bookingType === "self_arrange" || bookingType === "buyer_arranged";
   const basePrice = prices.full;
-  const finalPrice = prices.full;
-  const discountAmount = 0;
+  const finalPrice = isSelfArrange ? prices.self : prices.full;
+  const discountAmount = isSelfArrange ? SELF_ARRANGE_DISCOUNT : 0;
   return { basePrice, finalPrice, discountAmount };
 }
 

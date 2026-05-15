@@ -154,9 +154,10 @@ export async function POST(req: NextRequest) {
     });
 
     const serverPackage = classification.packageTier;
-    const basePrice = classification.basePrice;
-    const finalPrice = classification.basePrice;
-    const discountAmount = 0;
+    const { basePrice, finalPrice, discountAmount } = getPrice(
+      classification.packageTier as PackageType,
+      data.booking_type as BookingType
+    );
 
     const tracking_token = crypto.randomUUID();
     const payment_link_token = crypto.randomUUID();
