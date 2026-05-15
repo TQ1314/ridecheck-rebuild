@@ -1,8 +1,13 @@
 import { Resend } from "resend";
 
 const apiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.RESEND_FROM_EMAIL || "support@ridecheckauto.com";
-const fromDisplay = `RideCheck <${fromEmail}>`;
+const _rawFrom = process.env.RESEND_FROM_EMAIL || "support@ridecheckauto.com";
+
+function buildSender(displayName: string, raw: string): string {
+  return raw.includes("<") ? raw : `${displayName} <${raw}>`;
+}
+
+const fromDisplay = buildSender("RideCheck", _rawFrom);
 
 const resend = apiKey ? new Resend(apiKey) : null;
 

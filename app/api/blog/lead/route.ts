@@ -31,11 +31,12 @@ export async function POST(req: NextRequest) {
   const { listingUrl, name, contact } = result.data;
 
   const toEmail = process.env.ADMIN_EMAIL || process.env.RESEND_FROM_EMAIL || "support@ridecheckauto.com";
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@ridecheckauto.com";
+  const _rawFrom = process.env.RESEND_FROM_EMAIL || "noreply@ridecheckauto.com";
+  const fromSender = _rawFrom.includes("<") ? _rawFrom : `RideCheck Blog <${_rawFrom}>`;
 
   try {
     await resend.emails.send({
-      from: `RideCheck Blog <${fromEmail}>`,
+      from: fromSender,
       to: toEmail,
       subject: "New Blog Lead — Listing Submitted",
       html: `

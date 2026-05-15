@@ -76,7 +76,8 @@ export async function POST(
       process.env.ADMIN_EMAIL ||
       process.env.RESEND_FROM_EMAIL ||
       "ops@ridecheckauto.com";
-    const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@ridecheckauto.com";
+    const _rawFrom = process.env.RESEND_FROM_EMAIL || "noreply@ridecheckauto.com";
+    const fromSender = _rawFrom.includes("<") ? _rawFrom : `RideCheck Ops <${_rawFrom}>`;
 
     const vehicleLabel = order
       ? `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`
@@ -85,7 +86,7 @@ export async function POST(
 
     try {
       await resend.emails.send({
-        from: `RideCheck Ops <${fromEmail}>`,
+        from: fromSender,
         to: opsEmail,
         subject: `[Field Message] ${rcName} — ${vehicleLabel}`,
         html: `
