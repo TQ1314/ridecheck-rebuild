@@ -3,6 +3,7 @@ import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { INSPECTION_STEPS, isStepComplete } from "@/lib/inspection/steps";
 import type { StepData } from "@/lib/inspection/steps";
+import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,13 @@ export async function POST(
       notes: `Wizard submission. ${concerns.length} concern(s), ${notAccessible.length} not-accessible.`,
     });
   } catch { }
+
+  // Stage 1 scoring — wizard always validates completeness before reaching here
+  emitScoreEvents([
+    { ridecheckerId: session.ridechecker_id, assignmentId, orderId: session.order_id, eventType: "submitted_inspection" },
+    { ridecheckerId: session.ridechecker_id, assignmentId, orderId: session.order_id, eventType: "all_required_photos" },
+    { ridecheckerId: session.ridechecker_id, assignmentId, orderId: session.order_id, eventType: "no_missing_steps" },
+  ]).catch(() => {});
 
   return NextResponse.json({
     success: true,

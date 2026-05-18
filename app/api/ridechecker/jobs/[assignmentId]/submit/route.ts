@@ -3,6 +3,8 @@ import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
 import { isChecklistComplete } from "@/lib/ridechecker/scoring";
+import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
+import type { ScoreEventType } from "@/lib/ridechecker/scorecard";
 
 const submitSchema = z.object({
   vin_photo_url: z.string().min(1),
@@ -127,6 +129,25 @@ export async function POST(
       console.error("[submit assignment update error]", updateError);
       return NextResponse.json({ error: "Failed to update assignment status" }, { status: 500 });
     }
+
+    // Stage 1 scoring — fire and forget
+    const stage1: ScoreEventType[] = ["submitted_inspection"];
+    const hasAllPhotos =
+      !!data.vin_photo_url &&
+      !!data.odometer_photo_url &&
+      !!data.under_hood_photo_url &&
+      !!data.undercarriage_photo_url;
+    if (hasAllPhotos) stage1.push("all_required_photos");
+    if (checklist_complete) stage1.push("no_missing_steps");
+
+    emitScoreEvents(
+      stage1.map((eventType) => ({
+        ridecheckerId: session.user.id,
+        assignmentId: assignment.id,
+        orderId: assignment.order_id,
+        eventType,
+      }))
+    ).catch(() => {});
 
     return NextResponse.json({ success: true, submission_id: inserted.id });
   } catch (err: any) {

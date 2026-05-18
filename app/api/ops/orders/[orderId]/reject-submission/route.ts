@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeOrderEvent } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
+import { emitScoreEvent } from "@/lib/ridechecker/scorecard";
 
 const rejectSchema = z.object({
   reason: z.string().min(1),
@@ -60,6 +61,15 @@ export async function POST(
       details: { reason, ridechecker_id: assignment.ridechecker_id },
       isInternal: true,
     });
+
+    // Mild learning-oriented deduction — recoverable via revision_corrected
+    emitScoreEvent({
+      ridecheckerId: assignment.ridechecker_id,
+      assignmentId: assignment.id,
+      orderId: params.orderId,
+      eventType: "revision_required",
+      customReason: `Revision requested: ${reason.slice(0, 120)}`,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

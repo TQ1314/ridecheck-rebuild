@@ -51,6 +51,7 @@ interface RideCheckerSuggestion {
   phone: string | null;
   service_area: string | null;
   rating: number;
+  ridechecker_score: number;
   active_jobs: number;
   max_daily_jobs: number;
   decline_count_30d: number;
@@ -652,6 +653,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                         <Star className="h-2.5 w-2.5" />
                         {rc.rating.toFixed(1)}
                       </span>
+                      {rc.ridechecker_score > 0 && (
+                        <span className="text-[10px] font-bold px-1 py-0 rounded bg-green-50 text-green-700 border border-green-200 leading-4">
+                          {rc.ridechecker_score}pts
+                        </span>
+                      )}
                       <span className={`flex items-center gap-1 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500" : "text-muted-foreground"}`}>
                         <Briefcase className="h-2.5 w-2.5" />
                         {rc.active_jobs}/{rc.max_daily_jobs}
@@ -773,6 +779,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
                       <Star className="h-2.5 w-2.5" />
                       {rc.rating.toFixed(1)}
                     </span>
+                    {rc.ridechecker_score > 0 && (
+                      <span className="text-[10px] font-bold px-1 py-0 rounded bg-green-50 text-green-700 border border-green-200 leading-4" title="RideCheck Score">
+                        {rc.ridechecker_score}pts
+                      </span>
+                    )}
                     <span className={`flex items-center gap-0.5 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500 font-medium" : ""}`}>
                       <Briefcase className="h-2.5 w-2.5" />
                       {rc.active_jobs}/{rc.max_daily_jobs}

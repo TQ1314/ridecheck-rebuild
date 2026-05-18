@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
+import { ScoreCard } from "@/components/ridechecker/ScoreCard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DashboardStats {
@@ -630,6 +631,10 @@ export default function RideCheckerDashboardPage() {
             {/* Overview */}
             {activeTab === "overview" && (
               <div className="space-y-4" data-testid="tab-content-overview">
+
+                {/* Score card */}
+                <ScoreCard />
+
                 {/* Stats grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <SmallStatCard icon={Briefcase} label="Total Jobs" value={stats.totalJobs} testId="text-total-jobs" />

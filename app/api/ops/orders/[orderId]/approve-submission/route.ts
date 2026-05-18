@@ -3,6 +3,8 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { scoreSubmission } from "@/lib/ridechecker/scoring";
 import { getPayoutAmount } from "@/lib/ridechecker/payouts";
+import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
+import type { ScoreEventType } from "@/lib/ridechecker/scorecard";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +122,25 @@ export async function POST(
         newValue: { score: score.total, payout_amount, ridechecker_id: assignment.ridechecker_id },
       }),
     ]);
+
+    // Stage 2 scoring — quality events after ops review
+    const stage2: ScoreEventType[] = ["report_approved", "no_revision_needed"];
+    // arrived_on_time = timeliness score >= 18 (submitted on time or up to 2 hrs late)
+    // late_arrival    = timeliness score <= 8  (submitted 6+ hrs after window)
+    if (score.timelinessScore >= 18) {
+      stage2.push("arrived_on_time");
+    } else if (score.timelinessScore <= 8) {
+      stage2.push("late_arrival");
+    }
+
+    emitScoreEvents(
+      stage2.map((eventType) => ({
+        ridecheckerId: assignment.ridechecker_id,
+        assignmentId: assignment.id,
+        orderId: params.orderId,
+        eventType,
+      }))
+    ).catch(() => {});
 
     return NextResponse.json({ success: true, score: score.total, payout_amount });
   } catch (err: any) {

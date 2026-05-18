@@ -4,8 +4,19 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const BASE_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs";
-const AVAIL_SELECT = BASE_SELECT + ", is_available, availability_updated_at, availability_status, suspended_until";
+// Layered selects: each tier falls back if columns are missing
+const FULL_SELECT    = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until";
+const SCORE_SELECT   = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs";
+const MINIMAL_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs";
+
+async function fetchProfiles(select: string) {
+  return supabaseAdmin
+    .from("profiles")
+    .select(select)
+    .eq("role", "ridechecker_active")
+    .eq("is_active", true)
+    .order("ridechecker_rating", { ascending: false });
+}
 
 export async function GET(req: NextRequest) {
   const result = await requireRole(["owner", "operations_lead", "ops_lead", "operations"]);
@@ -14,40 +25,39 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const serviceArea = searchParams.get("area") || "";
 
-  // Try with availability columns first; fall back gracefully if Migration 036 not yet run
-  let activeRidecheckers: any[] | null = null;
+  let activeRidecheckers: any[] = [];
   let availabilityColumnsPresent = true;
+  let scoreColumnPresent = true;
 
-  const { data: d1, error: e1 } = await supabaseAdmin
-    .from("profiles")
-    .select(AVAIL_SELECT)
-    .eq("role", "ridechecker_active")
-    .eq("is_active", true)
-    .order("ridechecker_rating", { ascending: false });
-
-  if (e1) {
-    if (e1.code === "42703") {
-      availabilityColumnsPresent = false;
-      const { data: d2, error: e2 } = await supabaseAdmin
-        .from("profiles")
-        .select(BASE_SELECT)
-        .eq("role", "ridechecker_active")
-        .eq("is_active", true)
-        .order("ridechecker_rating", { ascending: false });
-      if (e2) {
-        console.error("[suggest ridecheckers error]", e2);
+  // Tier 1: full columns (avail + score)
+  const { data: d1, error: e1 } = await fetchProfiles(FULL_SELECT);
+  if (!e1) {
+    activeRidecheckers = d1 ?? [];
+  } else if (e1.code === "42703") {
+    // Tier 2: score only (no avail columns)
+    availabilityColumnsPresent = false;
+    const { data: d2, error: e2 } = await fetchProfiles(SCORE_SELECT);
+    if (!e2) {
+      activeRidecheckers = d2 ?? [];
+    } else if (e2.code === "42703") {
+      // Tier 3: minimal (no score, no avail columns)
+      scoreColumnPresent = false;
+      const { data: d3, error: e3 } = await fetchProfiles(MINIMAL_SELECT);
+      if (e3) {
+        console.error("[suggest ridecheckers error]", e3);
         return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
       }
-      activeRidecheckers = d2 ?? [];
+      activeRidecheckers = d3 ?? [];
     } else {
-      console.error("[suggest ridecheckers error]", e1);
+      console.error("[suggest ridecheckers error]", e2);
       return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
     }
   } else {
-    activeRidecheckers = d1 ?? [];
+    console.error("[suggest ridecheckers error]", e1);
+    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
 
-  if (!activeRidecheckers || activeRidecheckers.length === 0) {
+  if (activeRidecheckers.length === 0) {
     return NextResponse.json({ suggestions: [] });
   }
 
@@ -70,20 +80,16 @@ export async function GET(req: NextRequest) {
   ]);
 
   const loadMap: Record<string, number> = {};
-  if (activeJobsRes.data) {
-    for (const job of activeJobsRes.data) {
-      if (job.assigned_inspector_id) {
-        loadMap[job.assigned_inspector_id] = (loadMap[job.assigned_inspector_id] || 0) + 1;
-      }
+  for (const job of activeJobsRes.data ?? []) {
+    if (job.assigned_inspector_id) {
+      loadMap[job.assigned_inspector_id] = (loadMap[job.assigned_inspector_id] || 0) + 1;
     }
   }
 
   const declineMap: Record<string, number> = {};
-  if (declinesRes.data) {
-    for (const row of declinesRes.data) {
-      if (row.ridechecker_id) {
-        declineMap[row.ridechecker_id] = (declineMap[row.ridechecker_id] || 0) + 1;
-      }
+  for (const row of declinesRes.data ?? []) {
+    if (row.ridechecker_id) {
+      declineMap[row.ridechecker_id] = (declineMap[row.ridechecker_id] || 0) + 1;
     }
   }
 
@@ -95,14 +101,11 @@ export async function GET(req: NextRequest) {
     if (serviceArea && rc.service_area) {
       const area = rc.service_area.toLowerCase();
       const target = serviceArea.toLowerCase();
-      if (area.includes(target) || target.includes(area)) {
-        score += 50;
-      }
+      if (area.includes(target) || target.includes(area)) score += 50;
     }
 
     const rating = parseFloat(rc.ridechecker_rating) || 5.0;
     score += rating * 5;
-
     score -= currentLoad * 10;
     score -= declineCount * 8;
 
@@ -110,7 +113,6 @@ export async function GET(req: NextRequest) {
     const availStatus: string = availabilityColumnsPresent ? (rc.availability_status ?? "available") : "available";
     const suspendedUntil: string | null = availabilityColumnsPresent ? (rc.suspended_until ?? null) : null;
 
-    // Penalise suspended RCs heavily in scoring so they sort to bottom
     const isSuspended = availStatus === "suspended" &&
       suspendedUntil !== null &&
       new Date(suspendedUntil) > new Date();
@@ -123,6 +125,7 @@ export async function GET(req: NextRequest) {
       phone: rc.phone,
       service_area: rc.service_area,
       rating,
+      ridechecker_score: scoreColumnPresent ? (rc.ridechecker_score ?? 0) : 0,
       active_jobs: currentLoad,
       max_daily_jobs: rc.ridechecker_max_daily_jobs ?? 5,
       decline_count_30d: declineCount,

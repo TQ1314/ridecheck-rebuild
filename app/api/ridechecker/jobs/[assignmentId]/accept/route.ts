@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { writeOrderEvent } from "@/lib/rbac";
+import { emitScoreEvent } from "@/lib/ridechecker/scorecard";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,14 @@ export async function POST(
         assignment_id: assignment.id,
         ridechecker_name: profile.full_name ?? null,
       },
+    }).catch(() => {});
+
+    // Stage 1 score event — job accepted
+    emitScoreEvent({
+      ridecheckerId: session.user.id,
+      assignmentId: assignment.id,
+      orderId: assignment.order_id,
+      eventType: "accepted_job",
     }).catch(() => {});
 
     return NextResponse.json({ success: true });
