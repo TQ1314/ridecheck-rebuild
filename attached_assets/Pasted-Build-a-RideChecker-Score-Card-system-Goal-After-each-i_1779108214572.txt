@@ -1,0 +1,111 @@
+Build a RideChecker Score Card system.
+
+Goal:
+After each inspection/report workflow, RideCheck should update a RideChecker’s performance score.
+
+Score should update in two stages:
+
+1. Immediately after RideChecker submits inspection:
+- completion recorded
+- required photos completed
+- required steps completed
+- no missing critical fields
+- no unresolved issue flags
+
+2. After Ops approves the report:
+- report approved
+- inspection quality confirmed
+- arrived on time
+- followed RideCheck process
+- no revision required
+
+Add scoring categories:
+- On-time arrival
+- Job acceptance reliability
+- Inspection completion
+- Required photo compliance
+- SOP/process compliance
+- Report quality
+- Ops approval
+- Seller professionalism
+- No-show / late penalties
+- Rejection penalties
+
+Create score event records:
+- ridechecker_id
+- assignment_id
+- order_id
+- event_type
+- points
+- reason
+- created_at
+
+Example events:
+- accepted_job +5
+- arrived_on_time +10
+- started_inspection +5
+- submitted_complete_inspection +20
+- all_required_photos_uploaded +15
+- no_missing_steps +10
+- report_approved +25
+- revision_required -10
+- late_arrival -10
+- no_show -50
+- seller_complaint -25
+- unsafe_flag_valid +5
+- rejected_assignment -5
+
+Add profile totals:
+- clipboard_score / ridecheck_score
+- total_jobs_completed
+- approval_rate
+- on_time_rate
+- rejection_count_30d
+- last_score_updated_at
+
+UI:
+In RideChecker dashboard, show a score card:
+- “Your RideCheck Score”
+- large score number
+- recent points earned/lost
+- badge/rank text
+
+Example:
+“You earned 10 points for arriving on time.”
+“Report approved: +25”
+“Inspection submitted complete: +20”
+
+After report submission:
+Show instant confirmation:
+“Inspection submitted. Your score will update after Ops review.”
+
+After Ops approval:
+Update score and show:
+“You earned points for completing the inspection and following RideCheck’s process.”
+
+Ops/Admin:
+Show RideChecker score in:
+- RideChecker profile
+- assignment list
+- job suggestion list
+
+Do not make score public to buyers or sellers.
+
+Important:
+Do NOT punish RideCheckers for valid safety flags, seller refusal, or vehicle not present.
+Those should be neutral or positive if properly documented.
+
+Do NOT break:
+- middleware.ts
+- auth
+- assignment flow
+- report processing
+- existing roles
+
+Run build and return:
+- DB migration
+- files changed
+- scoring events implemented
+- dashboard UI added
+- Ops visibility added
+- QA test results
