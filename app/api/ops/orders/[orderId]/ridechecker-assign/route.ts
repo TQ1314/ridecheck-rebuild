@@ -86,7 +86,8 @@ export async function PATCH(
       .eq("id", params.orderId);
 
     if (updateErr) {
-      return NextResponse.json({ error: "Failed to update assignment" }, { status: 500 });
+      console.error("[ridechecker-assign update error]", updateErr.message, updateErr.code, updateErr.details);
+      return NextResponse.json({ error: `Failed to update assignment: ${updateErr.message}` }, { status: 500 });
     }
 
     let assignmentId: string | null = null;
