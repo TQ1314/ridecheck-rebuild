@@ -347,7 +347,7 @@ export default function OpsOrderDetailPage() {
           <BuyerCard order={order} onRefresh={loadData} />
           <RideCheckerAssignmentPanel order={order} onRefresh={loadData} />
           <JobStatusPanel order={order} onRefresh={loadData} />
-          <PayPanel order={order} onRefresh={loadData} />
+          <PayPanel order={order} onRefresh={loadData} userRole={role} />
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />
           <ConnecteamPanel order={order} onRefresh={loadData} />

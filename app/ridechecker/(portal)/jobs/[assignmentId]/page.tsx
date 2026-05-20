@@ -204,11 +204,18 @@ const INSPECTION_STEPS = [
 ];
 
 const DECLINE_REASONS = [
+  { value: "pay_too_low", label: "Pay is too low for this job" },
   { value: "too_far", label: "Location is too far" },
   { value: "not_available", label: "I'm not available at this time" },
   { value: "vehicle_type", label: "Vehicle type outside my expertise" },
   { value: "scheduling_conflict", label: "Scheduling conflict" },
   { value: "other", label: "Other reason" },
+];
+
+const INCENTIVE_BONUSES = [
+  { id: "on_time",  label: "On-time arrival",          amount: 10, tip: "Arrive within your scheduled window" },
+  { id: "quality",  label: "Premium report (1st pass)", amount: 10, tip: "Report approved with no revisions needed" },
+  { id: "streak",   label: "5-job streak bonus",        amount: 15, tip: "Complete 5 consecutive jobs without issues" },
 ];
 
 function statusBadge(status: string) {
@@ -572,16 +579,44 @@ export default function JobDetailPage() {
         {/* ── Pay ──────────────────────────────────────────────── */}
         {payAmount != null && (
           <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
-                <DollarSign className="h-5 w-5 text-green-700 dark:text-green-400" />
+            <CardContent className="p-4 space-y-3">
+              {/* Base pay */}
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
+                  <DollarSign className="h-5 w-5 text-green-700 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Pay</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400" data-testid="text-pay-amount">
+                    ${payAmount}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Pay</p>
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400" data-testid="text-pay-amount">
-                  ${payAmount}
-                </p>
-              </div>
+
+              {/* Incentive bonuses — shown on pending/active jobs so RC sees full earning potential */}
+              {(isPendingAcceptance || assignment?.status === "accepted" || assignment?.status === "in_progress") && (
+                <div className="border-t border-green-200 dark:border-green-800 pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-green-800 dark:text-green-300 uppercase tracking-wide flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5" />
+                    Earn more with bonuses
+                  </p>
+                  {INCENTIVE_BONUSES.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-green-800 dark:text-green-300">{b.label}</p>
+                        <p className="text-[11px] text-muted-foreground">{b.tip}</p>
+                      </div>
+                      <span className="text-xs font-bold text-green-700 dark:text-green-400 shrink-0 ml-3">+${b.amount}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between border-t border-green-200 dark:border-green-700 pt-2 mt-1">
+                    <p className="text-xs font-semibold text-green-800 dark:text-green-300">Max potential pay</p>
+                    <span className="text-sm font-bold text-green-700 dark:text-green-400">
+                      ${payAmount + INCENTIVE_BONUSES.reduce((s, b) => s + b.amount, 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

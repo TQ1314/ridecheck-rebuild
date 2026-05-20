@@ -12,13 +12,13 @@ const schema = z.object({
   notes:           z.string().optional(),
 });
 
-// POST — create or replace payout record for this order
+// POST — create or replace payout record for this order (ops_lead+ only)
 export async function POST(
   req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
   try {
-    const result = await requireRole(["operations", "operations_lead", "ops_lead", "admin", "owner", "ops"]);
+    const result = await requireRole(["operations_lead", "ops_lead", "admin", "owner"]);
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 

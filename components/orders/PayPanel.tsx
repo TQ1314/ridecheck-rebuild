@@ -25,7 +25,10 @@ import { formatRelative } from "@/lib/utils/format";
 interface PayPanelProps {
   order: Order;
   onRefresh: () => void;
+  userRole?: string;
 }
+
+const PAYOUT_CREATE_ROLES = ["operations_lead", "ops_lead", "owner", "admin"];
 
 // ── Pay tier config ──────────────────────────────────────────
 const DISTANCE_TIERS = [
@@ -61,7 +64,8 @@ function payoutStatusBadge(status: string) {
   }
 }
 
-export function PayPanel({ order, onRefresh }: PayPanelProps) {
+export function PayPanel({ order, onRefresh, userRole }: PayPanelProps) {
+  const canCreatePayout = PAYOUT_CREATE_ROLES.includes(userRole ?? "");
   const { toast } = useToast();
 
   // Calculator state
@@ -376,7 +380,7 @@ export function PayPanel({ order, onRefresh }: PayPanelProps) {
             <p className="text-xs text-muted-foreground">No payout record yet.</p>
           )}
 
-          {(!payout || payout.status === "cancelled") && (
+          {(!payout || payout.status === "cancelled") && canCreatePayout && (
             <Button
               size="sm"
               className="w-full gap-2"
@@ -390,6 +394,11 @@ export function PayPanel({ order, onRefresh }: PayPanelProps) {
                 <><CheckCircle2 className="h-3.5 w-3.5" />Create Payout Record</>
               )}
             </Button>
+          )}
+          {(!payout || payout.status === "cancelled") && !canCreatePayout && (
+            <p className="text-xs text-muted-foreground text-center border border-dashed rounded p-2">
+              Contact your Ops Lead to create the payout record
+            </p>
           )}
           {!order.assigned_ridechecker_id && (
             <p className="text-xs text-muted-foreground text-center">

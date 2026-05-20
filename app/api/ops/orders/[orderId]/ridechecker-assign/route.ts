@@ -38,6 +38,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    // Enforce pay-before-assign rule
+    if (ridechecker_id) {
+      const hasPay = (order.base_pay ?? 0) > 0 || (order.current_offer ?? 0) > 0;
+      if (!hasPay) {
+        return NextResponse.json(
+          { error: "A pay rate must be set before assigning a RideChecker. Use the Pay panel to configure distance, urgency, and any boosts." },
+          { status: 400 }
+        );
+      }
+    }
+
     let rcName: string | null = null;
 
     if (ridechecker_id) {
