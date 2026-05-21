@@ -3,6 +3,17 @@ export type VerdictType =
   | "MODERATE_RISK"
   | "HIGH_RISK";
 
+export type ConfidenceLevel =
+  | "HIGH CONFIDENCE"
+  | "MODERATE CONFIDENCE"
+  | "LIMITED CONFIDENCE";
+
+export interface ScopeRow {
+  system: string;
+  level: string;
+  status: "assessed" | "partial" | "not_assessed";
+}
+
 export type SystemStatus = "GOOD" | "MONITOR" | "RISK" | "FAIL";
 
 export type RepairPriority = "Immediate" | "Soon" | "Optional" | "Monitor";
@@ -62,6 +73,9 @@ export interface ReportMeta {
   vehicle_trim: string;
   vehicle_mileage: string;
   vehicle_price: string;
+  scope_table: ScopeRow[];
+  confidence_level: ConfidenceLevel;
+  missing_items: string[];
   inspection_location: string;
   package_tier: string;
   vin_photo_url: string;

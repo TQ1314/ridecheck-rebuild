@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import type { GeneratedReport, ReportMeta, SystemStatus, RepairPriority, VerdictType } from "./types";
+import type { GeneratedReport, ReportMeta, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
 
 Font.register({
   family: "Helvetica",
@@ -495,6 +495,103 @@ const s = StyleSheet.create({
     marginVertical: 8,
     marginHorizontal: 36,
   },
+
+  // ─── INSPECTION SCOPE TABLE ──────────────────────────────────────────────
+  scopeTable: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 3,
+    marginBottom: 10,
+  },
+  scopeHead: {
+    flexDirection: "row",
+    backgroundColor: C.gray_100,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  scopeRow: {
+    flexDirection: "row",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray_100,
+    alignItems: "center",
+  },
+  scopeRowLast: {
+    flexDirection: "row",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignItems: "center",
+  },
+  scopeColSystem: { width: 130 },
+  scopeColLevel:  { flex: 1 },
+  scopeColDot:    { width: 20, alignItems: "center" },
+  scopeDotAssessed:    { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.good },
+  scopeDotPartial:     { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.monitor },
+  scopeDotNotAssessed: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.gray_400 },
+
+  // ─── CONFIDENCE + MISSING ────────────────────────────────────────────────
+  confidenceRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  confidenceBox: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  confidenceLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_400,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  confidenceValue: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+  },
+  confidenceNote: {
+    fontSize: 6.5,
+    color: C.muted,
+    marginTop: 3,
+    lineHeight: 1.4,
+  },
+  missingBox: {
+    flex: 2,
+    padding: 10,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.gray_50,
+  },
+  missingTitle: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_400,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  missingItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 3,
+  },
+  missingDash: {
+    fontSize: 7.5,
+    color: C.monitor,
+    marginRight: 4,
+    fontFamily: "Helvetica-Bold",
+  },
+  missingText: { fontSize: 7.5, color: C.gray_700, flex: 1, lineHeight: 1.3 },
+  missingNone: { fontSize: 7.5, color: C.good, fontFamily: "Helvetica-Bold" },
 });
 
 // ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
@@ -554,6 +651,76 @@ function PriorityBadge({ priority }: { priority: RepairPriority }) {
       <Text style={[s.priorityText, { color: priorityColor(priority) }]}>
         ■ {priority}
       </Text>
+    </View>
+  );
+}
+
+function confidenceColor(c: ConfidenceLevel): string {
+  switch (c) {
+    case "HIGH CONFIDENCE":     return C.good;
+    case "MODERATE CONFIDENCE": return C.monitor;
+    case "LIMITED CONFIDENCE":  return C.fail;
+  }
+}
+
+function scopeDotStyle(status: ScopeRow["status"]) {
+  switch (status) {
+    case "assessed":     return s.scopeDotAssessed;
+    case "partial":      return s.scopeDotPartial;
+    case "not_assessed": return s.scopeDotNotAssessed;
+  }
+}
+
+function InspectionScopeSections({ meta }: { meta: ReportMeta }) {
+  return (
+    <View style={s.content}>
+      {/* ── Scope Table ── */}
+      <SectionTitle title="Inspection Scope Status" />
+      <View style={s.scopeTable}>
+        <View style={s.scopeHead}>
+          <View style={s.scopeColDot} />
+          <Text style={[s.thText, s.scopeColSystem]}>System</Text>
+          <Text style={[s.thText, s.scopeColLevel]}>Inspection Level</Text>
+        </View>
+        {meta.scope_table.map((row, i) => {
+          const isLast = i === meta.scope_table.length - 1;
+          return (
+            <View key={i} style={isLast ? s.scopeRowLast : s.scopeRow}>
+              <View style={s.scopeColDot}>
+                <View style={scopeDotStyle(row.status)} />
+              </View>
+              <Text style={[s.tdText, s.scopeColSystem]}>{row.system}</Text>
+              <Text style={[s.tdMuted, s.scopeColLevel]}>{row.level}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* ── Confidence + Missing ── */}
+      <View style={s.confidenceRow}>
+        <View style={s.confidenceBox}>
+          <Text style={s.confidenceLabel}>Inspection Confidence</Text>
+          <Text style={[s.confidenceValue, { color: confidenceColor(meta.confidence_level) }]}>
+            {meta.confidence_level}
+          </Text>
+          <Text style={s.confidenceNote}>
+            Reflects inspection completeness only — not vehicle quality.
+          </Text>
+        </View>
+        <View style={s.missingBox}>
+          <Text style={s.missingTitle}>Missing or Limited Information</Text>
+          {meta.missing_items.length === 0 ? (
+            <Text style={s.missingNone}>All standard inspection items completed.</Text>
+          ) : (
+            meta.missing_items.map((item, i) => (
+              <View key={i} style={s.missingItem}>
+                <Text style={s.missingDash}>–</Text>
+                <Text style={s.missingText}>{item}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -666,6 +833,9 @@ export function RideCheckReport({ report, meta }: Props) {
             </View>
           ))}
         </View>
+
+        {/* ── Inspection Scope + Confidence + Missing ── */}
+        <InspectionScopeSections meta={meta} />
 
         {/* ── System assessment ── */}
         <View style={s.content} break>

@@ -3,11 +3,62 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
 import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
-import type { ReportInput, ReportMeta } from "@/lib/report/types";
+import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel } from "@/lib/report/types";
 import React from "react";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+function buildScopeTable(submission: any): ScopeRow[] {
+  const hasOBD = Array.isArray(submission.scan_codes) && submission.scan_codes.length > 0;
+  const hasUndercarriage = !!submission.undercarriage_photo_url;
+  const hasBrakes = !!(submission.brake_condition && submission.brake_condition.trim().length > 0);
+  const hasTread = [
+    submission.tire_tread_mm_front_left,
+    submission.tire_tread_mm_front_right,
+    submission.tire_tread_mm_rear_left,
+    submission.tire_tread_mm_rear_right,
+  ].some((v) => v != null);
+  const hasRoadTest = !!(submission.test_drive_notes && submission.test_drive_notes.trim().length > 10);
+
+  return [
+    { system: "Engine",            level: hasOBD          ? "Visual + OBD Scan"         : "Visual Only",    status: hasOBD          ? "assessed"     : "partial"      },
+    { system: "OBD Scan",          level: hasOBD          ? "Full Scan Performed"        : "Not Performed",  status: hasOBD          ? "assessed"     : "not_assessed"  },
+    { system: "Frame / Underbody", level: hasUndercarriage ? "Visual Only"               : "Not Assessed",   status: hasUndercarriage ? "partial"      : "not_assessed"  },
+    { system: "Brakes",            level: hasBrakes        ? "Assessed"                  : "Not Assessed",   status: hasBrakes        ? "assessed"     : "not_assessed"  },
+    { system: "Transmission",      level: hasRoadTest      ? "Road Test Observed"        : "Visual Only",    status: "partial"                                           },
+    { system: "Electrical",        level: "Visual Only",                                                      status: "partial"                                           },
+    { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"   : "Visual Only",    status: hasTread         ? "assessed"     : "partial"       },
+    { system: "Road Test",         level: hasRoadTest      ? "Completed"                 : "Not Performed",  status: hasRoadTest      ? "assessed"     : "not_assessed"  },
+  ];
+}
+
+function buildMissingItems(submission: any): string[] {
+  const items: string[] = [];
+  if (!Array.isArray(submission.scan_codes) || submission.scan_codes.length === 0)
+    items.push("No OBD diagnostic codes retrieved");
+  if (!submission.undercarriage_photo_url)
+    items.push("No lift inspection performed");
+  if (!submission.brake_condition || submission.brake_condition.trim().length === 0)
+    items.push("Brake system not fully assessed");
+  const hasTread = [
+    submission.tire_tread_mm_front_left,
+    submission.tire_tread_mm_front_right,
+    submission.tire_tread_mm_rear_left,
+    submission.tire_tread_mm_rear_right,
+  ].some((v) => v != null);
+  if (!hasTread)
+    items.push("Tire tread depth not measured");
+  if (!submission.test_drive_notes || submission.test_drive_notes.trim().length <= 10)
+    items.push("Road test not performed");
+  return items;
+}
+
+function buildConfidenceLevel(missingCount: number): ConfidenceLevel {
+  if (missingCount === 0) return "HIGH CONFIDENCE";
+  if (missingCount <= 2)  return "MODERATE CONFIDENCE";
+  return "LIMITED CONFIDENCE";
+}
 
 function packageLabel(pkg: string): string {
   switch (pkg) {
@@ -109,6 +160,9 @@ export async function POST(
     const generatedReport = await generateReportWithClaude(reportInput);
 
     // 5. Build report metadata
+    const scopeTable   = buildScopeTable(submission);
+    const missingItems = buildMissingItems(submission);
+
     const reportMeta: ReportMeta = {
       report_number:      reportNumber,
       inspection_date:    dateStr,
@@ -125,6 +179,9 @@ export async function POST(
       under_hood_photo_url: submission.under_hood_photo_url || "",
       undercarriage_photo_url: submission.undercarriage_photo_url || "",
       extra_photos:       submission.extra_photos || [],
+      scope_table:        scopeTable,
+      confidence_level:   buildConfidenceLevel(missingItems.length),
+      missing_items:      missingItems,
     };
 
     // 6. Generate PDF
