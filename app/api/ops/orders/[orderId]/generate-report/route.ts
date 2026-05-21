@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
 import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
 import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel } from "@/lib/report/types";
+import { validatePhotos, partitionResults } from "@/lib/report/photo-validator";
 import React from "react";
 
 export const dynamic = "force-dynamic";
@@ -156,10 +157,50 @@ export async function POST(
       extra_photos:          submission.extra_photos || [],
     };
 
-    // 4. Generate report content with Claude
-    const generatedReport = await generateReportWithClaude(reportInput);
+    // 4. Collect all submission photos for validation
+    const rawPhotos = [
+      { url: submission.vin_photo_url       || "", label: "VIN plate" },
+      { url: submission.odometer_photo_url  || "", label: "Odometer" },
+      { url: submission.under_hood_photo_url|| "", label: "Engine bay" },
+      { url: submission.undercarriage_photo_url || "", label: "Undercarriage" },
+      ...(submission.extra_photos || []).map((url: string, i: number) => ({
+        url,
+        label: `Extra photo ${i + 1}`,
+      })),
+    ].filter((p) => !!p.url);
 
-    // 5. Build report metadata
+    // 4a. Run photo validation + report generation in parallel
+    const [generatedReport, photoValidationResults] = await Promise.all([
+      generateReportWithClaude(reportInput),
+      validatePhotos(rawPhotos),
+    ]);
+
+    const { approved, excluded } = partitionResults(photoValidationResults);
+    const approvedUrls = new Set(approved.map((r) => r.url));
+
+    // Log excluded photos for ops review (fire-and-forget)
+    if (excluded.length > 0) {
+      writeOrderEvent({
+        orderId:    params.orderId,
+        eventType:  "photo_excluded_ops_review",
+        actorId:    actor.userId,
+        actorEmail: actor.email,
+        details: {
+          excluded_count: excluded.length,
+          excluded_photos: excluded.map((r) => ({
+            label:  r.label,
+            reason: r.reason,
+            url:    r.url,
+          })),
+        },
+        isInternal: true,
+      }).catch(() => {});
+    }
+
+    // Helper: return URL only if approved, otherwise empty string
+    const safe = (url: string) => (approvedUrls.has(url) ? url : "");
+
+    // 5. Build report metadata (photos filtered to approved only)
     const scopeTable   = buildScopeTable(submission);
     const missingItems = buildMissingItems(submission);
 
@@ -174,11 +215,11 @@ export async function POST(
       vehicle_price:      order.vehicle_price ? `$${Number(order.vehicle_price).toLocaleString()}` : "Not provided",
       inspection_location: order.inspection_address || "Illinois area",
       package_tier:       packageLabel(order.package || "standard"),
-      vin_photo_url:      submission.vin_photo_url || "",
-      odometer_photo_url: submission.odometer_photo_url || "",
-      under_hood_photo_url: submission.under_hood_photo_url || "",
-      undercarriage_photo_url: submission.undercarriage_photo_url || "",
-      extra_photos:       submission.extra_photos || [],
+      vin_photo_url:      safe(submission.vin_photo_url || ""),
+      odometer_photo_url: safe(submission.odometer_photo_url || ""),
+      under_hood_photo_url: safe(submission.under_hood_photo_url || ""),
+      undercarriage_photo_url: safe(submission.undercarriage_photo_url || ""),
+      extra_photos: (submission.extra_photos || []).filter((url: string) => approvedUrls.has(url)),
       scope_table:        scopeTable,
       confidence_level:   buildConfidenceLevel(missingItems.length),
       missing_items:      missingItems,
