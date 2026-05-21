@@ -118,10 +118,11 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
   "total_repair_high": sum of all cost_high values,
   "negotiation_options": [
     {
-      "label": "OPTION A: Label (e.g. Request Seller Price Adjustment, Proceed at Current Price, Request Pre-Sale Repairs)",
+      "label": "OPTION A: Label (e.g. Request Seller Price Adjustment, Proceed at Current Price, Request Pre-Sale Repairs, Consider Alternative Vehicles)",
       "description": "3-4 sentences of specific, neutral guidance describing this option and its estimated financial implications"
     }
-    // 2-3 options. Do not use language like Walk Away, Do Not Buy, Avoid, or You Should. Frame as financial considerations only.
+    // 2-3 options. Do not use language like Walk Away, Do Not Buy, Avoid, or You Should. Frame as price and condition considerations only.
+    // If recommending the buyer look elsewhere, use label: "Consider Alternative Vehicles" — not "Walk Away".
   ]
 }
 

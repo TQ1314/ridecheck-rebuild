@@ -592,6 +592,43 @@ const s = StyleSheet.create({
   },
   missingText: { fontSize: 7.5, color: C.gray_700, flex: 1, lineHeight: 1.3 },
   missingNone: { fontSize: 7.5, color: C.good, fontFamily: "Helvetica-Bold" },
+
+  // ─── BUYER CONSIDERATIONS ────────────────────────────────────────────────
+  buyerConsiderationsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  buyerCol: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  buyerColHeader: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  buyerItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  buyerIcon: {
+    fontSize: 8,
+    marginRight: 5,
+    lineHeight: 1.4,
+  },
+  buyerText: {
+    fontSize: 7.5,
+    color: C.gray_700,
+    flex: 1,
+    lineHeight: 1.4,
+  },
 });
 
 // ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
@@ -720,6 +757,80 @@ function InspectionScopeSections({ meta }: { meta: ReportMeta }) {
             ))
           )}
         </View>
+      </View>
+    </View>
+  );
+}
+
+function BuyerConsiderations({ report }: { report: GeneratedReport }) {
+  const repairLow  = report.total_repair_low  ?? 0;
+  const repairHigh = report.total_repair_high ?? 0;
+  const hasRepairs = repairHigh > 0;
+  const isHigh     = report.verdict === "HIGH_RISK";
+  const isMod      = report.verdict === "MODERATE_RISK";
+
+  const moreFor: string[] = [];
+  if (hasRepairs) {
+    moreFor.push("Buyers comfortable with near-term mechanical repairs");
+    moreFor.push("Buyers with access to a trusted mechanic or service center");
+  }
+  if (isHigh || isMod) {
+    moreFor.push("Secondary or occasional-use vehicle buyers");
+  }
+  if (hasRepairs) {
+    moreFor.push(
+      `Buyers prepared for ${fmt(repairLow)}\u2013${fmt(repairHigh)} in near-term repair costs`
+    );
+  }
+  if (!hasRepairs) {
+    moreFor.push("Buyers seeking a lower-maintenance pre-owned vehicle");
+    moreFor.push("Daily-use buyers comfortable with standard upkeep");
+  }
+
+  const lessFor: string[] = [];
+  if (isHigh || isMod) {
+    lessFor.push("Buyers requiring immediate, uninterrupted daily reliability");
+  }
+  if (repairHigh > 1000) {
+    lessFor.push("Buyers without a repair budget contingency");
+  }
+  if (isHigh) {
+    lessFor.push("Long-distance commuters without a repair plan");
+    lessFor.push("Buyers without access to independent mechanical assessment");
+  }
+
+  if (moreFor.length === 0 && lessFor.length === 0) return null;
+
+  return (
+    <View wrap={false}>
+      <SectionTitle title="Buyer Considerations" />
+      <View style={s.buyerConsiderationsRow}>
+        {moreFor.length > 0 && (
+          <View style={[s.buyerCol, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+            <Text style={[s.buyerColHeader, { color: C.green_dark }]}>
+              This vehicle may be more appropriate for
+            </Text>
+            {moreFor.map((item, i) => (
+              <View key={i} style={s.buyerItem}>
+                <Text style={s.buyerIcon}>✓</Text>
+                <Text style={s.buyerText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {lessFor.length > 0 && (
+          <View style={[s.buyerCol, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
+            <Text style={[s.buyerColHeader, { color: "#92400e" }]}>
+              This vehicle may be less appropriate for
+            </Text>
+            {lessFor.map((item, i) => (
+              <View key={i} style={s.buyerItem}>
+                <Text style={s.buyerIcon}>!</Text>
+                <Text style={s.buyerText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -949,8 +1060,11 @@ export function RideCheckReport({ report, meta }: Props) {
             </View>
           </View>
 
-          {/* ── Financial Considerations ── */}
-          <SectionTitle title="Financial Considerations" />
+          {/* ── Buyer Considerations ── */}
+          <BuyerConsiderations report={report} />
+
+          {/* ── Price & Condition Considerations ── */}
+          <SectionTitle title="Price & Condition Considerations" />
           {report.negotiation_options.map((opt, i) => (
             <View key={i} style={s.negotiationOption} wrap={false}>
               <Text style={s.negotiationLabel}>{opt.label}</Text>
