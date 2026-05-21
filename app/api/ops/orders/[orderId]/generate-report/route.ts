@@ -215,20 +215,18 @@ export async function POST(
 
 function mapVerdictToSeverity(verdict: string): string {
   switch (verdict) {
-    case "BUY":                  return "minor";
-    case "NEGOTIATE":            return "moderate";
-    case "DO_NOT_BUY_AT_ASKING": return "major";
-    case "WALK_AWAY":            return "safety_critical";
-    default:                     return "moderate";
+    case "LOW_RISK":      return "minor";
+    case "MODERATE_RISK": return "moderate";
+    case "HIGH_RISK":     return "major";
+    default:              return "moderate";
   }
 }
 
 function mapVerdictToRecommendation(verdict: string): string {
   switch (verdict) {
-    case "BUY":                  return "BUY";
-    case "NEGOTIATE":            return "BUY_WITH_NEGOTIATION";
-    case "DO_NOT_BUY_AT_ASKING": return "DO_NOT_BUY_AT_ASKING_PRICE";
-    case "WALK_AWAY":            return "DO_NOT_BUY_AT_ASKING_PRICE";
-    default:                     return "BUY_WITH_NEGOTIATION";
+    case "LOW_RISK":      return "BUY";
+    case "MODERATE_RISK": return "BUY_WITH_NEGOTIATION";
+    case "HIGH_RISK":     return "DO_NOT_BUY_AT_ASKING_PRICE";
+    default:              return "BUY_WITH_NEGOTIATION";
   }
 }

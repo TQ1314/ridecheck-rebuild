@@ -1,8 +1,7 @@
 export type VerdictType =
-  | "BUY"
-  | "NEGOTIATE"
-  | "DO_NOT_BUY_AT_ASKING"
-  | "WALK_AWAY";
+  | "LOW_RISK"
+  | "MODERATE_RISK"
+  | "HIGH_RISK";
 
 export type SystemStatus = "GOOD" | "MONITOR" | "RISK" | "FAIL";
 

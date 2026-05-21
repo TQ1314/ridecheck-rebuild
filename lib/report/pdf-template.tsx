@@ -42,19 +42,17 @@ const C = {
 
 function verdictColor(v: VerdictType): string {
   switch (v) {
-    case "BUY":                  return "#15803d";
-    case "NEGOTIATE":            return "#d97706";
-    case "DO_NOT_BUY_AT_ASKING": return "#ea580c";
-    case "WALK_AWAY":            return "#dc2626";
+    case "LOW_RISK":      return "#15803d";
+    case "MODERATE_RISK": return "#d97706";
+    case "HIGH_RISK":     return "#dc2626";
   }
 }
 
 function verdictLabel(v: VerdictType): string {
   switch (v) {
-    case "BUY":                  return "BUY";
-    case "NEGOTIATE":            return "NEGOTIATE";
-    case "DO_NOT_BUY_AT_ASKING": return "DO NOT BUY AT ASKING PRICE";
-    case "WALK_AWAY":            return "WALK AWAY";
+    case "LOW_RISK":      return "LOW RISK OBSERVED";
+    case "MODERATE_RISK": return "MODERATE RISK OBSERVED";
+    case "HIGH_RISK":     return "HIGH FINANCIAL RISK OBSERVED";
   }
 }
 
@@ -496,7 +494,7 @@ function Header() {
     <View style={s.header} fixed>
       <View style={s.headerLeft}>
         <Text style={s.headerBrand}>RIDECHECK</Text>
-        <Text style={s.headerSub}>Pre-Purchase Vehicle Inspection Report</Text>
+        <Text style={s.headerSub}>Vehicle Transparency Report</Text>
       </View>
       <View style={s.headerRight}>
         <Text style={s.headerUrl}>ridecheckauto.com</Text>
@@ -600,7 +598,7 @@ export function RideCheckReport({ report, meta }: Props) {
             {meta.vehicle_year} {meta.vehicle_make}
           </Text>
           <Text style={s.vehicleSubtitle}>
-            Pre-Purchase Vehicle Inspection — {meta.vehicle_model}
+            Vehicle Transparency Inspection — {meta.vehicle_model}
             {meta.vehicle_trim ? ` ${meta.vehicle_trim}` : ""} —{" "}
             {meta.package_tier}
           </Text>
@@ -645,7 +643,7 @@ export function RideCheckReport({ report, meta }: Props) {
 
         {/* ── Top Insights ── */}
         <View style={s.content}>
-          <SectionTitle title="Top 3 Buyer Insights" />
+          <SectionTitle title="Top 3 Key Findings" />
           {report.top_insights.slice(0, 3).map((insight, i) => (
             <View key={i} style={s.insightBlock}>
               <View style={s.insightBulletBox}>
@@ -768,8 +766,8 @@ export function RideCheckReport({ report, meta }: Props) {
             </View>
           </View>
 
-          {/* ── Negotiation Guidance ── */}
-          <SectionTitle title="Negotiation Guidance" />
+          {/* ── Financial Considerations ── */}
+          <SectionTitle title="Financial Considerations" />
           {report.negotiation_options.map((opt, i) => (
             <View key={i} style={s.negotiationOption} wrap={false}>
               <Text style={s.negotiationLabel}>{opt.label}</Text>
@@ -780,9 +778,9 @@ export function RideCheckReport({ report, meta }: Props) {
           {/* ── Disclaimer ── */}
           <View style={s.disclaimer} wrap={false}>
             <Text style={s.disclaimerText}>
-              This report reflects visual observations and OBD-II diagnostic data collected at the time of inspection. It is not a guarantee of condition and does not constitute a warranty. RideCheck
+              This report reflects visual observations and OBD-II diagnostic data collected at the time of inspection. Risk levels represent estimated financial and maintenance exposure only and do not constitute purchase advice or a recommendation to buy or not buy. RideCheck
               is not responsible for undisclosed issues or post-inspection changes. Repair cost estimates are approximations based on Chicago-area rates and may vary significantly by shop and
-              market conditions. This report is intended to inform — not replace — a buyer&apos;s own due diligence. Governed by Illinois law, Lake County venue.
+              market conditions. A professional mechanical inspection is recommended before any transaction. Governed by Illinois law, Lake County venue.
               ridecheckauto.com
             </Text>
           </View>
