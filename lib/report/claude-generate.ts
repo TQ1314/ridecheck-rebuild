@@ -87,7 +87,8 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
     {
       "name": "System name (e.g. ENGINE / POWERTRAIN)",
       "status": "GOOD" | "MONITOR" | "RISK" | "FAIL",
-      "description": "2-4 sentences describing what was observed and its estimated significance",
+      "observed": "Only what the RideChecker physically saw, scanned, heard, photographed, measured, or selected. 1-3 sentences. No interpretation.",
+      "consideration": "Neutral mechanical context using general language. What this type of finding typically means, estimated cost range, or why professional assessment is recommended. 1-2 sentences. No purchase advice.",
       "cost_low": number or null,
       "cost_high": number or null,
       "cost_note": "Optional note if cost cannot be estimated (e.g. 'Lift inspection recommended')"

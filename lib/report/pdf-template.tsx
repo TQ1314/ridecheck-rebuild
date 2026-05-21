@@ -291,6 +291,16 @@ const s = StyleSheet.create({
   },
   systemDescCol: { flex: 1, paddingHorizontal: 10 },
   systemDesc: { fontSize: 8, color: C.gray_700, lineHeight: 1.4 },
+  systemFieldLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_400,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 1,
+    marginTop: 4,
+  },
+  systemFieldText: { fontSize: 8, color: C.gray_700, lineHeight: 1.4 },
   systemCostCol: { width: 95, alignItems: "flex-end" },
   systemCost: {
     fontSize: 8,
@@ -667,7 +677,10 @@ export function RideCheckReport({ report, meta }: Props) {
                 <StatusBadge status={sys.status} />
               </View>
               <View style={s.systemDescCol}>
-                <Text style={s.systemDesc}>{sys.description}</Text>
+                <Text style={[s.systemFieldLabel, { marginTop: 0 }]}>Observed</Text>
+                <Text style={s.systemFieldText}>{sys.observed}</Text>
+                <Text style={s.systemFieldLabel}>Consideration</Text>
+                <Text style={s.systemFieldText}>{sys.consideration}</Text>
               </View>
               <View style={s.systemCostCol}>
                 {sys.cost_low != null && sys.cost_high != null ? (

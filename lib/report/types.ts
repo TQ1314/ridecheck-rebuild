@@ -10,7 +10,8 @@ export type RepairPriority = "Immediate" | "Soon" | "Optional" | "Monitor";
 export interface ReportSystem {
   name: string;
   status: SystemStatus;
-  description: string;
+  observed: string;
+  consideration: string;
   cost_low?: number;
   cost_high?: number;
   cost_note?: string;
