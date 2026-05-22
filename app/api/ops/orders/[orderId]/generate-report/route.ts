@@ -20,17 +20,42 @@ function buildScopeTable(submission: any): ScopeRow[] {
     submission.tire_tread_mm_rear_left,
     submission.tire_tread_mm_rear_right,
   ].some((v) => v != null);
-  const hasRoadTest = !!(submission.test_drive_notes && submission.test_drive_notes.trim().length > 10);
+
+  const rtModule = submission.road_test_module as { status?: string } | null | undefined;
+  const rtStatus = rtModule?.status;
+
+  let roadTestLevel: string;
+  let roadTestScopeStatus: ScopeRow["status"];
+  let transmissionLevel: string;
+
+  if (rtStatus === "completed") {
+    roadTestLevel      = "Completed";
+    roadTestScopeStatus = "assessed";
+    transmissionLevel  = "Road Test Observed";
+  } else if (rtStatus === "not_permitted") {
+    roadTestLevel      = "Not Permitted by Seller";
+    roadTestScopeStatus = "not_assessed";
+    transmissionLevel  = "Visual Only";
+  } else if (rtStatus === "not_possible") {
+    roadTestLevel      = "Not Possible — Location/Condition";
+    roadTestScopeStatus = "not_assessed";
+    transmissionLevel  = "Visual Only";
+  } else {
+    const hasNotes = !!(submission.test_drive_notes && submission.test_drive_notes.trim().length > 10);
+    roadTestLevel      = hasNotes ? "Completed" : "Not Performed";
+    roadTestScopeStatus = hasNotes ? "assessed" : "not_assessed";
+    transmissionLevel  = hasNotes ? "Road Test Observed" : "Visual Only";
+  }
 
   return [
-    { system: "Engine",            level: hasOBD          ? "Visual + OBD Scan"         : "Visual Only",    status: hasOBD          ? "assessed"     : "partial"      },
-    { system: "OBD Scan",          level: hasOBD          ? "Full Scan Performed"        : "Not Performed",  status: hasOBD          ? "assessed"     : "not_assessed"  },
-    { system: "Frame / Underbody", level: hasUndercarriage ? "Visual Only"               : "Not Assessed",   status: hasUndercarriage ? "partial"      : "not_assessed"  },
-    { system: "Brakes",            level: hasBrakes        ? "Assessed"                  : "Not Assessed",   status: hasBrakes        ? "assessed"     : "not_assessed"  },
-    { system: "Transmission",      level: hasRoadTest      ? "Road Test Observed"        : "Visual Only",    status: "partial"                                           },
-    { system: "Electrical",        level: "Visual Only",                                                      status: "partial"                                           },
-    { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"   : "Visual Only",    status: hasTread         ? "assessed"     : "partial"       },
-    { system: "Road Test",         level: hasRoadTest      ? "Completed"                 : "Not Performed",  status: hasRoadTest      ? "assessed"     : "not_assessed"  },
+    { system: "Engine",            level: hasOBD           ? "Visual + OBD Scan"       : "Visual Only",  status: hasOBD           ? "assessed"     : "partial"      },
+    { system: "OBD Scan",          level: hasOBD           ? "Full Scan Performed"      : "Not Performed",status: hasOBD           ? "assessed"     : "not_assessed" },
+    { system: "Frame / Underbody", level: hasUndercarriage ? "Visual Only"              : "Not Assessed", status: hasUndercarriage ? "partial"      : "not_assessed" },
+    { system: "Brakes",            level: hasBrakes        ? "Assessed"                 : "Not Assessed", status: hasBrakes        ? "assessed"     : "not_assessed" },
+    { system: "Transmission",      level: transmissionLevel,                                               status: "partial"                                          },
+    { system: "Electrical",        level: "Visual Only",                                                   status: "partial"                                          },
+    { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"  : "Visual Only",  status: hasTread         ? "assessed"     : "partial"      },
+    { system: "Road Test",         level: roadTestLevel,                                                   status: roadTestScopeStatus                                },
   ];
 }
 
@@ -50,14 +75,26 @@ function buildMissingItems(submission: any): string[] {
   ].some((v) => v != null);
   if (!hasTread)
     items.push("Tire tread depth not measured");
-  if (!submission.test_drive_notes || submission.test_drive_notes.trim().length <= 10)
-    items.push("Road test not performed");
+
+  const rtModule = submission.road_test_module as { status?: string } | null | undefined;
+  const rtStatus = rtModule?.status;
+  if (rtStatus === "not_permitted") {
+    items.push("Road test not permitted by seller");
+  } else if (rtStatus === "not_possible") {
+    items.push("Road test not possible — location or vehicle condition");
+  } else if (rtStatus !== "completed") {
+    if (!submission.test_drive_notes || submission.test_drive_notes.trim().length <= 10)
+      items.push("Road test not performed");
+  }
   return items;
 }
 
-function buildConfidenceLevel(missingCount: number): ConfidenceLevel {
-  if (missingCount === 0) return "HIGH CONFIDENCE";
-  if (missingCount <= 2)  return "MODERATE CONFIDENCE";
+function buildConfidenceLevel(submission: any, missingCount: number): ConfidenceLevel {
+  const rtModule = submission.road_test_module as { status?: string } | null | undefined;
+  const roadTestCompleted = rtModule?.status === "completed";
+  const effectiveMissing = roadTestCompleted ? Math.max(0, missingCount - 1) : missingCount;
+  if (effectiveMissing === 0) return "HIGH CONFIDENCE";
+  if (effectiveMissing <= 2)  return "MODERATE CONFIDENCE";
   return "LIMITED CONFIDENCE";
 }
 
@@ -155,9 +192,11 @@ export async function POST(
       under_hood_photo_url:  submission.under_hood_photo_url || "",
       undercarriage_photo_url: submission.undercarriage_photo_url || "",
       extra_photos:          submission.extra_photos || [],
+      road_test_module:      submission.road_test_module ?? undefined,
     };
 
     // 4. Collect all submission photos for validation
+    const rtMod = submission.road_test_module as { photo_1_url?: string; photo_2_url?: string } | null | undefined;
     const rawPhotos = [
       { url: submission.vin_photo_url       || "", label: "VIN plate" },
       { url: submission.odometer_photo_url  || "", label: "Odometer" },
@@ -167,6 +206,8 @@ export async function POST(
         url,
         label: `Extra photo ${i + 1}`,
       })),
+      ...(rtMod?.photo_1_url ? [{ url: rtMod.photo_1_url, label: "Road test photo 1" }] : []),
+      ...(rtMod?.photo_2_url ? [{ url: rtMod.photo_2_url, label: "Road test photo 2" }] : []),
     ].filter((p) => !!p.url);
 
     // 4a. Run photo validation + report generation in parallel
@@ -203,6 +244,7 @@ export async function POST(
     // 5. Build report metadata (photos filtered to approved only)
     const scopeTable   = buildScopeTable(submission);
     const missingItems = buildMissingItems(submission);
+    const rtModule     = submission.road_test_module ?? undefined;
 
     const reportMeta: ReportMeta = {
       report_number:      reportNumber,
@@ -221,8 +263,9 @@ export async function POST(
       undercarriage_photo_url: safe(submission.undercarriage_photo_url || ""),
       extra_photos: (submission.extra_photos || []).filter((url: string) => approvedUrls.has(url)),
       scope_table:        scopeTable,
-      confidence_level:   buildConfidenceLevel(missingItems.length),
+      confidence_level:   buildConfidenceLevel(submission, missingItems.length),
       missing_items:      missingItems,
+      road_test_module:   rtModule,
     };
 
     // 6. Generate PDF

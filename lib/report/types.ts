@@ -1,3 +1,19 @@
+export interface RoadTestModule {
+  status: "completed" | "not_permitted" | "not_possible";
+  engine_behavior?: string[];
+  transmission?: string[];
+  brakes?: string[];
+  steering?: string[];
+  suspension?: string[];
+  warning_lights?: string[];
+  other_lights_noted?: boolean;
+  other_lights_description?: string;
+  overall?: string[];
+  concerns_notes?: string;
+  photo_1_url?: string;
+  photo_2_url?: string;
+}
+
 export type VerdictType =
   | "LOW_RISK"
   | "MODERATE_RISK"
@@ -83,6 +99,7 @@ export interface ReportMeta {
   under_hood_photo_url: string;
   undercarriage_photo_url: string;
   extra_photos: string[];
+  road_test_module?: RoadTestModule;
 }
 
 export interface ReportInput {
@@ -115,4 +132,5 @@ export interface ReportInput {
   under_hood_photo_url: string;
   undercarriage_photo_url: string;
   extra_photos?: string[];
+  road_test_module?: RoadTestModule;
 }

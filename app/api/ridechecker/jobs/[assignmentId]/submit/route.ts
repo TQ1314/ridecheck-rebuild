@@ -6,6 +6,22 @@ import { isChecklistComplete } from "@/lib/ridechecker/scoring";
 import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
 import type { ScoreEventType } from "@/lib/ridechecker/scorecard";
 
+const roadTestModuleSchema = z.object({
+  status: z.enum(["completed", "not_permitted", "not_possible"]),
+  engine_behavior: z.array(z.string()).optional(),
+  transmission: z.array(z.string()).optional(),
+  brakes: z.array(z.string()).optional(),
+  steering: z.array(z.string()).optional(),
+  suspension: z.array(z.string()).optional(),
+  warning_lights: z.array(z.string()).optional(),
+  other_lights_noted: z.boolean().optional(),
+  other_lights_description: z.string().optional(),
+  overall: z.array(z.string()).optional(),
+  concerns_notes: z.string().optional(),
+  photo_1_url: z.string().optional(),
+  photo_2_url: z.string().optional(),
+});
+
 const submitSchema = z.object({
   vin_photo_url: z.string().min(1),
   odometer_photo_url: z.string().min(1),
@@ -24,6 +40,7 @@ const submitSchema = z.object({
   immediate_concerns: z.string().min(1),
   audio_note_url: z.string().optional(),
   extra_photos: z.array(z.string()).optional(),
+  road_test_module: roadTestModuleSchema.optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -107,6 +124,7 @@ export async function POST(
         immediate_concerns: data.immediate_concerns,
         audio_note_url: data.audio_note_url ?? null,
         extra_photos: data.extra_photos ?? null,
+        road_test_module: data.road_test_module ?? null,
         submitted_at: now,
       })
       .select("id")

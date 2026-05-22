@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import type { GeneratedReport, ReportMeta, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
+import type { GeneratedReport, ReportMeta, RoadTestModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
 
 Font.register({
   family: "Helvetica",
@@ -629,6 +629,93 @@ const s = StyleSheet.create({
     flex: 1,
     lineHeight: 1.4,
   },
+
+  // ─── ROAD TEST RESULTS ───────────────────────────────────────────────────
+  rtGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  rtSubSection: {
+    width: "48%",
+    padding: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 3,
+    backgroundColor: C.gray_50,
+    marginBottom: 4,
+  },
+  rtSubTitle: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_600,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingBottom: 3,
+  },
+  rtItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 3,
+  },
+  rtCheckOn:  { fontSize: 7.5, color: C.good,    marginRight: 4, fontFamily: "Helvetica-Bold" },
+  rtCheckOff: { fontSize: 7.5, color: C.gray_400, marginRight: 4 },
+  rtItemOn:   { fontSize: 7.5, color: C.gray_900, flex: 1, lineHeight: 1.3 },
+  rtItemOff:  { fontSize: 7.5, color: C.gray_400, flex: 1, lineHeight: 1.3 },
+  rtOtherRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  rtOtherBox: {
+    flex: 1,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 3,
+    backgroundColor: C.gray_50,
+  },
+  rtOtherTitle: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_600,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingBottom: 3,
+  },
+  rtConcernsBox: {
+    padding: 8,
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    borderRadius: 3,
+    marginBottom: 8,
+  },
+  rtConcernsLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#92400e",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+  rtConcernsText: {
+    fontSize: 8,
+    color: C.gray_700,
+    lineHeight: 1.4,
+  },
+  rtPhotosRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
 });
 
 // ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
@@ -836,6 +923,121 @@ function BuyerConsiderations({ report }: { report: GeneratedReport }) {
   );
 }
 
+const RT_PDF_SECTIONS: Array<{
+  title: string;
+  key: keyof RoadTestModule;
+  items: Array<{ id: string; label: string }>;
+}> = [
+  { title: "Engine Behavior", key: "engine_behavior", items: [
+    { id: "engine_started_promptly",    label: "Engine started promptly" },
+    { id: "no_unusual_noises_startup",  label: "No unusual noises at startup" },
+    { id: "no_smoke_from_exhaust",      label: "No smoke from exhaust" },
+    { id: "engine_ran_smoothly",        label: "Engine ran smoothly during drive" },
+    { id: "no_hesitation_rough_idling", label: "No hesitation or rough idling" },
+  ]},
+  { title: "Transmission / Shifting", key: "transmission", items: [
+    { id: "transmission_shifted_smoothly",  label: "Transmission shifted smoothly" },
+    { id: "no_slipping_delayed_engagement", label: "No slipping or delayed engagement" },
+    { id: "no_unusual_sounds_gear_changes", label: "No unusual sounds during gear changes" },
+    { id: "vehicle_accelerated_normally",   label: "Vehicle accelerated normally" },
+  ]},
+  { title: "Brakes", key: "brakes", items: [
+    { id: "brakes_engaged_responsively", label: "Brakes engaged responsively" },
+    { id: "no_pulling_when_braking",     label: "No pulling to one side" },
+    { id: "no_grinding_squealing",       label: "No grinding or squealing" },
+    { id: "brake_pedal_felt_firm",       label: "Brake pedal felt firm" },
+    { id: "vehicle_stopped_straight",    label: "Vehicle stopped straight" },
+  ]},
+  { title: "Steering & Handling", key: "steering", items: [
+    { id: "steering_felt_responsive_centered", label: "Steering responsive and centered" },
+    { id: "no_pulling_left_right",             label: "No pulling left or right" },
+    { id: "no_steering_wheel_vibration",       label: "No steering wheel vibration" },
+    { id: "no_unusual_noises_turning",         label: "No unusual noises during turning" },
+  ]},
+  { title: "Suspension", key: "suspension", items: [
+    { id: "no_excessive_bouncing_rattling", label: "No excessive bouncing or rattling" },
+    { id: "no_clunking_over_bumps",         label: "No clunking over bumps" },
+    { id: "ride_felt_consistent",           label: "Ride consistent with vehicle age/type" },
+  ]},
+  { title: "Warning Lights During Drive", key: "warning_lights", items: [
+    { id: "no_new_warning_lights",  label: "No new warning lights appeared" },
+    { id: "check_engine_unchanged", label: "Check engine light status unchanged" },
+    { id: "abs_light_unchanged",    label: "ABS light status unchanged" },
+  ]},
+];
+
+function RoadTestResultsSection({ rt }: { rt: RoadTestModule }) {
+  if (rt.status !== "completed") return null;
+
+  const overallItems = [
+    { id: "vehicle_drove_as_expected",   label: "Vehicle drove as expected for age and mileage" },
+    { id: "noticeable_concerns_observed",label: "Noticeable concerns observed during drive" },
+  ];
+
+  return (
+    <View style={s.content}>
+      <SectionTitle title="Road Test Results" />
+      <View style={s.rtGrid}>
+        {RT_PDF_SECTIONS.map(({ title, key, items }) => {
+          const checked = (rt[key] as string[] | undefined) ?? [];
+          return (
+            <View key={title} style={s.rtSubSection} wrap={false}>
+              <Text style={s.rtSubTitle}>{title}</Text>
+              {items.map(({ id, label }) => {
+                const isOn = checked.includes(id);
+                return (
+                  <View key={id} style={s.rtItem}>
+                    <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
+                    <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Other lights + Overall in a row */}
+      <View style={s.rtOtherRow} wrap={false}>
+        <View style={s.rtOtherBox}>
+          <Text style={s.rtOtherTitle}>Other Warning Lights</Text>
+          <Text style={rt.other_lights_noted ? [s.rtItemOn, { fontSize: 8 }] as any : [s.rtItemOff, { fontSize: 8 }] as any}>
+            {rt.other_lights_noted ? `Yes — ${rt.other_lights_description || "noted"}` : "None noted"}
+          </Text>
+        </View>
+        <View style={s.rtOtherBox}>
+          <Text style={s.rtOtherTitle}>Overall Drive Impression</Text>
+          {overallItems.map(({ id, label }) => {
+            const isOn = rt.overall?.includes(id);
+            return (
+              <View key={id} style={s.rtItem}>
+                <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
+                <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Drive concerns */}
+      {rt.concerns_notes && (
+        <View style={s.rtConcernsBox} wrap={false}>
+          <Text style={s.rtConcernsLabel}>Drive Concerns Noted</Text>
+          <Text style={s.rtConcernsText}>{rt.concerns_notes}</Text>
+        </View>
+      )}
+
+      {/* Road test photos */}
+      {(rt.photo_1_url || rt.photo_2_url) && (
+        <View style={s.rtPhotosRow} wrap={false}>
+          {rt.photo_1_url && <PhotoBlock url={rt.photo_1_url} caption="Road test — Photo 1" />}
+          {rt.photo_2_url && <PhotoBlock url={rt.photo_2_url} caption="Road test — Photo 2" />}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function PhotoBlock({ url, caption }: { url?: string; caption: string }) {
   return (
     <View style={s.photoBlock}>
@@ -979,6 +1181,11 @@ export function RideCheckReport({ report, meta }: Props) {
             </View>
           ))}
         </View>
+
+        {/* ── Road Test Results (if completed) ── */}
+        {meta.road_test_module?.status === "completed" && (
+          <RoadTestResultsSection rt={meta.road_test_module} />
+        )}
 
         {/* ── OBD Table ── */}
         {report.obd_entries.length > 0 && (

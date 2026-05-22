@@ -2646,3 +2646,10 @@ ALTER TABLE orders
 
 COMMENT ON COLUMN orders.report_internal_json IS
   'Full AI-generated report JSON for internal use and ML training. Never exposed to customers.';
+
+-- ── 037: Road Test Module ─────────────────────────────────────────────────────
+ALTER TABLE ridechecker_raw_submissions
+  ADD COLUMN IF NOT EXISTS road_test_module JSONB NULL;
+
+COMMENT ON COLUMN ridechecker_raw_submissions.road_test_module IS
+  'Structured road test module data: { status: completed|not_permitted|not_possible, engine_behavior: [], transmission: [], brakes: [], steering: [], suspension: [], warning_lights: [], other_lights_noted: bool, other_lights_description: str, overall: [], concerns_notes: str, photo_1_url: str, photo_2_url: str }';

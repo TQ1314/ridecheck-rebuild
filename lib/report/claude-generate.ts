@@ -6,6 +6,81 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
+const RT_LABELS: Record<string, string> = {
+  engine_started_promptly:       "Engine started promptly",
+  no_unusual_noises_startup:     "No unusual noises at startup",
+  no_smoke_from_exhaust:         "No smoke from exhaust at startup",
+  engine_ran_smoothly:           "Engine ran smoothly during drive",
+  no_hesitation_rough_idling:    "No hesitation or rough idling noticed",
+  transmission_shifted_smoothly: "Automatic transmission shifted smoothly",
+  no_slipping_delayed_engagement:"No slipping or delayed engagement felt",
+  no_unusual_sounds_gear_changes:"No unusual sounds during gear changes",
+  vehicle_accelerated_normally:  "Vehicle accelerated normally",
+  brakes_engaged_responsively:   "Brakes engaged responsively",
+  no_pulling_when_braking:       "No pulling to one side when braking",
+  no_grinding_squealing:         "No grinding or squealing noticed",
+  brake_pedal_felt_firm:         "Brake pedal felt firm",
+  vehicle_stopped_straight:      "Vehicle stopped straight",
+  steering_felt_responsive_centered: "Steering felt responsive and centered",
+  no_pulling_left_right:         "No pulling left or right",
+  no_steering_wheel_vibration:   "No steering wheel vibration",
+  no_unusual_noises_turning:     "No unusual noises during turning",
+  no_excessive_bouncing_rattling:"No excessive bouncing or rattling",
+  no_clunking_over_bumps:        "No clunking over bumps",
+  ride_felt_consistent:          "Ride felt consistent with vehicle age/type",
+  no_new_warning_lights:         "No new warning lights appeared",
+  check_engine_unchanged:        "Check engine light status unchanged",
+  abs_light_unchanged:           "ABS light status unchanged",
+  vehicle_drove_as_expected:     "Vehicle drove as expected for age and mileage",
+  noticeable_concerns_observed:  "Noticeable concerns observed during drive",
+};
+
+function buildRoadTestSection(input: ReportInput): string {
+  const rt = input.road_test_module;
+  if (!rt) return "";
+
+  if (rt.status === "not_permitted") {
+    return "**Road Test:** Not permitted by seller.";
+  }
+  if (rt.status === "not_possible") {
+    return "**Road Test:** Not possible due to location or vehicle condition.";
+  }
+
+  const lines: string[] = ["**Road Test Module (Structured Checklist):**"];
+  lines.push("Status: Completed");
+
+  const sections: Array<[string, string[] | undefined]> = [
+    ["Engine Behavior",        rt.engine_behavior],
+    ["Transmission / Shifting", rt.transmission],
+    ["Brakes",                 rt.brakes],
+    ["Steering & Handling",    rt.steering],
+    ["Suspension",             rt.suspension],
+    ["Warning Lights",         rt.warning_lights],
+  ];
+
+  for (const [title, items] of sections) {
+    if (items && items.length > 0) {
+      const labels = items.map((k) => RT_LABELS[k] || k).join("; ");
+      lines.push(`${title}: ${labels}`);
+    }
+  }
+
+  if (rt.other_lights_noted) {
+    lines.push(`Other Warning Lights Noted: Yes${rt.other_lights_description ? ` — ${rt.other_lights_description}` : ""}`);
+  }
+
+  if (rt.overall && rt.overall.length > 0) {
+    const overallLabels = rt.overall.map((k) => RT_LABELS[k] || k).join("; ");
+    lines.push(`Overall Drive Impression: ${overallLabels}`);
+  }
+
+  if (rt.concerns_notes) {
+    lines.push(`Drive Concerns Noted: ${rt.concerns_notes}`);
+  }
+
+  return lines.join("\n");
+}
+
 function buildPrompt(input: ReportInput): string {
   const tires = [
     input.tire_tread_mm_front_left != null ? `FL: ${input.tire_tread_mm_front_left}mm` : null,
@@ -67,6 +142,8 @@ ${input.immediate_concerns}
 **Brake Condition:** ${input.brake_condition || "Not assessed"}
 
 **Tire Tread Depth:** ${tires}
+
+${buildRoadTestSection(input)}
 
 ## YOUR TASK
 

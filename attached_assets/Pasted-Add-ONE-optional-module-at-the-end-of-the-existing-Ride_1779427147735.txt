@@ -1,0 +1,67 @@
+Add ONE optional module at the end of the existing RideCheck inspection wizard.
+
+Do not change any existing inspection categories.
+Do not change auth, roles, checkout, middleware, or order flow.
+
+MODULE:
+ROAD TEST (Where Permitted)
+
+RideChecker must select one:
+[ ] Road test completed
+[ ] Road test not permitted by seller
+[ ] Road test not possible (location/condition)
+
+If “Road test completed” is selected, show these checkbox sections:
+
+ENGINE BEHAVIOR
+[ ] Engine started promptly
+[ ] No unusual noises at startup
+[ ] No smoke from exhaust at startup
+[ ] Engine ran smoothly during drive
+[ ] No hesitation or rough idling noticed
+
+TRANSMISSION / SHIFTING
+[ ] Automatic transmission shifted smoothly
+[ ] No slipping or delayed engagement felt
+[ ] No unusual sounds during gear changes
+[ ] Vehicle accelerated normally
+
+BRAKES
+[ ] Brakes engaged responsively
+[ ] No pulling to one side when braking
+[ ] No grinding or squealing noticed
+[ ] Brake pedal felt firm
+[ ] Vehicle stopped straight
+
+STEERING & HANDLING
+[ ] Steering felt responsive and centered
+[ ] No pulling left or right
+[ ] No steering wheel vibration
+[ ] No unusual noises during turning
+
+SUSPENSION
+[ ] No excessive bouncing or rattling
+[ ] No clunking over bumps
+[ ] Ride felt consistent with vehicle age/type
+
+WARNING LIGHTS DURING DRIVE
+[ ] No new warning lights appeared
+[ ] Check engine light status unchanged
+[ ] ABS light status unchanged
+[ ] Other lights noted — Yes/No with description field
+
+OVERALL DRIVE IMPRESSION
+[ ] Vehicle drove as expected for age and mileage
+[ ] Noticeable concerns observed during drive
+If checked, show notes field.
+
+ROAD TEST PHOTOS
+Allow up to 2 optional photos.
+
+Report logic:
+- If road test completed, add ROAD TEST RESULTS after system-by-system assessment.
+- If not permitted, add to Missing or Limited Information.
+- If not possible, add to Missing or Limited Information.
+- Road test completed should improve Inspection Confidence Level.
+
+Run a test and confirm the module appears only at the end.

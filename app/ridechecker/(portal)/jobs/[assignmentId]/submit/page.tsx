@@ -73,6 +73,19 @@ interface FormData {
   immediate_concerns: string;
   audio_note_url: string;
   extra_photos: string[];
+  road_test_status: string;
+  road_test_engine: string[];
+  road_test_transmission: string[];
+  road_test_brakes: string[];
+  road_test_steering: string[];
+  road_test_suspension: string[];
+  road_test_warning_lights: string[];
+  road_test_other_lights: boolean;
+  road_test_other_lights_desc: string;
+  road_test_overall: string[];
+  road_test_concerns_notes: string;
+  road_test_photo_1: string;
+  road_test_photo_2: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -93,25 +106,39 @@ const EMPTY_FORM: FormData = {
   immediate_concerns: "",
   audio_note_url: "",
   extra_photos: [],
+  road_test_status: "",
+  road_test_engine: [],
+  road_test_transmission: [],
+  road_test_brakes: [],
+  road_test_steering: [],
+  road_test_suspension: [],
+  road_test_warning_lights: [],
+  road_test_other_lights: false,
+  road_test_other_lights_desc: "",
+  road_test_overall: [],
+  road_test_concerns_notes: "",
+  road_test_photo_1: "",
+  road_test_photo_2: "",
 };
 
 // ── Steps definition ──────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: "confirm",       title: "Confirm Vehicle",   icon: Car },
-  { id: "vin",          title: "VIN Photo",          icon: Camera },
-  { id: "odometer",     title: "Odometer",           icon: Gauge },
-  { id: "engine",       title: "Engine Bay",         icon: Camera },
-  { id: "undercarriage",title: "Undercarriage",      icon: Camera },
-  { id: "tires",        title: "Tire Tread",         icon: Gauge },
-  { id: "brakes",       title: "Brakes",             icon: Wrench },
-  { id: "obd",          title: "OBD Scan",           icon: ClipboardCheck },
-  { id: "exterior",     title: "Exterior",           icon: Eye },
-  { id: "interior",     title: "Interior",           icon: Eye },
-  { id: "mechanical",   title: "Mechanical",         icon: Wrench },
-  { id: "testdrive",    title: "Test Drive",         icon: Car },
-  { id: "concerns",     title: "Final Notes",        icon: AlertCircle },
-  { id: "review",       title: "Review & Submit",    icon: CheckCircle2 },
+  { id: "confirm",          title: "Confirm Vehicle",    icon: Car },
+  { id: "vin",              title: "VIN Photo",          icon: Camera },
+  { id: "odometer",         title: "Odometer",           icon: Gauge },
+  { id: "engine",           title: "Engine Bay",         icon: Camera },
+  { id: "undercarriage",    title: "Undercarriage",      icon: Camera },
+  { id: "tires",            title: "Tire Tread",         icon: Gauge },
+  { id: "brakes",           title: "Brakes",             icon: Wrench },
+  { id: "obd",              title: "OBD Scan",           icon: ClipboardCheck },
+  { id: "exterior",         title: "Exterior",           icon: Eye },
+  { id: "interior",         title: "Interior",           icon: Eye },
+  { id: "mechanical",       title: "Mechanical",         icon: Wrench },
+  { id: "testdrive",        title: "Test Drive",         icon: Car },
+  { id: "concerns",         title: "Final Notes",        icon: AlertCircle },
+  { id: "roadtest_module",  title: "Road Test Module",   icon: Navigation },
+  { id: "review",           title: "Review & Submit",    icon: CheckCircle2 },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -129,10 +156,11 @@ function isStepComplete(stepId: StepId, form: FormData): boolean {
     case "exterior":      return form.cosmetic_exterior.trim().length > 0;
     case "interior":      return form.interior_condition.trim().length > 0;
     case "mechanical":    return form.mechanical_issues.trim().length > 0;
-    case "testdrive":     return form.test_drive_notes.trim().length > 0;
-    case "concerns":      return form.immediate_concerns.trim().length > 0;
-    case "review":        return false;
-    default:              return false;
+    case "testdrive":        return form.test_drive_notes.trim().length > 0;
+    case "concerns":         return form.immediate_concerns.trim().length > 0;
+    case "roadtest_module":  return form.road_test_status.length > 0;
+    case "review":           return false;
+    default:                 return false;
   }
 }
 
@@ -273,6 +301,24 @@ export default function RideCheckerSubmitPage() {
     });
   };
 
+  const toggleChecklistItem = (key: keyof FormData, item: string) => {
+    setForm((prev) => {
+      const arr = prev[key] as string[];
+      const updated = arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
+      const next = { ...prev, [key]: updated };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
+  const updateBoolField = (key: keyof FormData, value: boolean) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
   const goToStep = (index: number) => {
     saveDraft(form, index);
     setCurrentStep(index);
@@ -318,6 +364,28 @@ export default function RideCheckerSubmitPage() {
 
       const filtered = form.extra_photos.filter((p) => p.trim().length > 0);
       if (filtered.length > 0) payload.extra_photos = filtered;
+
+      if (form.road_test_status) {
+        const rtModule: Record<string, unknown> = { status: form.road_test_status };
+        if (form.road_test_status === "completed") {
+          if (form.road_test_engine.length > 0)       rtModule.engine_behavior = form.road_test_engine;
+          if (form.road_test_transmission.length > 0) rtModule.transmission    = form.road_test_transmission;
+          if (form.road_test_brakes.length > 0)       rtModule.brakes          = form.road_test_brakes;
+          if (form.road_test_steering.length > 0)     rtModule.steering        = form.road_test_steering;
+          if (form.road_test_suspension.length > 0)   rtModule.suspension      = form.road_test_suspension;
+          if (form.road_test_warning_lights.length > 0) rtModule.warning_lights = form.road_test_warning_lights;
+          if (form.road_test_other_lights) {
+            rtModule.other_lights_noted = true;
+            if (form.road_test_other_lights_desc.trim()) rtModule.other_lights_description = form.road_test_other_lights_desc.trim();
+          }
+          if (form.road_test_overall.length > 0) rtModule.overall = form.road_test_overall;
+          if (form.road_test_overall.includes("noticeable_concerns_observed") && form.road_test_concerns_notes.trim())
+            rtModule.concerns_notes = form.road_test_concerns_notes.trim();
+          if (form.road_test_photo_1.trim()) rtModule.photo_1_url = form.road_test_photo_1.trim();
+          if (form.road_test_photo_2.trim()) rtModule.photo_2_url = form.road_test_photo_2.trim();
+        }
+        payload.road_test_module = rtModule;
+      }
 
       const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/submit`, {
         method: "POST",
@@ -814,6 +882,236 @@ export default function RideCheckerSubmitPage() {
                 Add Photo URL
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* ── STEP: Road Test Module ────────────────────────────────── */}
+        {step.id === "roadtest_module" && (
+          <div className="space-y-5">
+            <StepHeader
+              icon={<Navigation className="h-7 w-7 text-[#22774F]" />}
+              title="Road Test Module"
+              description="Optional structured road test assessment. Select your status first, then complete the checklist if a road test was performed."
+            />
+
+            <div className="rounded-xl border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3">
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Optional module</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">Skip this step if you already documented the drive in Test Drive Notes. Complete it for a structured assessment that improves report quality.</p>
+            </div>
+
+            {/* Status selector */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Road Test Status</p>
+              {[
+                { value: "completed",    label: "Road test completed",                       color: "border-green-500 bg-green-50 dark:bg-green-950/20" },
+                { value: "not_permitted",label: "Road test not permitted by seller",          color: "border-amber-400 bg-amber-50 dark:bg-amber-950/20" },
+                { value: "not_possible", label: "Road test not possible (location/condition)",color: "border-slate-400 bg-slate-50 dark:bg-slate-900/20" },
+              ].map(({ value, label, color }) => (
+                <button
+                  key={value}
+                  onClick={() => updateField("road_test_status", value)}
+                  className={`w-full flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                    form.road_test_status === value ? color : "border-muted hover:border-muted-foreground/40"
+                  }`}
+                  data-testid={`button-rt-status-${value}`}
+                >
+                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    form.road_test_status === value ? "border-[#22774F] bg-[#22774F]" : "border-muted-foreground"
+                  }`}>
+                    {form.road_test_status === value && <div className="h-2 w-2 rounded-full bg-white" />}
+                  </div>
+                  <span className="text-sm font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Checklist — only shown when completed */}
+            {form.road_test_status === "completed" && (() => {
+              const sections: Array<{
+                key: keyof FormData;
+                title: string;
+                items: Array<{ id: string; label: string }>;
+              }> = [
+                { key: "road_test_engine", title: "ENGINE BEHAVIOR", items: [
+                  { id: "engine_started_promptly",    label: "Engine started promptly" },
+                  { id: "no_unusual_noises_startup",  label: "No unusual noises at startup" },
+                  { id: "no_smoke_from_exhaust",      label: "No smoke from exhaust at startup" },
+                  { id: "engine_ran_smoothly",        label: "Engine ran smoothly during drive" },
+                  { id: "no_hesitation_rough_idling", label: "No hesitation or rough idling noticed" },
+                ]},
+                { key: "road_test_transmission", title: "TRANSMISSION / SHIFTING", items: [
+                  { id: "transmission_shifted_smoothly",   label: "Automatic transmission shifted smoothly" },
+                  { id: "no_slipping_delayed_engagement",  label: "No slipping or delayed engagement felt" },
+                  { id: "no_unusual_sounds_gear_changes",  label: "No unusual sounds during gear changes" },
+                  { id: "vehicle_accelerated_normally",    label: "Vehicle accelerated normally" },
+                ]},
+                { key: "road_test_brakes", title: "BRAKES", items: [
+                  { id: "brakes_engaged_responsively", label: "Brakes engaged responsively" },
+                  { id: "no_pulling_when_braking",     label: "No pulling to one side when braking" },
+                  { id: "no_grinding_squealing",       label: "No grinding or squealing noticed" },
+                  { id: "brake_pedal_felt_firm",       label: "Brake pedal felt firm" },
+                  { id: "vehicle_stopped_straight",    label: "Vehicle stopped straight" },
+                ]},
+                { key: "road_test_steering", title: "STEERING & HANDLING", items: [
+                  { id: "steering_felt_responsive_centered", label: "Steering felt responsive and centered" },
+                  { id: "no_pulling_left_right",             label: "No pulling left or right" },
+                  { id: "no_steering_wheel_vibration",       label: "No steering wheel vibration" },
+                  { id: "no_unusual_noises_turning",         label: "No unusual noises during turning" },
+                ]},
+                { key: "road_test_suspension", title: "SUSPENSION", items: [
+                  { id: "no_excessive_bouncing_rattling", label: "No excessive bouncing or rattling" },
+                  { id: "no_clunking_over_bumps",         label: "No clunking over bumps" },
+                  { id: "ride_felt_consistent",           label: "Ride felt consistent with vehicle age/type" },
+                ]},
+              ];
+
+              return (
+                <div className="space-y-4">
+                  {sections.map(({ key, title, items }) => {
+                    const checked = form[key] as string[];
+                    return (
+                      <div key={title} className="rounded-xl border bg-card p-4 space-y-2">
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+                        {items.map(({ id, label }) => {
+                          const isOn = checked.includes(id);
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => toggleChecklistItem(key, id)}
+                              className="flex items-center gap-3 w-full text-left py-1"
+                              data-testid={`button-rt-${key}-${id}`}
+                            >
+                              <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                                isOn ? "border-[#22774F] bg-[#22774F]" : "border-muted-foreground/40"
+                              }`}>
+                                {isOn && <CheckCircle2 className="h-3 w-3 text-white" />}
+                              </div>
+                              <span className={`text-sm ${isOn ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Warning lights section */}
+                  <div className="rounded-xl border bg-card p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">WARNING LIGHTS DURING DRIVE</p>
+                    {[
+                      { id: "no_new_warning_lights",  label: "No new warning lights appeared" },
+                      { id: "check_engine_unchanged", label: "Check engine light status unchanged" },
+                      { id: "abs_light_unchanged",    label: "ABS light status unchanged" },
+                    ].map(({ id, label }) => {
+                      const isOn = form.road_test_warning_lights.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => toggleChecklistItem("road_test_warning_lights", id)}
+                          className="flex items-center gap-3 w-full text-left py-1"
+                          data-testid={`button-rt-warning-${id}`}
+                        >
+                          <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                            isOn ? "border-[#22774F] bg-[#22774F]" : "border-muted-foreground/40"
+                          }`}>
+                            {isOn && <CheckCircle2 className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className={`text-sm ${isOn ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                        </button>
+                      );
+                    })}
+
+                    {/* Other lights toggle */}
+                    <div className="border-t pt-3 mt-2">
+                      <button
+                        onClick={() => updateBoolField("road_test_other_lights", !form.road_test_other_lights)}
+                        className="flex items-center gap-3 w-full text-left py-1"
+                        data-testid="button-rt-other-lights"
+                      >
+                        <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                          form.road_test_other_lights ? "border-amber-500 bg-amber-500" : "border-muted-foreground/40"
+                        }`}>
+                          {form.road_test_other_lights && <AlertCircle className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className={`text-sm ${form.road_test_other_lights ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                          Other lights noted — describe below
+                        </span>
+                      </button>
+                      {form.road_test_other_lights && (
+                        <Input
+                          placeholder="Describe which lights and any context…"
+                          value={form.road_test_other_lights_desc}
+                          onChange={(e) => updateField("road_test_other_lights_desc", e.target.value)}
+                          className="mt-2 h-11"
+                          data-testid="input-rt-other-lights-desc"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Overall drive impression */}
+                  <div className="rounded-xl border bg-card p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">OVERALL DRIVE IMPRESSION</p>
+                    {[
+                      { id: "vehicle_drove_as_expected",   label: "Vehicle drove as expected for age and mileage" },
+                      { id: "noticeable_concerns_observed",label: "Noticeable concerns observed during drive" },
+                    ].map(({ id, label }) => {
+                      const isOn = form.road_test_overall.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => toggleChecklistItem("road_test_overall", id)}
+                          className="flex items-center gap-3 w-full text-left py-1"
+                          data-testid={`button-rt-overall-${id}`}
+                        >
+                          <div className={`h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                            isOn ? "border-[#22774F] bg-[#22774F]" : "border-muted-foreground/40"
+                          }`}>
+                            {isOn && <CheckCircle2 className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className={`text-sm ${isOn ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                        </button>
+                      );
+                    })}
+                    {form.road_test_overall.includes("noticeable_concerns_observed") && (
+                      <Textarea
+                        placeholder="Describe the concerns observed during the drive…"
+                        value={form.road_test_concerns_notes}
+                        onChange={(e) => updateField("road_test_concerns_notes", e.target.value)}
+                        rows={3}
+                        className="resize-none text-base mt-2"
+                        data-testid="textarea-rt-concerns-notes"
+                      />
+                    )}
+                  </div>
+
+                  {/* Road test photos */}
+                  <div className="rounded-xl border bg-card p-4 space-y-3">
+                    <p className="text-sm font-semibold">Road Test Photos <span className="text-muted-foreground font-normal text-xs">(up to 2, optional)</span></p>
+                    <p className="text-xs text-muted-foreground">Capture any relevant conditions, warning lights, or findings from the drive.</p>
+                    <PhotoUpload
+                      label="Road Test Photo 1"
+                      hint="Any relevant finding from the road test"
+                      fieldKey="road_test_photo_1"
+                      value={form.road_test_photo_1}
+                      onChange={(url) => updateField("road_test_photo_1", url)}
+                      assignmentId={assignmentId}
+                    />
+                    <PhotoUpload
+                      label="Road Test Photo 2"
+                      hint="Additional road test finding (optional)"
+                      fieldKey="road_test_photo_2"
+                      value={form.road_test_photo_2}
+                      onChange={(url) => updateField("road_test_photo_2", url)}
+                      assignmentId={assignmentId}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {!form.road_test_status && (
+              <p className="text-xs text-center text-muted-foreground">Select a status above to continue, or tap Next to skip this module.</p>
+            )}
           </div>
         )}
 
