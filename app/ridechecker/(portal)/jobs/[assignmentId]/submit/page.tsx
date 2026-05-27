@@ -30,12 +30,14 @@ import {
   ArrowRight,
   Gauge,
   Wrench,
-  MapPin,
   ClipboardCheck,
   Eye,
   Loader2,
   Navigation,
+  Upload,
+  FileText,
 } from "lucide-react";
+
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -53,6 +55,20 @@ interface AssignmentDetails {
   scheduled_date?: string;
   scheduled_time?: string;
   special_instructions?: string;
+}
+
+interface OBDUploadedFile {
+  url: string;
+  fileName: string;
+  fileType: "image" | "pdf";
+}
+
+interface OBDDTCEntry {
+  _key: string;
+  system: string;
+  code: string;
+  description: string;
+  status: string;
 }
 
 interface FormData {
@@ -86,6 +102,14 @@ interface FormData {
   road_test_concerns_notes: string;
   road_test_photo_1: string;
   road_test_photo_2: string;
+  // OBD module fields
+  obd_scan_performed: string;
+  obd_uploaded_files: OBDUploadedFile[];
+  obd_dtc_codes: OBDDTCEntry[];
+  obd_notes: string;
+  obd_emissions: string;
+  obd_warning_lights: string[];
+  obd_warning_other_desc: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -119,6 +143,13 @@ const EMPTY_FORM: FormData = {
   road_test_concerns_notes: "",
   road_test_photo_1: "",
   road_test_photo_2: "",
+  obd_scan_performed: "",
+  obd_uploaded_files: [],
+  obd_dtc_codes: [],
+  obd_notes: "",
+  obd_emissions: "",
+  obd_warning_lights: [],
+  obd_warning_other_desc: "",
 };
 
 // ── Steps definition ──────────────────────────────────────────────────────────
@@ -180,6 +211,7 @@ export default function RideCheckerSubmitPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [obdUploading, setObdUploading] = useState(false);
   const [assignment, setAssignment] = useState<AssignmentDetails | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [scanCodeInput, setScanCodeInput] = useState("");
@@ -319,6 +351,112 @@ export default function RideCheckerSubmitPage() {
     });
   };
 
+  // ── OBD helpers ────────────────────────────────────────────────────────────
+  const toggleOBDWarningLight = (light: string) => {
+    setForm((prev) => {
+      let updated: string[];
+      if (light === "none") {
+        // "None" is mutually exclusive — selecting it clears all others
+        updated = prev.obd_warning_lights.includes("none") ? [] : ["none"];
+      } else {
+        // Selecting any real light clears "none"
+        const without = prev.obd_warning_lights.filter((l) => l !== "none");
+        updated = without.includes(light)
+          ? without.filter((l) => l !== light)
+          : [...without, light];
+      }
+      const next = { ...prev, obd_warning_lights: updated };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
+  const addOBDDTCCode = () => {
+    setForm((prev) => {
+      const entry: OBDDTCEntry = {
+        _key:        Date.now().toString(),
+        system:      "Powertrain",
+        code:        "",
+        description: "",
+        status:      "Active",
+      };
+      const next = { ...prev, obd_dtc_codes: [...prev.obd_dtc_codes, entry] };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
+  const removeOBDDTCCode = (key: string) => {
+    setForm((prev) => {
+      const next = { ...prev, obd_dtc_codes: prev.obd_dtc_codes.filter((e) => e._key !== key) };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
+  const updateOBDDTCField = (key: string, field: keyof OBDDTCEntry, value: string) => {
+    setForm((prev) => {
+      const updated = prev.obd_dtc_codes.map((e) =>
+        e._key === key ? { ...e, [field]: field === "code" ? value.toUpperCase() : value } : e
+      );
+      const next = { ...prev, obd_dtc_codes: updated };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
+  const handleOBDFileUpload = async (file: File) => {
+    if (!file) return;
+    const isPDF   = file.type === "application/pdf";
+    const isImage = file.type.startsWith("image/");
+    if (!isPDF && !isImage) {
+      toast({ title: "Only images and PDF files are supported", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File must be under 10 MB", variant: "destructive" });
+      return;
+    }
+
+    setObdUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("assignmentId", assignmentId);
+      fd.append("fieldKey", `obd_file_${Date.now()}`);
+
+      const res = await fetch("/api/ridechecker/photos/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: err.error || "Upload failed", variant: "destructive" });
+        return;
+      }
+      const { url } = await res.json();
+      const entry: OBDUploadedFile = {
+        url,
+        fileName: file.name,
+        fileType: isPDF ? "pdf" : "image",
+      };
+      setForm((prev) => {
+        const next = { ...prev, obd_uploaded_files: [...prev.obd_uploaded_files, entry] };
+        saveDraft(next, currentStep);
+        return next;
+      });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setObdUploading(false);
+    }
+  };
+
+  const removeOBDFile = (index: number) => {
+    setForm((prev) => {
+      const next = { ...prev, obd_uploaded_files: prev.obd_uploaded_files.filter((_, i) => i !== index) };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
   const goToStep = (index: number) => {
     saveDraft(form, index);
     setCurrentStep(index);
@@ -385,6 +523,52 @@ export default function RideCheckerSubmitPage() {
           if (form.road_test_photo_2.trim()) rtModule.photo_2_url = form.road_test_photo_2.trim();
         }
         payload.road_test_module = rtModule;
+      }
+
+      // Build OBD module payload
+      if (form.obd_scan_performed) {
+        const obdModule: Record<string, unknown> = {
+          scan_performed: form.obd_scan_performed,
+        };
+
+        // Warning lights — always include if any selected
+        if (form.obd_warning_lights.length > 0) {
+          obdModule.warning_lights = form.obd_warning_lights;
+          if (form.obd_warning_lights.includes("other") && form.obd_warning_other_desc.trim()) {
+            obdModule.warning_other_desc = form.obd_warning_other_desc.trim();
+          }
+        }
+
+        if (form.obd_scan_performed === "yes") {
+          // Uploaded files
+          if (form.obd_uploaded_files.length > 0) {
+            obdModule.uploaded_files = form.obd_uploaded_files.map(({ url, fileName, fileType }) => ({
+              url, fileName, fileType, reviewStatus: "approved_for_report",
+            }));
+          }
+
+          // DTC codes — filter out blank entries, strip _key
+          const validCodes = form.obd_dtc_codes
+            .filter((c) => c.code.trim().length > 0)
+            .map(({ _key: _ignored, ...rest }) => ({
+              ...rest,
+              code: rest.code.trim().toUpperCase(),
+            }));
+          if (validCodes.length > 0) {
+            obdModule.dtc_codes = validCodes;
+            // Populate legacy scan_codes for backward compatibility
+            const legacyCodes = validCodes.map((c) => c.code);
+            payload.scan_codes = [
+              ...((payload.scan_codes as string[]) || []),
+              ...legacyCodes,
+            ];
+          }
+
+          if (form.obd_emissions) obdModule.emissions_readiness = form.obd_emissions;
+          if (form.obd_notes.trim())    obdModule.notes = form.obd_notes.trim();
+        }
+
+        payload.obd_module = obdModule;
       }
 
       const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/submit`, {
@@ -700,45 +884,334 @@ export default function RideCheckerSubmitPage() {
           </div>
         )}
 
-        {/* ── STEP: OBD Scan ────────────────────────────────────────── */}
+        {/* ── STEP: OBD Diagnostics ─────────────────────────────────── */}
         {step.id === "obd" && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <StepHeader
               icon={<ClipboardCheck className="h-7 w-7 text-[#22774F]" />}
-              title="OBD-II Scan Codes"
-              description="Connect your scan tool to the OBD-II port (under the dash, driver's side) and record any codes."
+              title="OBD-II Diagnostics"
+              description="Document the diagnostic scan results, warning lights, and any evidence files."
             />
+
+            {/* Info banner */}
             <div className="rounded-xl border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Important</p>
-              <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">Include ALL codes shown — active and stored/cleared. If no codes are found, leave this empty. Don't guess.</p>
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Optional module</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">Any data you add here improves the buyer's report. You can tap Next to skip.</p>
             </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g. P0301"
-                value={scanCodeInput}
-                onChange={(e) => setScanCodeInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScanCode(); } }}
-                className="flex-1 uppercase h-12 text-base"
-                data-testid="input-scan-code"
-              />
-              <Button variant="outline" onClick={addScanCode} className="h-12 px-4" data-testid="button-add-scan-code">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {form.scan_codes.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {form.scan_codes.map((code) => (
-                  <Badge key={code} variant="secondary" className="gap-1 text-sm py-1.5 px-3" data-testid={`badge-scan-code-${code}`}>
-                    {code}
-                    <button onClick={() => removeScanCode(code)} className="ml-1" data-testid={`button-remove-scan-code-${code}`}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
+
+            {/* ── Scan performed? ── */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Was an OBD-II scan performed?</p>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { value: "yes",           label: "✅ Yes — scan completed" },
+                  { value: "no",            label: "❌ No — scan not performed" },
+                  { value: "not_available", label: "⚠️ Not available — scanner issue" },
+                  { value: "not_permitted", label: "🚫 Not permitted by seller" },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => updateField("obd_scan_performed", value)}
+                    data-testid={`button-obd-scan-${value}`}
+                    className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                      form.obd_scan_performed === value
+                        ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
+                        : "border-border bg-card text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-center text-muted-foreground py-2">No codes added — clean scan is fine.</p>
+            </div>
+
+            {/* ── Warning lights (always visible) ── */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Warning lights observed on dashboard</p>
+              <p className="text-xs text-muted-foreground">Select all that apply. "None" is exclusive.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "check_engine", label: "🔴 Check Engine" },
+                  { value: "abs",          label: "🟡 ABS" },
+                  { value: "airbag_srs",   label: "🔴 Airbag / SRS" },
+                  { value: "battery",      label: "🟡 Battery" },
+                  { value: "oil_pressure", label: "🔴 Oil Pressure" },
+                  { value: "brake",        label: "🔴 Brake" },
+                  { value: "tpms",         label: "🟡 TPMS" },
+                  { value: "other",        label: "⚪ Other" },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => toggleOBDWarningLight(value)}
+                    data-testid={`button-obd-light-${value}`}
+                    className={`text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                      form.obd_warning_lights.includes(value)
+                        ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300"
+                        : "border-border bg-card text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* None — full-width exclusive option */}
+              <button
+                type="button"
+                onClick={() => toggleOBDWarningLight("none")}
+                data-testid="button-obd-light-none"
+                className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                  form.obd_warning_lights.includes("none")
+                    ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
+                    : "border-border bg-card text-foreground hover:bg-muted/50"
+                }`}
+              >
+                ✅ None — no warning lights observed
+              </button>
+
+              {/* Other desc field */}
+              {form.obd_warning_lights.includes("other") && (
+                <Input
+                  placeholder="Describe the other warning light(s)…"
+                  value={form.obd_warning_other_desc}
+                  onChange={(e) => updateField("obd_warning_other_desc", e.target.value)}
+                  className="h-11 text-sm"
+                  data-testid="input-obd-warning-other"
+                />
+              )}
+            </div>
+
+            {/* ── Scan-specific fields (only if "yes") ── */}
+            {form.obd_scan_performed === "yes" && (
+              <div className="space-y-5">
+                {/* Divider */}
+                <div className="border-t border-dashed" />
+
+                {/* ── File upload ── */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Upload diagnostic evidence</p>
+                  <p className="text-xs text-muted-foreground">Screenshots, photos of scanner display, or exported PDF reports. Max 10 MB per file.</p>
+
+                  {/* Upload button */}
+                  <label
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                      obdUploading
+                        ? "border-muted bg-muted/30 text-muted-foreground"
+                        : "border-[#22774F]/40 hover:border-[#22774F] hover:bg-[#22774F]/5 text-[#22774F]"
+                    }`}
+                    data-testid="label-obd-file-upload"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="sr-only"
+                      disabled={obdUploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleOBDFileUpload(file);
+                        e.target.value = "";
+                      }}
+                      data-testid="input-obd-file"
+                    />
+                    {obdUploading ? (
+                      <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                    ) : (
+                      <Upload className="h-5 w-5 shrink-0" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {obdUploading ? "Uploading…" : "Tap to upload image or PDF"}
+                    </span>
+                  </label>
+
+                  {/* Uploaded files list */}
+                  {form.obd_uploaded_files.length > 0 && (
+                    <div className="space-y-2">
+                      {form.obd_uploaded_files.map((f, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card"
+                          data-testid={`item-obd-file-${i}`}
+                        >
+                          {f.fileType === "pdf" ? (
+                            <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                          ) : (
+                            <Camera className="h-5 w-5 text-blue-500 shrink-0" />
+                          )}
+                          <span className="flex-1 text-xs truncate text-foreground">{f.fileName}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {f.fileType.toUpperCase()}
+                          </Badge>
+                          <button
+                            onClick={() => removeOBDFile(i)}
+                            className="text-muted-foreground hover:text-destructive shrink-0"
+                            data-testid={`button-remove-obd-file-${i}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── DTC codes ── */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Diagnostic Trouble Codes (DTC)</p>
+                  <p className="text-xs text-muted-foreground">Enter all codes shown by your scanner — active, pending, and stored.</p>
+
+                  {form.obd_dtc_codes.length > 0 && (
+                    <div className="space-y-3">
+                      {form.obd_dtc_codes.map((entry, i) => (
+                        <div
+                          key={entry._key}
+                          className="rounded-xl border bg-card p-3 space-y-2.5"
+                          data-testid={`item-obd-dtc-${i}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code #{i + 1}</span>
+                            <button
+                              onClick={() => removeOBDDTCCode(entry._key)}
+                              className="text-muted-foreground hover:text-destructive"
+                              data-testid={`button-remove-dtc-${i}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* System */}
+                            <div className="space-y-1">
+                              <Label className="text-xs">System</Label>
+                              <Select
+                                value={entry.system}
+                                onValueChange={(v) => updateOBDDTCField(entry._key, "system", v)}
+                              >
+                                <SelectTrigger className="h-9 text-xs" data-testid={`select-dtc-system-${i}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Powertrain">Powertrain (P)</SelectItem>
+                                  <SelectItem value="Chassis">Chassis / ABS (C)</SelectItem>
+                                  <SelectItem value="Body">Body (B)</SelectItem>
+                                  <SelectItem value="Network">Network (U)</SelectItem>
+                                  <SelectItem value="Transmission">Transmission</SelectItem>
+                                  <SelectItem value="Emissions">Emissions</SelectItem>
+                                  <SelectItem value="Unknown">Unknown</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {/* Status */}
+                            <div className="space-y-1">
+                              <Label className="text-xs">Status</Label>
+                              <Select
+                                value={entry.status}
+                                onValueChange={(v) => updateOBDDTCField(entry._key, "status", v)}
+                              >
+                                <SelectTrigger className="h-9 text-xs" data-testid={`select-dtc-status-${i}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Active">🔴 Active</SelectItem>
+                                  <SelectItem value="Pending">🟡 Pending</SelectItem>
+                                  <SelectItem value="Stored">⚪ Stored / History</SelectItem>
+                                  <SelectItem value="Unknown">❓ Unknown</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {/* Code */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Code</Label>
+                            <Input
+                              placeholder="e.g. P0430"
+                              value={entry.code}
+                              onChange={(e) => updateOBDDTCField(entry._key, "code", e.target.value)}
+                              className="h-9 text-sm uppercase font-mono"
+                              data-testid={`input-dtc-code-${i}`}
+                            />
+                          </div>
+                          {/* Description */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Description <span className="text-muted-foreground">(optional)</span></Label>
+                            <Input
+                              placeholder="e.g. Catalyst system efficiency below threshold"
+                              value={entry.description}
+                              onChange={(e) => updateOBDDTCField(entry._key, "description", e.target.value)}
+                              className="h-9 text-sm"
+                              data-testid={`input-dtc-desc-${i}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-10 border-dashed text-sm"
+                    onClick={addOBDDTCCode}
+                    data-testid="button-add-dtc"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {form.obd_dtc_codes.length === 0 ? "Add a DTC code" : "Add another code"}
+                  </Button>
+
+                  {form.obd_dtc_codes.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground">No codes? Leave this empty — a clean scan is still documented.</p>
+                  )}
+                </div>
+
+                {/* ── Emissions readiness ── */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Emissions readiness status</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "ready",     label: "✅ Ready" },
+                      { value: "not_ready", label: "❌ Not Ready" },
+                      { value: "unknown",   label: "❓ Unknown" },
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => updateField("obd_emissions", form.obd_emissions === value ? "" : value)}
+                        data-testid={`button-obd-emissions-${value}`}
+                        className={`text-center px-2 py-3 rounded-xl border text-xs font-medium transition-colors ${
+                          form.obd_emissions === value
+                            ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
+                            : "border-border bg-card text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {form.obd_emissions === "not_ready" && (
+                    <div className="rounded-xl border bg-amber-50 dark:bg-amber-950/20 border-amber-200 p-2.5">
+                      <p className="text-xs text-amber-800 dark:text-amber-300">
+                        ⚠️ "Not Ready" may indicate the vehicle cannot pass an emissions test and could have a registration issue.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── OBD notes ── */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">OBD notes <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <Textarea
+                    placeholder="e.g. Scanner showed 2 pending codes, check engine light was on at time of scan. Used BlueDriver app."
+                    value={form.obd_notes}
+                    onChange={(e) => updateField("obd_notes", e.target.value)}
+                    rows={3}
+                    className="resize-none text-sm"
+                    data-testid="textarea-obd-notes"
+                  />
+                </div>
+              </div>
             )}
+
+            <p className="text-xs text-muted-foreground text-center">Optional — tap Next to skip this step.</p>
           </div>
         )}
 

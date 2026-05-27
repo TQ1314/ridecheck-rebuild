@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import type { GeneratedReport, ReportMeta, RoadTestModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
+import type { GeneratedReport, ReportMeta, RoadTestModule, OBDModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
 
 Font.register({
   family: "Helvetica",
@@ -630,6 +630,62 @@ const s = StyleSheet.create({
     lineHeight: 1.4,
   },
 
+  // ─── OBD DIAGNOSTICS SECTION ─────────────────────────────────────────────────
+  obdScanBanner: {
+    padding: 8, borderRadius: 3, marginBottom: 8, borderWidth: 1,
+  },
+  obdScanLabel: {
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", textTransform: "uppercase",
+    letterSpacing: 0.4, marginBottom: 2, color: C.gray_400,
+  },
+  obdScanValue: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  obdTwoCol:  { flexDirection: "row", gap: 8, marginBottom: 8 },
+  obdBox: {
+    flex: 1, padding: 8, borderWidth: 1, borderColor: C.border,
+    borderRadius: 3, backgroundColor: C.gray_50,
+  },
+  obdBoxTitle: {
+    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.gray_600,
+    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 5,
+    borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
+  },
+  obdLightItem: { flexDirection: "row", alignItems: "center", marginBottom: 3 },
+  obdLightDot:  { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
+  obdLightText: { fontSize: 7.5, color: C.gray_900, flex: 1 },
+  obdDTCTable:  { borderWidth: 1, borderColor: C.border, borderRadius: 3, marginBottom: 8 },
+  obdDTCHead: {
+    flexDirection: "row", backgroundColor: C.gray_100,
+    paddingVertical: 5, paddingHorizontal: 8,
+    borderBottomWidth: 1, borderBottomColor: C.border,
+  },
+  obdDTCRow: {
+    flexDirection: "row", paddingVertical: 5, paddingHorizontal: 8,
+    borderBottomWidth: 1, borderBottomColor: C.gray_100, alignItems: "flex-start",
+  },
+  obdDTCRowLast: {
+    flexDirection: "row", paddingVertical: 5, paddingHorizontal: 8, alignItems: "flex-start",
+  },
+  obdCol_sys:  { width: 70 },
+  obdCol_code: { width: 60 },
+  obdCol_stat: { width: 58 },
+  obdCol_desc: { flex: 1 },
+  obdStatusPill: {
+    paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, alignSelf: "flex-start",
+  },
+  obdNotesBox: {
+    padding: 8, backgroundColor: C.gray_50, borderWidth: 1, borderColor: C.border,
+    borderRadius: 3, marginBottom: 8,
+  },
+  obdNotesLabel: {
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", color: C.gray_400,
+    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3,
+  },
+  obdNotesText: { fontSize: 8, color: C.gray_700, lineHeight: 1.4 },
+  obdFileRef:  { flexDirection: "row", alignItems: "center", marginBottom: 3 },
+  obdFileIcon: { fontSize: 7.5, color: C.gray_600, marginRight: 5, fontFamily: "Helvetica-Bold" },
+  obdFileName: { fontSize: 7.5, color: C.gray_700 },
+  obdPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+
   // ─── ROAD TEST RESULTS ───────────────────────────────────────────────────
   rtGrid: {
     flexDirection: "row",
@@ -966,6 +1022,190 @@ const RT_PDF_SECTIONS: Array<{
   ]},
 ];
 
+const OBD_WARNING_LIGHT_LABELS: Record<string, string> = {
+  check_engine: "Check Engine",
+  abs:          "ABS",
+  airbag_srs:   "Airbag / SRS",
+  battery:      "Battery",
+  oil_pressure: "Oil Pressure",
+  brake:        "Brake",
+  tpms:         "TPMS",
+  none:         "No warning lights observed",
+  other:        "Other",
+};
+
+const OBD_HIGH_SEVERITY_LIGHTS = new Set(["check_engine", "oil_pressure", "airbag_srs", "brake"]);
+
+function dtcStatusColor(status: string): string {
+  switch (status.toLowerCase()) {
+    case "active":  return C.fail;
+    case "pending": return C.monitor;
+    case "stored":  return C.gray_600;
+    default:        return C.gray_400;
+  }
+}
+
+function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
+  const scanPerformedLabels: Record<string, string> = {
+    yes:           "OBD-II Scan Performed",
+    no:            "OBD-II Scan Not Performed",
+    not_available: "OBD-II Scan Not Available — Scanner / Connection Issue",
+    not_permitted: "OBD-II Scan Not Permitted by Seller",
+  };
+
+  const scanColor = obd.scan_performed === "yes" ? C.good : C.monitor;
+  const scanBg    = obd.scan_performed === "yes" ? C.good_bg : C.monitor_bg;
+
+  const warningLights  = obd.warning_lights || [];
+  const activeWarnings = warningLights.filter((l) => l !== "none" && OBD_HIGH_SEVERITY_LIGHTS.has(l));
+  const visibleLights  = warningLights.filter((l) => l !== "none" && l !== "other");
+  const noneSelected   = warningLights.includes("none");
+
+  const dtcCodes    = obd.dtc_codes || [];
+  const imageFiles  = (obd.uploaded_files || []).filter((f) => f.fileType === "image");
+  const pdfFiles    = (obd.uploaded_files || []).filter((f) => f.fileType === "pdf");
+
+  const emissionLabels: Record<string, string> = {
+    ready:     "Ready",
+    not_ready: "Not Ready — Potential Registration Issue",
+    unknown:   "Unknown / Not Checked",
+  };
+
+  return (
+    <View style={s.content}>
+      <SectionTitle title="OBD-II Diagnostic Data" />
+
+      {/* Scan status banner */}
+      <View style={[s.obdScanBanner, { backgroundColor: scanBg, borderColor: scanColor }]} wrap={false}>
+        <Text style={[s.obdScanLabel, { color: scanColor }]}>Scan Status</Text>
+        <Text style={[s.obdScanValue, { color: scanColor }]}>
+          {scanPerformedLabels[obd.scan_performed] || obd.scan_performed}
+        </Text>
+      </View>
+
+      {/* Warning lights + Emissions side-by-side */}
+      <View style={s.obdTwoCol} wrap={false}>
+        {/* Warning lights */}
+        <View style={s.obdBox}>
+          <Text style={s.obdBoxTitle}>Warning Lights Observed</Text>
+          {noneSelected && (
+            <View style={s.obdLightItem}>
+              <View style={[s.obdLightDot, { backgroundColor: C.good }]} />
+              <Text style={s.obdLightText}>No warning lights observed</Text>
+            </View>
+          )}
+          {!noneSelected && visibleLights.length === 0 && (
+            <Text style={[s.obdLightText, { color: C.muted }]}>Not documented</Text>
+          )}
+          {visibleLights.map((light) => (
+            <View key={light} style={s.obdLightItem}>
+              <View style={[s.obdLightDot, {
+                backgroundColor: OBD_HIGH_SEVERITY_LIGHTS.has(light) ? C.fail : C.monitor,
+              }]} />
+              <Text style={s.obdLightText}>{OBD_WARNING_LIGHT_LABELS[light] || light}</Text>
+            </View>
+          ))}
+          {warningLights.includes("other") && obd.warning_other_desc && (
+            <Text style={[s.obdLightText, { color: C.gray_600, marginTop: 2 }]}>
+              Other: {obd.warning_other_desc}
+            </Text>
+          )}
+        </View>
+
+        {/* Emissions readiness */}
+        <View style={s.obdBox}>
+          <Text style={s.obdBoxTitle}>Emissions Readiness</Text>
+          {obd.emissions_readiness ? (
+            <View style={s.obdLightItem}>
+              <View style={[s.obdLightDot, {
+                backgroundColor: obd.emissions_readiness === "ready" ? C.good
+                  : obd.emissions_readiness === "not_ready" ? C.fail
+                  : C.gray_400,
+              }]} />
+              <Text style={s.obdLightText}>
+                {emissionLabels[obd.emissions_readiness] || obd.emissions_readiness}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[s.obdLightText, { color: C.muted }]}>
+              {obd.scan_performed === "yes" ? "Not recorded" : "Scan not performed"}
+            </Text>
+          )}
+
+          {/* Active high-severity count callout */}
+          {activeWarnings.length > 0 && (
+            <View style={{ marginTop: 6, padding: 5, backgroundColor: "#fef2f2", borderRadius: 2, borderWidth: 1, borderColor: "#fecaca" }}>
+              <Text style={{ fontSize: 7, color: C.fail, fontFamily: "Helvetica-Bold" }}>
+                {activeWarnings.length} high-severity warning light{activeWarnings.length !== 1 ? "s" : ""} observed
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* DTC codes table */}
+      {dtcCodes.length > 0 && (
+        <View style={s.obdDTCTable} wrap={false}>
+          <View style={s.obdDTCHead}>
+            <Text style={[s.thText, s.obdCol_sys]}>System</Text>
+            <Text style={[s.thText, s.obdCol_code]}>Code</Text>
+            <Text style={[s.thText, s.obdCol_stat]}>Status</Text>
+            <Text style={[s.thText, s.obdCol_desc]}>Description</Text>
+          </View>
+          {dtcCodes.map((code, i) => {
+            const isLast = i === dtcCodes.length - 1;
+            const color  = dtcStatusColor(code.status);
+            return (
+              <View key={i} style={isLast ? s.obdDTCRowLast : s.obdDTCRow}>
+                <Text style={[s.tdMuted, s.obdCol_sys]}>{code.system}</Text>
+                <Text style={[s.tdText, s.obdCol_code, { fontFamily: "Helvetica-Bold" }]}>{code.code}</Text>
+                <View style={[s.obdCol_stat]}>
+                  <View style={[s.obdStatusPill, { backgroundColor: `${color}18` }]}>
+                    <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold", color, textTransform: "uppercase" }}>
+                      {code.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[s.tdText, s.obdCol_desc]}>{code.description || "—"}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* OBD notes */}
+      {obd.notes && (
+        <View style={s.obdNotesBox} wrap={false}>
+          <Text style={s.obdNotesLabel}>Inspector OBD Notes</Text>
+          <Text style={s.obdNotesText}>{obd.notes}</Text>
+        </View>
+      )}
+
+      {/* Uploaded image thumbnails */}
+      {imageFiles.length > 0 && (
+        <View style={s.obdPhotoRow} wrap={false}>
+          {imageFiles.slice(0, 4).map((f, i) => (
+            <PhotoBlock key={i} url={f.url} caption={`OBD diagnostic — ${f.fileName}`} />
+          ))}
+        </View>
+      )}
+
+      {/* PDF file references */}
+      {pdfFiles.length > 0 && (
+        <View style={[s.obdNotesBox, { marginBottom: 0 }]} wrap={false}>
+          <Text style={s.obdNotesLabel}>Uploaded Diagnostic Files (PDF)</Text>
+          {pdfFiles.map((f, i) => (
+            <View key={i} style={s.obdFileRef}>
+              <Text style={s.obdFileIcon}>[PDF]</Text>
+              <Text style={s.obdFileName}>{f.fileName}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function RoadTestResultsSection({ rt }: { rt: RoadTestModule }) {
   if (rt.status !== "completed") return null;
 
@@ -1187,7 +1427,12 @@ export function RideCheckReport({ report, meta }: Props) {
           <RoadTestResultsSection rt={meta.road_test_module} />
         )}
 
-        {/* ── OBD Table ── */}
+        {/* ── OBD-II Diagnostics (structured module) ── */}
+        {meta.obd_module && (
+          <OBDDiagnosticsSection obd={meta.obd_module} />
+        )}
+
+        {/* ── OBD Table (AI-interpreted entries) ── */}
         {report.obd_entries.length > 0 && (
           <View style={s.content} wrap={false}>
             <SectionTitle title="OBD-II Diagnostic Data" />

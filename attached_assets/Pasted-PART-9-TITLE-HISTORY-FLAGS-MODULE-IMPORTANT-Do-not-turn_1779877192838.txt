@@ -1,0 +1,399 @@
+PART 9 — TITLE & HISTORY FLAGS MODULE
+
+IMPORTANT:
+Do not turn RideCheck into CARFAX, a DMV system, title agency, or law-enforcement verification platform.
+
+RideCheck remains:
+- a Vehicle Transparency Platform
+- an observational inspection system
+- a documentation and risk-awareness platform
+
+RideCheck does NOT:
+- guarantee title validity
+- run title databases
+- certify flood history
+- certify theft status
+- certify accident history
+- guarantee odometer accuracy
+
+Those services remain optional buyer-paid upsells such as:
+- CARFAX
+- AutoCheck
+- NMVTIS
+- professional title search services
+
+This module documents observable indicators only.
+
+Do not change the existing inspection flow.
+Add this module after the OBD-II module.
+
+────────────────────────────
+MODULE:
+TITLE & HISTORY FLAGS
+(Where Available)
+────────────────────────────
+
+This module is optional and observational.
+
+Purpose:
+Document visible title, VIN, flood, tampering, odometer, and accident-repair indicators observed during inspection.
+
+The module should gracefully support:
+- private-party transactions
+- dealership transactions
+- situations where title is unavailable
+- situations where seller refuses title review
+
+Do not require title review to complete inspection.
+
+────────────────────────────
+TITLE REVIEW STATUS
+────────────────────────────
+
+Was the physical title available during inspection?
+
+[ ] Yes — physical title reviewed
+[ ] Partial review only
+[ ] No — seller did not provide title
+[ ] Dealer transaction — title unavailable onsite
+[ ] Not applicable
+
+Title type observed:
+[ ] Clean title
+[ ] Salvage title
+[ ] Rebuilt/reconstructed title
+[ ] Bonded title
+[ ] Lien noted on title
+[ ] Out-of-state title
+[ ] Unknown
+[ ] Unable to verify
+
+VIN on title matched vehicle VIN?
+[ ] Yes — confirmed
+[ ] No — mismatch observed
+[ ] Unable to verify
+[ ] Title unavailable
+
+Seller name matched title?
+[ ] Yes
+[ ] No — third-party seller observed
+[ ] Unable to verify
+[ ] Dealer transaction
+
+Title signed appropriately?
+[ ] Yes
+[ ] No — unsigned/incomplete
+[ ] Unable to verify
+
+────────────────────────────
+VIN VERIFICATION
+────────────────────────────
+
+Require VIN photo upload if accessible:
+
+- dashboard VIN
+- door jamb VIN if accessible
+
+Fields:
+
+Dashboard VIN verified?
+[ ] Yes
+[ ] No
+[ ] Unable to verify
+
+Door jamb VIN verified?
+[ ] Yes
+[ ] No
+[ ] Unable to verify
+
+VINs matched each other?
+[ ] Yes
+[ ] No — discrepancy observed
+[ ] Unable to verify
+
+────────────────────────────
+LIEN STATUS
+────────────────────────────
+
+Was lien release present?
+
+[ ] Lien release document present
+[ ] Lien noted — no release provided
+[ ] No lien observed
+[ ] Unable to verify
+
+Lien notes:
+[free text]
+
+────────────────────────────
+ODOMETER DISCLOSURE
+────────────────────────────
+
+Odometer reading at inspection:
+[number field]
+
+Odometer disclosure appeared consistent?
+[ ] Yes
+[ ] No — discrepancy observed
+[ ] Unable to verify
+[ ] Title unavailable
+
+Physical signs of odometer tampering observed?
+[ ] Yes
+[ ] No
+[ ] Unable to determine
+
+Examples:
+- disturbed instrument cluster
+- inconsistent wear
+- replacement cluster indicators
+
+Odometer notes:
+[free text]
+
+────────────────────────────
+FLOOD / WATER INTRUSION INDICATORS
+────────────────────────────
+
+Observable indicators only.
+
+Check all observed:
+
+[ ] Water staining on carpet or upholstery
+[ ] Mold or musty odor observed
+[ ] Rust/corrosion inside cabin areas
+[ ] Mud/silt deposits observed
+[ ] Corroded wiring/connectors observed
+[ ] Fogged moisture inside lights
+[ ] Unusual rust on interior metal
+[ ] No flood indicators observed
+
+Flood notes:
+[free text]
+
+────────────────────────────
+THEFT / TAMPERING INDICATORS
+────────────────────────────
+
+Observable indicators only.
+
+Check all observed:
+
+[ ] Ignition/steering column tampering observed
+[ ] VIN plate appeared altered/damaged
+[ ] VIN mismatch observed
+[ ] Door jamb sticker missing/replaced
+[ ] Non-OEM or mismatched keys observed
+[ ] Unusual aftermarket ignition wiring observed
+[ ] Lock cylinder damage observed
+[ ] No tampering indicators observed
+
+Tampering notes:
+[free text]
+
+────────────────────────────
+PRIOR ACCIDENT / REPAIR INDICATORS
+────────────────────────────
+
+Observable indicators only.
+
+Check all observed:
+
+[ ] Mismatched paint between panels
+[ ] Overspray on trim/glass/seals
+[ ] Inconsistent panel gaps observed
+[ ] Replacement body panels observed
+[ ] Body filler/bondo indicators observed
+[ ] Structural straightening/weld indicators observed
+[ ] Airbag cover replacement indicators observed
+[ ] No accident-repair indicators observed
+
+Accident/repair notes:
+[free text]
+
+────────────────────────────
+OPS REVIEW ESCALATION
+────────────────────────────
+
+Automatically flag for ops review if:
+- VIN mismatch observed
+- salvage/rebuilt title observed
+- flood indicators + electrical corrosion observed
+- title unavailable + third-party seller
+- odometer discrepancy observed
+- theft/tampering indicators observed
+
+Add internal review status:
+- normal
+- ops_review_required
+- severe_attention_flag
+
+These flags are internal only unless surfaced in the report through approved neutral language.
+
+────────────────────────────
+STORAGE
+────────────────────────────
+
+Store additively with inspection record:
+
+- title_review_status
+- title_type
+- vin_match_status
+- seller_name_match
+- title_signed_status
+- lien_status
+- lien_notes
+- odometer_reading
+- odometer_consistency
+- odometer_tampering_observed
+- odometer_notes
+- flood_indicators[]
+- flood_notes
+- tampering_indicators[]
+- tampering_notes
+- accident_indicators[]
+- accident_notes
+- dashboard_vin_photo
+- door_jamb_vin_photo
+- ops_review_status
+
+Do not break existing schema.
+Do not rename existing fields.
+
+────────────────────────────
+REPORT INTEGRATION
+────────────────────────────
+
+Add section:
+
+TITLE & HISTORY FLAGS
+
+Place after:
+OBD-II DIAGNOSTIC DATA
+
+Use same report philosophy as all RideCheck sections:
+
+OBSERVED:
+Only factual observations documented by RideChecker.
+
+CONSIDERATION:
+Neutral explanation of what indicators may typically mean.
+
+Examples:
+
+TITLE STATUS
+OBSERVED:
+Physical title reviewed. Salvage branding observed.
+
+CONSIDERATION:
+Salvage or rebuilt branding may affect financing, resale value, insurance eligibility, and registration requirements. Independent verification recommended.
+
+FLOOD/WATER INTRUSION
+OBSERVED:
+Corrosion inside cabin areas and musty odor observed.
+
+CONSIDERATION:
+Indicators consistent with possible prior water intrusion were observed. Water exposure can affect electrical systems and interior materials over time. Professional assessment recommended.
+
+PRIOR ACCIDENT/REPAIR
+OBSERVED:
+Overspray and inconsistent panel gaps observed.
+
+CONSIDERATION:
+Indicators consistent with prior repair work were observed. Additional body or structural assessment may provide further clarity.
+
+THEFT/TAMPERING
+OBSERVED:
+VIN plate appeared damaged.
+
+CONSIDERATION:
+VIN irregularities should be independently verified before transaction completion.
+
+────────────────────────────
+MISSING OR LIMITED INFORMATION
+────────────────────────────
+
+If title unavailable:
+Add:
+"Physical title was not available for review at time of inspection. Independent title verification recommended."
+
+If lien noted with no release:
+Add:
+"Lien noted during inspection. No lien release document was present at time of inspection."
+
+If VIN mismatch:
+Add:
+"VIN discrepancy observed during inspection. Immediate independent verification recommended before transaction completion."
+
+Do NOT say:
+- stolen vehicle
+- flood car
+- title fraud
+- rollback confirmed
+- seller hiding something
+
+Use only:
+- indicators observed
+- discrepancy observed
+- unable to verify
+- professional verification recommended
+- independent verification recommended
+
+────────────────────────────
+INSPECTION CONFIDENCE IMPACT
+────────────────────────────
+
+Increase confidence when:
+- title reviewed
+- VINs matched
+- no major indicators observed
+
+Lower confidence when:
+- title unavailable
+- VIN unverified
+- flood indicators observed
+- odometer inconsistency observed
+- multiple tampering indicators observed
+
+Confidence reflects inspection completeness only.
+Not vehicle quality.
+
+────────────────────────────
+UPSELL POSITIONING
+────────────────────────────
+
+Do NOT automatically include CARFAX or title reports.
+
+If buyer purchased:
+- CARFAX
+- AutoCheck
+- title history add-on
+
+Then integrate those results into separate paid-add-on sections.
+
+Otherwise:
+RideCheck only documents physical observable indicators.
+
+RideCheck should not become dependent on third-party history providers.
+
+────────────────────────────
+TESTING
+────────────────────────────
+
+Test:
+1. Clean title + VIN match.
+2. Salvage title observed.
+3. VIN mismatch observed.
+4. Flood indicators observed.
+5. Tampering indicators observed.
+6. Title unavailable.
+7. Lien noted without release.
+8. No indicators observed.
+9. Existing inspection flow unchanged.
+10. OBD module still functions.
+11. Existing report generation unchanged.
+12. No third-party dependency introduced.
+13. Neutral language maintained everywhere.
+
+After testing:
+List any remaining issues or sections needing refinement.

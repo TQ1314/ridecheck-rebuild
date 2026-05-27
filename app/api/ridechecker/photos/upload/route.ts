@@ -9,6 +9,7 @@ const MAX_SIZE      = 20 * 1024 * 1024;
 const ALLOWED_TYPES = [
   "image/jpeg", "image/jpg", "image/png",
   "image/webp", "image/heic", "image/heif",
+  "application/pdf",
 ];
 
 export async function POST(req: NextRequest) {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     const mimeType = file.type || "image/jpeg";
     if (!ALLOWED_TYPES.includes(mimeType)) {
       return NextResponse.json(
-        { error: "Invalid file type. Use JPEG, PNG, WebP, or HEIC." },
+        { error: "Invalid file type. Use JPEG, PNG, WebP, HEIC, or PDF." },
         { status: 400 },
       );
     }

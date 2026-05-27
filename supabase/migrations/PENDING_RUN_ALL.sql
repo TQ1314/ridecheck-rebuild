@@ -1000,3 +1000,10 @@ ALTER TABLE ridechecker_raw_submissions
 
 COMMENT ON COLUMN ridechecker_raw_submissions.road_test_module IS
   'Structured road test module data: { status: completed|not_permitted|not_possible, engine_behavior: [], transmission: [], brakes: [], steering: [], suspension: [], warning_lights: [], other_lights_noted: bool, other_lights_description: str, overall: [], concerns_notes: str, photo_1_url: str, photo_2_url: str }';
+
+-- ── 038: OBD-II Diagnostic Module ─────────────────────────────────────────────
+ALTER TABLE ridechecker_raw_submissions
+  ADD COLUMN IF NOT EXISTS obd_module JSONB NULL;
+
+COMMENT ON COLUMN ridechecker_raw_submissions.obd_module IS
+  'Structured OBD-II diagnostic module: { scan_performed: yes|no|not_available|not_permitted, uploaded_files: [{url, fileName, fileType, reviewStatus}], dtc_codes: [{system, code, description, status}], notes: str, emissions_readiness: ready|not_ready|unknown, warning_lights: [], warning_other_desc: str }';

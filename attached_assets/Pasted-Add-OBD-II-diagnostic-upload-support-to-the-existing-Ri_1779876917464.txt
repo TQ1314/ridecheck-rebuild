@@ -1,0 +1,278 @@
+Add OBD-II diagnostic upload support to the existing RideCheck inspection flow.
+
+IMPORTANT:
+Do not rebuild the app.
+Do not replace the guided inspection wizard.
+Do not change auth, middleware.ts, roles, checkout, payment, order flow, or report philosophy.
+RideCheck must remain the primary inspection platform.
+Do not create dependency on third-party inspection software.
+
+GOAL:
+RideCheck should support one unified inspection report containing:
+- physical inspection findings
+- photos
+- rust findings
+- road test results if completed
+- OBD-II diagnostics
+- uploaded OBD images/PDFs
+- manual DTC codes
+- OBD notes
+- neutral price/condition insights
+
+────────────────────────────
+PART 1 — ADD OBD-II MODULE
+────────────────────────────
+
+Add a new section inside the RideChecker inspection flow:
+
+MODULE:
+OBD-II DIAGNOSTICS
+
+This module should allow the RideChecker to add diagnostic evidence from any scanner source.
+
+Fields:
+
+1. OBD scan performed?
+[ ] Yes
+[ ] No
+[ ] Not available / scanner issue
+[ ] Seller did not permit
+
+2. Upload OBD-II files
+Allow:
+- images: jpg, jpeg, png, webp
+- PDF files
+
+Examples:
+- AutoZone scan PDF
+- scanner screenshot
+- dashboard warning light photo
+- OBD app screenshot
+- Innova / BlueDriver / Launch / Autel report PDF
+
+3. Manual DTC code entry
+Allow multiple codes.
+
+Fields per code:
+- system: Powertrain / ABS / SRS / Transmission / Body / Unknown
+- code: example P0430, P0420, C0035, U0100
+- description: optional
+- status: Active / Pending / Stored / Unknown
+
+Allow “Add another code.”
+
+4. OBD notes
+Free-text field:
+“Inspector notes about diagnostic scan, scanner limitations, unreadable codes, or warning lights.”
+
+5. Emissions readiness
+[ ] Ready
+[ ] Not ready
+[ ] Unknown / not checked
+
+6. Warning lights observed
+[ ] Check engine
+[ ] ABS
+[ ] Airbag/SRS
+[ ] Battery
+[ ] Oil pressure
+[ ] Brake
+[ ] TPMS
+[ ] Other: ________
+[ ] No warning lights observed
+
+────────────────────────────
+PART 2 — STORAGE
+────────────────────────────
+
+Persist OBD data with the inspection/order.
+
+Use additive schema changes only.
+
+Store:
+- obd_scan_performed
+- obd_scan_status
+- obd_uploaded_files[]
+- manual_dtc_codes[]
+- obd_notes
+- emissions_readiness
+- warning_lights_observed[]
+- created_at
+- updated_at
+
+Do not remove or rename existing fields.
+
+Uploaded files should be tied to:
+- order_id
+- inspection_id
+- ridechecker_id
+- file_type
+- file_url/storage_path
+- uploaded_at
+
+────────────────────────────
+PART 3 — FILE UPLOAD RULES
+────────────────────────────
+
+Support OBD-II uploads as images and PDFs.
+
+Allowed:
+- .jpg
+- .jpeg
+- .png
+- .webp
+- .pdf
+
+Reject unsupported files with a clear message.
+
+Maximum file size:
+Use existing upload limit if already configured.
+If no limit exists, set reasonable default:
+10MB per file.
+
+Allow multiple uploads.
+
+Do not require OBD upload if manual codes are entered.
+
+Do not require manual codes if file upload is provided.
+
+────────────────────────────
+PART 4 — REPORT INTEGRATION
+────────────────────────────
+
+Add an “OBD-II DIAGNOSTIC DATA” section to the unified RideCheck report.
+
+If OBD data exists, show:
+
+OBD-II DIAGNOSTIC DATA
+
+Scan Status:
+Performed / Not performed / Not available / Seller did not permit
+
+Warning Lights Observed:
+List selected lights.
+
+Diagnostic Codes:
+Table:
+| System | Code | Status | Description |
+| Powertrain | P0430 | Active | Catalyst efficiency below threshold |
+
+Emissions Readiness:
+Ready / Not Ready / Unknown
+
+OBD Notes:
+Display inspector notes.
+
+Uploaded Diagnostic Files:
+Show thumbnails for image uploads.
+Show PDF attachment/reference label for PDF uploads.
+
+If OBD was not performed:
+Add to Missing or Limited Information:
+“OBD-II diagnostic scan was not performed.”
+
+If scanner issue:
+“OBD-II diagnostic scan could not be completed due to scanner or connection issue.”
+
+If seller did not permit:
+“OBD-II diagnostic scan was not permitted by seller.”
+
+────────────────────────────
+PART 5 — AI REPORT GENERATION
+────────────────────────────
+
+Update AI report prompt so OBD data feeds into:
+- risk level
+- inspection confidence level
+- system-by-system assessment
+- buyer considerations
+- missing or limited information
+- price/condition considerations
+
+Language rules remain:
+RideCheck is a Vehicle Transparency Platform, not a purchase advisor.
+
+Do not say:
+- do not buy
+- walk away
+- avoid this vehicle
+- you should buy
+- you should not buy
+
+Use:
+- observed
+- noted
+- identified
+- estimated
+- may
+- could range
+- professional assessment recommended
+
+Every OBD-related finding must follow:
+
+OBSERVED:
+Example:
+Check engine light observed. Manual code P0430 entered by RideChecker. Uploaded diagnostic PDF attached.
+
+CONSIDERATION:
+Example:
+P0430 commonly relates to catalyst system efficiency. Repair cost can vary depending on diagnosis, parts, and labor. Professional diagnostic confirmation recommended.
+
+────────────────────────────
+PART 6 — INSPECTION CONFIDENCE
+────────────────────────────
+
+Update Inspection Confidence calculation:
+
+Increase confidence when:
+- OBD scan performed
+- codes retrieved
+- diagnostic PDF/image uploaded
+- warning lights documented
+- emissions readiness recorded
+
+Lower confidence when:
+- OBD not performed
+- scanner unavailable
+- seller did not permit
+- check engine light present but no codes retrieved
+
+Do not treat confidence as vehicle quality.
+Confidence only means inspection completeness.
+
+────────────────────────────
+PART 7 — OPS REVIEW
+────────────────────────────
+
+If uploaded OBD files are unreadable, blurry, or appear unrelated:
+- flag for ops review
+- do not delete file
+- mark as “needs_review”
+
+Statuses:
+- approved_for_report
+- needs_review
+- excluded_from_report
+
+If a PDF is uploaded, include it as a diagnostic attachment/reference in the report even if not parsed.
+
+────────────────────────────
+PART 8 — TESTING
+────────────────────────────
+
+After implementation, test these cases:
+
+1. OBD scan performed + manual DTC codes entered.
+2. OBD scan performed + PDF uploaded only.
+3. OBD scan performed + image uploaded only.
+4. Check engine light observed but no codes retrieved.
+5. OBD scan not available / scanner issue.
+6. Seller did not permit OBD scan.
+7. Unsupported file upload rejected.
+8. Report includes OBD section correctly.
+9. Missing or Limited Information updates correctly.
+10. Existing inspection wizard still works.
+11. Existing report generation still works.
+12. No third-party inspection software dependency was added.
+
+Confirm all tests and list any remaining issues.

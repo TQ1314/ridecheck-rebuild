@@ -14,6 +14,30 @@ export interface RoadTestModule {
   photo_2_url?: string;
 }
 
+export interface OBDUploadedFile {
+  url: string;
+  fileName: string;
+  fileType: "image" | "pdf";
+  reviewStatus: "approved_for_report" | "needs_review" | "excluded_from_report";
+}
+
+export interface OBDDTCCode {
+  system: string;
+  code: string;
+  description: string;
+  status: string;
+}
+
+export interface OBDModule {
+  scan_performed: string;
+  uploaded_files?: OBDUploadedFile[];
+  dtc_codes?: OBDDTCCode[];
+  notes?: string;
+  emissions_readiness?: string;
+  warning_lights?: string[];
+  warning_other_desc?: string;
+}
+
 export type VerdictType =
   | "LOW_RISK"
   | "MODERATE_RISK"
@@ -100,6 +124,7 @@ export interface ReportMeta {
   undercarriage_photo_url: string;
   extra_photos: string[];
   road_test_module?: RoadTestModule;
+  obd_module?: OBDModule;
 }
 
 export interface ReportInput {
@@ -133,4 +158,5 @@ export interface ReportInput {
   undercarriage_photo_url: string;
   extra_photos?: string[];
   road_test_module?: RoadTestModule;
+  obd_module?: OBDModule;
 }

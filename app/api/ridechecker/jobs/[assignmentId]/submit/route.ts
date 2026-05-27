@@ -6,6 +6,30 @@ import { isChecklistComplete } from "@/lib/ridechecker/scoring";
 import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
 import type { ScoreEventType } from "@/lib/ridechecker/scorecard";
 
+const obdUploadedFileSchema = z.object({
+  url: z.string(),
+  fileName: z.string(),
+  fileType: z.enum(["image", "pdf"]),
+  reviewStatus: z.enum(["approved_for_report", "needs_review", "excluded_from_report"]).default("approved_for_report"),
+});
+
+const obdDTCCodeSchema = z.object({
+  system: z.string(),
+  code: z.string(),
+  description: z.string().optional().default(""),
+  status: z.string(),
+});
+
+const obdModuleSchema = z.object({
+  scan_performed: z.enum(["yes", "no", "not_available", "not_permitted"]),
+  uploaded_files: z.array(obdUploadedFileSchema).optional(),
+  dtc_codes: z.array(obdDTCCodeSchema).optional(),
+  notes: z.string().optional(),
+  emissions_readiness: z.enum(["ready", "not_ready", "unknown"]).optional(),
+  warning_lights: z.array(z.string()).optional(),
+  warning_other_desc: z.string().optional(),
+});
+
 const roadTestModuleSchema = z.object({
   status: z.enum(["completed", "not_permitted", "not_possible"]),
   engine_behavior: z.array(z.string()).optional(),
@@ -41,6 +65,7 @@ const submitSchema = z.object({
   audio_note_url: z.string().optional(),
   extra_photos: z.array(z.string()).optional(),
   road_test_module: roadTestModuleSchema.optional(),
+  obd_module: obdModuleSchema.optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -125,6 +150,7 @@ export async function POST(
         audio_note_url: data.audio_note_url ?? null,
         extra_photos: data.extra_photos ?? null,
         road_test_module: data.road_test_module ?? null,
+        obd_module: data.obd_module ?? null,
         submitted_at: now,
       })
       .select("id")

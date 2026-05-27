@@ -3,15 +3,42 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
 import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
-import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel } from "@/lib/report/types";
+import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel, OBDModule } from "@/lib/report/types";
 import { validatePhotos, partitionResults } from "@/lib/report/photo-validator";
 import React from "react";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+function resolveOBDScope(submission: any): { level: string; status: ScopeRow["status"] } {
+  const obd = submission.obd_module as OBDModule | null | undefined;
+  if (obd) {
+    switch (obd.scan_performed) {
+      case "yes": {
+        const hasCodes   = (obd.dtc_codes?.length ?? 0) > 0;
+        const hasFiles   = (obd.uploaded_files?.length ?? 0) > 0;
+        const hasEvidence = hasCodes || hasFiles;
+        return {
+          level:  hasEvidence ? "Performed — Codes + Evidence Uploaded" : "Performed",
+          status: "assessed",
+        };
+      }
+      case "no":            return { level: "Not Performed",                        status: "not_assessed" };
+      case "not_available": return { level: "Not Available — Scanner Issue",        status: "not_assessed" };
+      case "not_permitted": return { level: "Not Permitted by Seller",              status: "not_assessed" };
+    }
+  }
+  // Legacy fallback — plain scan_codes
+  const hasLegacyCodes = Array.isArray(submission.scan_codes) && submission.scan_codes.length > 0;
+  return {
+    level:  hasLegacyCodes ? "Full Scan Performed" : "Not Performed",
+    status: hasLegacyCodes ? "assessed" : "not_assessed",
+  };
+}
+
 function buildScopeTable(submission: any): ScopeRow[] {
-  const hasOBD = Array.isArray(submission.scan_codes) && submission.scan_codes.length > 0;
+  const obdScope      = resolveOBDScope(submission);
+  const hasOBD        = obdScope.status === "assessed";
   const hasUndercarriage = !!submission.undercarriage_photo_url;
   const hasBrakes = !!(submission.brake_condition && submission.brake_condition.trim().length > 0);
   const hasTread = [
@@ -29,40 +56,53 @@ function buildScopeTable(submission: any): ScopeRow[] {
   let transmissionLevel: string;
 
   if (rtStatus === "completed") {
-    roadTestLevel      = "Completed";
+    roadTestLevel       = "Completed";
     roadTestScopeStatus = "assessed";
-    transmissionLevel  = "Road Test Observed";
+    transmissionLevel   = "Road Test Observed";
   } else if (rtStatus === "not_permitted") {
-    roadTestLevel      = "Not Permitted by Seller";
+    roadTestLevel       = "Not Permitted by Seller";
     roadTestScopeStatus = "not_assessed";
-    transmissionLevel  = "Visual Only";
+    transmissionLevel   = "Visual Only";
   } else if (rtStatus === "not_possible") {
-    roadTestLevel      = "Not Possible — Location/Condition";
+    roadTestLevel       = "Not Possible — Location/Condition";
     roadTestScopeStatus = "not_assessed";
-    transmissionLevel  = "Visual Only";
+    transmissionLevel   = "Visual Only";
   } else {
     const hasNotes = !!(submission.test_drive_notes && submission.test_drive_notes.trim().length > 10);
-    roadTestLevel      = hasNotes ? "Completed" : "Not Performed";
+    roadTestLevel       = hasNotes ? "Completed" : "Not Performed";
     roadTestScopeStatus = hasNotes ? "assessed" : "not_assessed";
-    transmissionLevel  = hasNotes ? "Road Test Observed" : "Visual Only";
+    transmissionLevel   = hasNotes ? "Road Test Observed" : "Visual Only";
   }
 
   return [
     { system: "Engine",            level: hasOBD           ? "Visual + OBD Scan"       : "Visual Only",  status: hasOBD           ? "assessed"     : "partial"      },
-    { system: "OBD Scan",          level: hasOBD           ? "Full Scan Performed"      : "Not Performed",status: hasOBD           ? "assessed"     : "not_assessed" },
+    { system: "OBD Scan",          level: obdScope.level,                                                status: obdScope.status                                     },
     { system: "Frame / Underbody", level: hasUndercarriage ? "Visual Only"              : "Not Assessed", status: hasUndercarriage ? "partial"      : "not_assessed" },
     { system: "Brakes",            level: hasBrakes        ? "Assessed"                 : "Not Assessed", status: hasBrakes        ? "assessed"     : "not_assessed" },
-    { system: "Transmission",      level: transmissionLevel,                                               status: "partial"                                          },
-    { system: "Electrical",        level: "Visual Only",                                                   status: "partial"                                          },
+    { system: "Transmission",      level: transmissionLevel,                                              status: "partial"                                           },
+    { system: "Electrical",        level: "Visual Only",                                                  status: "partial"                                           },
     { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"  : "Visual Only",  status: hasTread         ? "assessed"     : "partial"      },
-    { system: "Road Test",         level: roadTestLevel,                                                   status: roadTestScopeStatus                                },
+    { system: "Road Test",         level: roadTestLevel,                                                  status: roadTestScopeStatus                                 },
   ];
 }
 
 function buildMissingItems(submission: any): string[] {
   const items: string[] = [];
-  if (!Array.isArray(submission.scan_codes) || submission.scan_codes.length === 0)
-    items.push("No OBD diagnostic codes retrieved");
+
+  // OBD — prefer structured module, fall back to legacy scan_codes
+  const obd = submission.obd_module as OBDModule | null | undefined;
+  if (obd) {
+    switch (obd.scan_performed) {
+      case "no":            items.push("OBD-II diagnostic scan was not performed"); break;
+      case "not_available": items.push("OBD-II diagnostic scan could not be completed — scanner or connection issue"); break;
+      case "not_permitted": items.push("OBD-II diagnostic scan was not permitted by seller"); break;
+      // "yes" → scan performed; no missing item
+    }
+  } else {
+    const hasLegacyCodes = Array.isArray(submission.scan_codes) && submission.scan_codes.length > 0;
+    if (!hasLegacyCodes) items.push("No OBD diagnostic codes retrieved");
+  }
+
   if (!submission.undercarriage_photo_url)
     items.push("No lift inspection performed");
   if (!submission.brake_condition || submission.brake_condition.trim().length === 0)
@@ -92,9 +132,21 @@ function buildMissingItems(submission: any): string[] {
 function buildConfidenceLevel(submission: any, missingCount: number): ConfidenceLevel {
   const rtModule = submission.road_test_module as { status?: string } | null | undefined;
   const roadTestCompleted = rtModule?.status === "completed";
-  const effectiveMissing = roadTestCompleted ? Math.max(0, missingCount - 1) : missingCount;
-  if (effectiveMissing === 0) return "HIGH CONFIDENCE";
-  if (effectiveMissing <= 2)  return "MODERATE CONFIDENCE";
+
+  const obd = submission.obd_module as OBDModule | null | undefined;
+  const obdPerformed  = obd?.scan_performed === "yes";
+  const obdHasEvidence = obdPerformed && (
+    (obd?.dtc_codes?.length ?? 0) > 0 ||
+    (obd?.uploaded_files?.length ?? 0) > 0
+  );
+
+  let effective = missingCount;
+  if (roadTestCompleted)  effective = Math.max(0, effective - 1);
+  if (obdHasEvidence)     effective = Math.max(0, effective - 1);
+  else if (obdPerformed)  effective = Math.max(0, effective - 0); // performed but no codes — neutral
+
+  if (effective === 0) return "HIGH CONFIDENCE";
+  if (effective <= 2)  return "MODERATE CONFIDENCE";
   return "LIMITED CONFIDENCE";
 }
 
@@ -193,10 +245,16 @@ export async function POST(
       undercarriage_photo_url: submission.undercarriage_photo_url || "",
       extra_photos:          submission.extra_photos || [],
       road_test_module:      submission.road_test_module ?? undefined,
+      obd_module:            submission.obd_module ?? undefined,
     };
 
     // 4. Collect all submission photos for validation
-    const rtMod = submission.road_test_module as { photo_1_url?: string; photo_2_url?: string } | null | undefined;
+    const rtMod  = submission.road_test_module as { photo_1_url?: string; photo_2_url?: string } | null | undefined;
+    const obdMod = submission.obd_module as { uploaded_files?: Array<{ url: string; fileName: string; fileType: string }> } | null | undefined;
+    const obdImageFiles = (obdMod?.uploaded_files || [])
+      .filter((f) => f.fileType === "image")
+      .map((f, i) => ({ url: f.url, label: `OBD diagnostic photo ${i + 1}` }));
+
     const rawPhotos = [
       { url: submission.vin_photo_url       || "", label: "VIN plate" },
       { url: submission.odometer_photo_url  || "", label: "Odometer" },
@@ -208,6 +266,7 @@ export async function POST(
       })),
       ...(rtMod?.photo_1_url ? [{ url: rtMod.photo_1_url, label: "Road test photo 1" }] : []),
       ...(rtMod?.photo_2_url ? [{ url: rtMod.photo_2_url, label: "Road test photo 2" }] : []),
+      ...obdImageFiles,
     ].filter((p) => !!p.url);
 
     // 4a. Run photo validation + report generation in parallel
@@ -266,6 +325,7 @@ export async function POST(
       confidence_level:   buildConfidenceLevel(submission, missingItems.length),
       missing_items:      missingItems,
       road_test_module:   rtModule,
+      obd_module:         submission.obd_module ?? undefined,
     };
 
     // 6. Generate PDF

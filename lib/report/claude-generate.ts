@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import type { GeneratedReport, ReportInput } from "./types";
+import type { GeneratedReport, ReportInput, OBDModule } from "./types";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -33,6 +33,18 @@ const RT_LABELS: Record<string, string> = {
   abs_light_unchanged:           "ABS light status unchanged",
   vehicle_drove_as_expected:     "Vehicle drove as expected for age and mileage",
   noticeable_concerns_observed:  "Noticeable concerns observed during drive",
+};
+
+const OBD_WARNING_LABELS: Record<string, string> = {
+  check_engine: "Check Engine",
+  abs:          "ABS",
+  airbag_srs:   "Airbag / SRS",
+  battery:      "Battery",
+  oil_pressure: "Oil Pressure",
+  brake:        "Brake",
+  tpms:         "TPMS",
+  none:         "No warning lights observed",
+  other:        "Other (see notes)",
 };
 
 function buildRoadTestSection(input: ReportInput): string {
@@ -81,6 +93,84 @@ function buildRoadTestSection(input: ReportInput): string {
   return lines.join("\n");
 }
 
+function buildOBDSection(input: ReportInput): string {
+  const obd = input.obd_module as OBDModule | undefined;
+  if (!obd) return "";
+
+  const lines: string[] = ["**OBD-II Diagnostic Module:**"];
+
+  // Scan status
+  const statusLabels: Record<string, string> = {
+    yes:           "Scan performed",
+    no:            "Scan not performed",
+    not_available: "Scan not available — scanner or connection issue",
+    not_permitted: "Scan not permitted by seller",
+  };
+  lines.push(`Scan Status: ${statusLabels[obd.scan_performed] || obd.scan_performed}`);
+
+  // Warning lights (always show if present)
+  if (obd.warning_lights && obd.warning_lights.length > 0) {
+    const lightLabels = obd.warning_lights
+      .map((k) => OBD_WARNING_LABELS[k] || k)
+      .join(", ");
+    lines.push(`Warning Lights Observed: ${lightLabels}`);
+    if (obd.warning_other_desc) {
+      lines.push(`Other Warning Light Description: ${obd.warning_other_desc}`);
+    }
+    const hasCheckEngine = obd.warning_lights.includes("check_engine");
+    const hasSRS         = obd.warning_lights.includes("airbag_srs");
+    const hasOilPressure = obd.warning_lights.includes("oil_pressure");
+    if (hasCheckEngine || hasSRS || hasOilPressure) {
+      lines.push("NOTE: Active warning lights observed. These are safety-relevant findings.");
+    }
+  } else if (obd.scan_performed === "yes") {
+    lines.push("Warning Lights: None observed during OBD session");
+  }
+
+  // Only show the following if scan was performed
+  if (obd.scan_performed === "yes") {
+    // DTC codes
+    if (obd.dtc_codes && obd.dtc_codes.length > 0) {
+      lines.push(`Diagnostic Trouble Codes (${obd.dtc_codes.length} code${obd.dtc_codes.length !== 1 ? "s" : ""}):`);
+      for (const code of obd.dtc_codes) {
+        const desc = code.description ? ` — ${code.description}` : "";
+        lines.push(`  • ${code.system} / ${code.code} / ${code.status}${desc}`);
+      }
+    } else {
+      lines.push("Diagnostic Trouble Codes: None entered manually");
+    }
+
+    // Uploaded files
+    if (obd.uploaded_files && obd.uploaded_files.length > 0) {
+      const imageCount = obd.uploaded_files.filter((f) => f.fileType === "image").length;
+      const pdfCount   = obd.uploaded_files.filter((f) => f.fileType === "pdf").length;
+      const parts: string[] = [];
+      if (imageCount > 0) parts.push(`${imageCount} image${imageCount !== 1 ? "s" : ""}`);
+      if (pdfCount   > 0) parts.push(`${pdfCount} PDF${pdfCount !== 1 ? "s" : ""}`);
+      lines.push(`Uploaded Diagnostic Evidence: ${parts.join(", ")} (${obd.uploaded_files.map((f) => f.fileName).join(", ")})`);
+    } else {
+      lines.push("Uploaded Diagnostic Evidence: None uploaded");
+    }
+
+    // Emissions
+    if (obd.emissions_readiness) {
+      const emissionLabels: Record<string, string> = {
+        ready:     "Ready",
+        not_ready: "Not Ready",
+        unknown:   "Unknown / Not checked",
+      };
+      lines.push(`Emissions Readiness: ${emissionLabels[obd.emissions_readiness] || obd.emissions_readiness}`);
+    }
+
+    // Notes
+    if (obd.notes) {
+      lines.push(`Inspector OBD Notes: ${obd.notes}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function buildPrompt(input: ReportInput): string {
   const tires = [
     input.tire_tread_mm_front_left != null ? `FL: ${input.tire_tread_mm_front_left}mm` : null,
@@ -101,6 +191,9 @@ function buildPrompt(input: ReportInput): string {
   const platformLabel = input.platform_source
     ? input.platform_source.replace(/_/g, " ")
     : null;
+
+  const obdSection   = buildOBDSection(input);
+  const roadSection  = buildRoadTestSection(input);
 
   return `You are a senior automotive analyst for RideCheck, a Vehicle Transparency Platform based in Lake County, Illinois.
 
@@ -137,13 +230,15 @@ ${input.test_drive_notes}
 **Immediate Concerns:**
 ${input.immediate_concerns}
 
-**OBD-II Scan Codes:** ${scanCodes}
+**Legacy OBD-II Scan Codes:** ${scanCodes}
 
 **Brake Condition:** ${input.brake_condition || "Not assessed"}
 
 **Tire Tread Depth:** ${tires}
 
-${buildRoadTestSection(input)}
+${obdSection}
+
+${roadSection}
 
 ## YOUR TASK
 
@@ -171,6 +266,7 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
       "cost_note": "Optional note if cost cannot be estimated (e.g. 'Lift inspection recommended')"
     }
     // Include ALL relevant systems. Cover at minimum: Engine/Powertrain, Brakes, Body/Exterior, Interior, Tires, Battery/Electrical, Transmission/Drivetrain. Add Emissions, Frame/Underbody, ABS as needed.
+    // If OBD data was collected (structured module OR legacy codes), include an OBD/Emissions system entry reflecting the specific codes, warning lights, and emissions readiness found.
   ],
   "obd_entries": [
     {
@@ -180,7 +276,8 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
       "description": "Brief plain-English description of the code or status",
       "is_active": true if warning light is ON or status is a fail/not-ready, false otherwise
     }
-    // Include one entry per system. If no scan codes, include entries for key systems with status.
+    // Include one entry per system. If structured OBD module is present, reflect its codes and warning lights here.
+    // If no OBD data at all, include key systems with unknown/unscanned status.
   ],
   "repair_estimates": [
     {
@@ -190,6 +287,7 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
       "cost_high": number
     }
     // Use Chicago-area labor rates. Only include items where repair cost can be estimated. Sort by priority.
+    // OBD-identified codes with known repair ranges should appear here.
   ],
   "total_repair_low": sum of all cost_low values,
   "total_repair_high": sum of all cost_high values,
@@ -210,7 +308,12 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
 - Cost estimates should reflect Chicago/Lake County area shop rates.
 - "Immediate" = safety issue or registration blocker. "Soon" = needed within 6 months. "Optional" = cosmetic or comfort. "Monitor" = watch but not urgent.
 - Tire tread: < 3mm = replace immediately, 3-5mm = monitor, > 5mm = good.
-- If OBD codes are present, explain them in plain English.
+- OBD guidelines:
+  - If structured OBD module present with codes: explain each code system and status in the observed field. P-codes = Powertrain, C-codes = Chassis/ABS, B-codes = Body, U-codes = Network.
+  - Active codes raise risk level more than Pending or Stored codes.
+  - Check engine light observed with no codes = still a finding worth noting.
+  - Emissions "Not Ready" = potential registration issue in emissions-test states.
+  - If seller did not permit scan or scanner unavailable, note this as a limitation.
 - Risk level guidance: LOW_RISK = minor findings only with estimated total repairs under $500; MODERATE_RISK = estimated $500–$2,500 in repairs or notable but non-safety-critical findings identified; HIGH_RISK = estimated $2,500+ in repairs, safety-critical findings noted, or structural concerns identified.
 
 Return ONLY the JSON object. Do not wrap it in markdown code blocks.`;

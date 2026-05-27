@@ -1,0 +1,1 @@
+- [OBD Module Architecture](obd-module.md) — full OBD-II diagnostic module added to inspection wizard; structured payload flows from UI → submit API → generate-report → Claude prompt → PDF section.
