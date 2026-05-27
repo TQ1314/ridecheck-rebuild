@@ -346,9 +346,11 @@ function buildTitleHistorySection(input: ReportInput): string {
   }
   if (thf.accident_notes) lines.push(`Accident/Repair Notes: ${thf.accident_notes}`);
 
-  // Internal ops status hint for Claude's tone calibration (not shown to buyer)
-  if (thf.ops_review_status && thf.ops_review_status !== "normal") {
-    lines.push(`INTERNAL FLAG: ${thf.ops_review_status} — Use heightened neutral language and ensure all flagged items are described as indicators warranting independent verification.`);
+  // Internal tone instruction for Claude — DO NOT echo any of this to the buyer
+  if (thf.ops_review_status === "severe_attention_flag") {
+    lines.push("INTERNAL NOTE (do not include in output): Multiple significant indicators were observed on this vehicle. Use careful, measured language throughout. Describe every flagged item as an observable indicator that warrants independent verification before proceeding.");
+  } else if (thf.ops_review_status === "ops_review_required") {
+    lines.push("INTERNAL NOTE (do not include in output): One or more items in this section require closer review. Ensure flagged items are described as indicators observed on-site, and recommend independent verification where relevant.");
   }
 
   return lines.join("\n");
