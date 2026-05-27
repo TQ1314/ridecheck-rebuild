@@ -30,6 +30,61 @@ const obdModuleSchema = z.object({
   warning_other_desc: z.string().optional(),
 });
 
+const titleHistoryModuleSchema = z.object({
+  title_review_status:    z.string().optional(),
+  title_type:             z.string().optional(),
+  vin_match_title:        z.string().optional(),
+  seller_name_match:      z.string().optional(),
+  title_signed:           z.string().optional(),
+  dashboard_vin_verified: z.string().optional(),
+  door_jamb_vin_verified: z.string().optional(),
+  vins_matched:           z.string().optional(),
+  dashboard_vin_photo_url:z.string().optional(),
+  door_jamb_vin_photo_url:z.string().optional(),
+  lien_status:            z.string().optional(),
+  lien_notes:             z.string().optional(),
+  odometer_reading:       z.number().optional(),
+  odometer_consistency:   z.string().optional(),
+  odometer_tampering:     z.string().optional(),
+  odometer_notes:         z.string().optional(),
+  flood_indicators:       z.array(z.string()).optional(),
+  flood_notes:            z.string().optional(),
+  tampering_indicators:   z.array(z.string()).optional(),
+  tampering_notes:        z.string().optional(),
+  accident_indicators:    z.array(z.string()).optional(),
+  accident_notes:         z.string().optional(),
+  // ops_review_status is stripped from client input and computed server-side
+}).strip();
+
+function computeOpsReviewStatus(thf: z.infer<typeof titleHistoryModuleSchema>): string {
+  const flags: string[] = [];
+
+  if (thf.vin_match_title === "no_mismatch")    flags.push("vin_mismatch_title");
+  if (thf.vins_matched   === "no_discrepancy")  flags.push("vin_mismatch_physical");
+  if (thf.title_type === "salvage" || thf.title_type === "rebuilt") flags.push("branded_title");
+  if (thf.odometer_consistency === "no_discrepancy") flags.push("odometer_discrepancy");
+  if (thf.odometer_tampering === "yes")         flags.push("odometer_tampering");
+  if (thf.lien_status === "lien_no_release")    flags.push("lien_no_release");
+
+  const tamperingActive = (thf.tampering_indicators || []).filter((i) => i !== "none");
+  if (tamperingActive.length > 0) flags.push("tampering_observed");
+
+  const floodActive = (thf.flood_indicators || []).filter((i) => i !== "none");
+  if (floodActive.length >= 2) flags.push("multiple_flood_indicators");
+
+  if (flags.includes("title_unavailable_third_party")) flags.push("title_unavailable_third_party");
+
+  if (
+    (flags.includes("vin_mismatch_title") && flags.includes("vin_mismatch_physical")) ||
+    tamperingActive.includes("vin_plate_altered")
+  ) {
+    return "severe_attention_flag";
+  }
+
+  if (flags.length > 0) return "ops_review_required";
+  return "normal";
+}
+
 const roadTestModuleSchema = z.object({
   status: z.enum(["completed", "not_permitted", "not_possible"]),
   engine_behavior: z.array(z.string()).optional(),
@@ -66,6 +121,7 @@ const submitSchema = z.object({
   extra_photos: z.array(z.string()).optional(),
   road_test_module: roadTestModuleSchema.optional(),
   obd_module: obdModuleSchema.optional(),
+  title_history_module: titleHistoryModuleSchema.optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -151,6 +207,9 @@ export async function POST(
         extra_photos: data.extra_photos ?? null,
         road_test_module: data.road_test_module ?? null,
         obd_module: data.obd_module ?? null,
+        title_history_module: data.title_history_module
+          ? { ...data.title_history_module, ops_review_status: computeOpsReviewStatus(data.title_history_module) }
+          : null,
         submitted_at: now,
       })
       .select("id")

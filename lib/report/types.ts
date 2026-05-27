@@ -38,6 +38,47 @@ export interface OBDModule {
   warning_other_desc?: string;
 }
 
+export interface TitleHistoryModule {
+  // Title review
+  title_review_status?: string;       // yes_reviewed | partial | no_seller | dealer_unavailable | not_applicable
+  title_type?: string;                // clean | salvage | rebuilt | bonded | lien | out_of_state | unknown | unable
+  vin_match_title?: string;           // yes | no_mismatch | unable | unavailable
+  seller_name_match?: string;         // yes | no_third_party | unable | dealer
+  title_signed?: string;             // yes | no | unable
+
+  // VIN verification
+  dashboard_vin_verified?: string;   // yes | no | unable
+  door_jamb_vin_verified?: string;   // yes | no | unable
+  vins_matched?: string;             // yes | no_discrepancy | unable
+  dashboard_vin_photo_url?: string;
+  door_jamb_vin_photo_url?: string;
+
+  // Lien
+  lien_status?: string;              // release_present | lien_no_release | no_lien | unable
+  lien_notes?: string;
+
+  // Odometer
+  odometer_reading?: number;
+  odometer_consistency?: string;     // yes | no_discrepancy | unable | unavailable
+  odometer_tampering?: string;       // yes | no | unable
+  odometer_notes?: string;
+
+  // Flood indicators (observable only)
+  flood_indicators?: string[];       // water_staining | mold_odor | interior_rust | mud_silt | corroded_wiring | fogged_lights | unusual_interior_rust | none
+  flood_notes?: string;
+
+  // Theft/tampering indicators (observable only)
+  tampering_indicators?: string[];   // ignition_steering | vin_plate_altered | vin_mismatch | door_jamb_sticker | non_oem_keys | aftermarket_wiring | lock_damage | none
+  tampering_notes?: string;
+
+  // Prior accident/repair indicators (observable only)
+  accident_indicators?: string[];    // mismatched_paint | overspray | panel_gaps | replacement_panels | body_filler | structural_weld | airbag_cover | none
+  accident_notes?: string;
+
+  // Internal ops review flag (computed server-side)
+  ops_review_status?: string;        // normal | ops_review_required | severe_attention_flag
+}
+
 export type VerdictType =
   | "LOW_RISK"
   | "MODERATE_RISK"
@@ -125,6 +166,7 @@ export interface ReportMeta {
   extra_photos: string[];
   road_test_module?: RoadTestModule;
   obd_module?: OBDModule;
+  title_history_module?: TitleHistoryModule;
 }
 
 export interface ReportInput {
@@ -159,4 +201,5 @@ export interface ReportInput {
   extra_photos?: string[];
   road_test_module?: RoadTestModule;
   obd_module?: OBDModule;
+  title_history_module?: TitleHistoryModule;
 }

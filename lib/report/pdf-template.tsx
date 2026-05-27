@@ -686,6 +686,56 @@ const s = StyleSheet.create({
   obdFileName: { fontSize: 7.5, color: C.gray_700 },
   obdPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
 
+  // ─── TITLE & HISTORY FLAGS SECTION ───────────────────────────────────────
+  thfBanner: {
+    padding: 8, borderRadius: 3, marginBottom: 8,
+    borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10,
+  },
+  thfBannerLabel: {
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", textTransform: "uppercase",
+    letterSpacing: 0.4, marginBottom: 2, color: C.gray_400,
+  },
+  thfBannerValue: { fontSize: 9, fontFamily: "Helvetica-Bold" },
+  thfBannerSub: { fontSize: 7.5, color: C.gray_600, marginTop: 1 },
+  thfBannerCol: { flex: 1 },
+  thfGrid2: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  thfGrid3: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  thfBox: {
+    flex: 1, padding: 8, borderWidth: 1, borderColor: C.border,
+    borderRadius: 3, backgroundColor: C.gray_50,
+  },
+  thfBoxTitle: {
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", color: C.gray_500,
+    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4,
+    borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
+  },
+  thfBoxValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.gray_900, marginBottom: 2 },
+  thfBoxSub:   { fontSize: 7.5, color: C.gray_600 },
+  thfOdomRow:  { flexDirection: "row", gap: 8, marginBottom: 8 },
+  thfIndicatorGroup: {
+    marginBottom: 8, padding: 8, borderWidth: 1, borderColor: C.border,
+    borderRadius: 3, backgroundColor: C.gray_50,
+  },
+  thfIndicatorGroupTitle: {
+    fontSize: 7, fontFamily: "Helvetica-Bold", color: C.gray_600,
+    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 5,
+    borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
+  },
+  thfIndicatorRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 3 },
+  thfIndicatorDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6, marginTop: 1 },
+  thfIndicatorText: { fontSize: 7.5, color: C.gray_900, flex: 1, lineHeight: 1.3 },
+  thfNoneText:      { fontSize: 7.5, color: C.good, flex: 1, lineHeight: 1.3 },
+  thfNotesBox: {
+    padding: 7, backgroundColor: C.gray_50, borderWidth: 1, borderColor: C.border,
+    borderRadius: 3, marginBottom: 8,
+  },
+  thfNotesLabel: {
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", color: C.gray_400,
+    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3,
+  },
+  thfNotesText: { fontSize: 8, color: C.gray_700, lineHeight: 1.4 },
+  thfVinPhotoRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+
   // ─── ROAD TEST RESULTS ───────────────────────────────────────────────────
   rtGrid: {
     flexDirection: "row",
@@ -1206,6 +1256,292 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
   );
 }
 
+function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_history_module"]> }) {
+  const titleReviewLabels: Record<string, string> = {
+    yes_reviewed:       "Physical Title Reviewed",
+    partial:            "Partial Review Only",
+    no_seller:          "Not Provided by Seller",
+    dealer_unavailable: "Dealer — Not Available On-Site",
+    not_applicable:     "Not Applicable",
+  };
+  const titleTypeLabels: Record<string, string> = {
+    clean: "Clean", salvage: "Salvage", rebuilt: "Rebuilt / Reconstructed",
+    bonded: "Bonded", lien: "Lien Noted", out_of_state: "Out-of-State",
+    unknown: "Unknown", unable: "Unable to Verify",
+  };
+  const vinMatchLabels: Record<string, string> = {
+    yes: "Confirmed Match", no_mismatch: "Discrepancy Observed",
+    unable: "Unable to Verify", unavailable: "Title Unavailable",
+  };
+  const vinVerifyLabels: Record<string, string> = {
+    yes: "Verified", no: "Not Verified", unable: "Unable to Verify",
+  };
+  const vinsMatchedLabels: Record<string, string> = {
+    yes: "Matched", no_discrepancy: "Discrepancy Observed", unable: "Unable to Verify",
+  };
+  const lienLabels: Record<string, string> = {
+    release_present: "Release Document Present",
+    lien_no_release: "Lien Noted — No Release",
+    no_lien:         "No Lien Observed",
+    unable:          "Unable to Verify",
+  };
+  const odometerConsistencyLabels: Record<string, string> = {
+    yes: "Consistent with Disclosure", no_discrepancy: "Discrepancy Observed",
+    unable: "Unable to Verify", unavailable: "Title Unavailable",
+  };
+  const odometerTamperingLabels: Record<string, string> = {
+    yes: "Indicators Observed", no: "None Observed", unable: "Unable to Determine",
+  };
+
+  const FLOOD_LABELS: Record<string, string> = {
+    water_staining: "Water staining on carpet or upholstery",
+    mold_odor: "Mold or musty odor observed",
+    interior_rust: "Rust/corrosion inside cabin areas",
+    mud_silt: "Mud/silt deposits observed",
+    corroded_wiring: "Corroded wiring/connectors observed",
+    fogged_lights: "Fogged moisture inside lights",
+    unusual_interior_rust: "Unusual rust on interior metal",
+  };
+  const TAMPERING_LABELS: Record<string, string> = {
+    ignition_steering: "Ignition/steering column tampering observed",
+    vin_plate_altered: "VIN plate appeared altered/damaged",
+    vin_mismatch: "VIN mismatch observed",
+    door_jamb_sticker: "Door jamb sticker missing/replaced",
+    non_oem_keys: "Non-OEM or mismatched keys observed",
+    aftermarket_wiring: "Unusual aftermarket ignition wiring observed",
+    lock_damage: "Lock cylinder damage observed",
+  };
+  const ACCIDENT_LABELS: Record<string, string> = {
+    mismatched_paint: "Mismatched paint between panels",
+    overspray: "Overspray on trim/glass/seals",
+    panel_gaps: "Inconsistent panel gaps observed",
+    replacement_panels: "Replacement body panels observed",
+    body_filler: "Body filler/bondo indicators observed",
+    structural_weld: "Structural straightening/weld indicators observed",
+    airbag_cover: "Airbag cover replacement indicators observed",
+  };
+
+  const titleReviewStatus = thf.title_review_status || "";
+  const isFlagged = thf.vin_match_title === "no_mismatch" || thf.vins_matched === "no_discrepancy"
+    || thf.title_type === "salvage" || thf.title_type === "rebuilt";
+  const bannerBg    = isFlagged ? C.monitor_bg  : C.gray_50;
+  const bannerBorder = isFlagged ? C.monitor     : C.border;
+  const bannerColor  = isFlagged ? C.monitor     : C.gray_900;
+
+  const floodActive     = (thf.flood_indicators || []).filter((i) => i !== "none");
+  const tamperingActive = (thf.tampering_indicators || []).filter((i) => i !== "none");
+  const accidentActive  = (thf.accident_indicators || []).filter((i) => i !== "none");
+
+  function IndicatorGroup({ title, items, activeItems, notes, labelMap }: {
+    title: string; items: string[]; activeItems: string[]; notes?: string; labelMap: Record<string, string>;
+  }) {
+    const hasNone = items.includes("none") && activeItems.length === 0;
+    const showItems = activeItems.length > 0 ? activeItems : [];
+    return (
+      <View style={s.thfIndicatorGroup} wrap={false}>
+        <Text style={s.thfIndicatorGroupTitle}>{title}</Text>
+        {hasNone ? (
+          <View style={s.thfIndicatorRow}>
+            <View style={[s.thfIndicatorDot, { backgroundColor: C.good }]} />
+            <Text style={s.thfNoneText}>No indicators observed</Text>
+          </View>
+        ) : showItems.length > 0 ? (
+          showItems.map((item, i) => (
+            <View key={i} style={s.thfIndicatorRow}>
+              <View style={[s.thfIndicatorDot, { backgroundColor: C.monitor }]} />
+              <Text style={s.thfIndicatorText}>{labelMap[item] || item}</Text>
+            </View>
+          ))
+        ) : (
+          <View style={s.thfIndicatorRow}>
+            <View style={[s.thfIndicatorDot, { backgroundColor: C.gray_400 }]} />
+            <Text style={[s.thfIndicatorText, { color: C.gray_400 }]}>Not assessed</Text>
+          </View>
+        )}
+        {notes ? (
+          <View style={[s.thfNotesBox, { marginTop: 5, marginBottom: 0 }]}>
+            <Text style={s.thfNotesLabel}>Notes</Text>
+            <Text style={s.thfNotesText}>{notes}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.content}>
+      <SectionTitle title="Title & History Flags" />
+
+      {/* Title status banner */}
+      <View style={[s.thfBanner, { backgroundColor: bannerBg, borderColor: bannerBorder }]} wrap={false}>
+        <View style={s.thfBannerCol}>
+          <Text style={s.thfBannerLabel}>Title Review</Text>
+          <Text style={[s.thfBannerValue, { color: bannerColor }]}>
+            {titleReviewLabels[titleReviewStatus] || (titleReviewStatus || "Not assessed")}
+          </Text>
+          {thf.title_type ? (
+            <Text style={s.thfBannerSub}>
+              Title Type Observed: {titleTypeLabels[thf.title_type] || thf.title_type}
+            </Text>
+          ) : null}
+        </View>
+        {thf.vin_match_title ? (
+          <View style={s.thfBannerCol}>
+            <Text style={s.thfBannerLabel}>VIN vs. Title</Text>
+            <Text style={[s.thfBannerValue, {
+              color: thf.vin_match_title === "no_mismatch" ? C.fail : bannerColor,
+            }]}>
+              {vinMatchLabels[thf.vin_match_title] || thf.vin_match_title}
+            </Text>
+          </View>
+        ) : null}
+        {thf.lien_status ? (
+          <View style={s.thfBannerCol}>
+            <Text style={s.thfBannerLabel}>Lien Status</Text>
+            <Text style={[s.thfBannerValue, {
+              color: thf.lien_status === "lien_no_release" ? C.monitor : bannerColor,
+            }]}>
+              {lienLabels[thf.lien_status] || thf.lien_status}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* VIN Verification + Seller */}
+      {(thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched ||
+        thf.seller_name_match || thf.title_signed) ? (
+        <View style={s.thfGrid3} wrap={false}>
+          {thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched ? (
+            <View style={s.thfBox}>
+              <Text style={s.thfBoxTitle}>VIN Verification</Text>
+              {thf.dashboard_vin_verified ? (
+                <>
+                  <Text style={[s.thfBoxSub, { marginBottom: 1 }]}>Dashboard VIN</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5 }]}>{vinVerifyLabels[thf.dashboard_vin_verified] || thf.dashboard_vin_verified}</Text>
+                </>
+              ) : null}
+              {thf.door_jamb_vin_verified ? (
+                <>
+                  <Text style={[s.thfBoxSub, { marginBottom: 1 }]}>Door Jamb VIN</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5 }]}>{vinVerifyLabels[thf.door_jamb_vin_verified] || thf.door_jamb_vin_verified}</Text>
+                </>
+              ) : null}
+              {thf.vins_matched ? (
+                <>
+                  <Text style={[s.thfBoxSub, { marginBottom: 1 }]}>Physical VINs</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5, color: thf.vins_matched === "no_discrepancy" ? C.fail : C.gray_900 }]}>
+                    {vinsMatchedLabels[thf.vins_matched] || thf.vins_matched}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+          {thf.seller_name_match ? (
+            <View style={s.thfBox}>
+              <Text style={s.thfBoxTitle}>Seller / Title</Text>
+              <Text style={s.thfBoxSub}>Seller Name Match</Text>
+              <Text style={[s.thfBoxValue, { fontSize: 7.5, marginBottom: 5 }]}>
+                {thf.seller_name_match === "yes" ? "Matched" :
+                 thf.seller_name_match === "no_third_party" ? "Third-party seller observed" :
+                 thf.seller_name_match === "dealer" ? "Dealer transaction" :
+                 "Unable to verify"}
+              </Text>
+              {thf.title_signed ? (
+                <>
+                  <Text style={s.thfBoxSub}>Title Signed</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5 }]}>
+                    {thf.title_signed === "yes" ? "Appropriately signed" :
+                     thf.title_signed === "no" ? "Unsigned / Incomplete" :
+                     "Unable to verify"}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+          {thf.odometer_consistency || thf.odometer_reading != null ? (
+            <View style={s.thfBox}>
+              <Text style={s.thfBoxTitle}>Odometer</Text>
+              {thf.odometer_reading != null ? (
+                <>
+                  <Text style={s.thfBoxSub}>Reading at Inspection</Text>
+                  <Text style={[s.thfBoxValue, { marginBottom: 5 }]}>{thf.odometer_reading.toLocaleString()} mi</Text>
+                </>
+              ) : null}
+              {thf.odometer_consistency ? (
+                <>
+                  <Text style={s.thfBoxSub}>Disclosure Consistency</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5, color: thf.odometer_consistency === "no_discrepancy" ? C.monitor : C.gray_900 }]}>
+                    {odometerConsistencyLabels[thf.odometer_consistency] || thf.odometer_consistency}
+                  </Text>
+                </>
+              ) : null}
+              {thf.odometer_tampering ? (
+                <>
+                  <Text style={[s.thfBoxSub, { marginTop: 3 }]}>Tampering Indicators</Text>
+                  <Text style={[s.thfBoxValue, { fontSize: 7.5, color: thf.odometer_tampering === "yes" ? C.monitor : C.gray_900 }]}>
+                    {odometerTamperingLabels[thf.odometer_tampering] || thf.odometer_tampering}
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Lien notes */}
+      {thf.lien_notes ? (
+        <View style={s.thfNotesBox} wrap={false}>
+          <Text style={s.thfNotesLabel}>Lien Notes</Text>
+          <Text style={s.thfNotesText}>{thf.lien_notes}</Text>
+        </View>
+      ) : null}
+
+      {/* Odometer notes */}
+      {thf.odometer_notes ? (
+        <View style={s.thfNotesBox} wrap={false}>
+          <Text style={s.thfNotesLabel}>Odometer Notes</Text>
+          <Text style={s.thfNotesText}>{thf.odometer_notes}</Text>
+        </View>
+      ) : null}
+
+      {/* Observable indicator groups */}
+      <IndicatorGroup
+        title="Flood / Water Intrusion Indicators"
+        items={thf.flood_indicators || []}
+        activeItems={floodActive}
+        notes={thf.flood_notes}
+        labelMap={FLOOD_LABELS}
+      />
+      <IndicatorGroup
+        title="Theft / Tampering Indicators"
+        items={thf.tampering_indicators || []}
+        activeItems={tamperingActive}
+        notes={thf.tampering_notes}
+        labelMap={TAMPERING_LABELS}
+      />
+      <IndicatorGroup
+        title="Prior Accident / Repair Indicators"
+        items={thf.accident_indicators || []}
+        activeItems={accidentActive}
+        notes={thf.accident_notes}
+        labelMap={ACCIDENT_LABELS}
+      />
+
+      {/* VIN verification photos */}
+      {(thf.dashboard_vin_photo_url || thf.door_jamb_vin_photo_url) ? (
+        <View style={s.thfVinPhotoRow} wrap={false}>
+          {thf.dashboard_vin_photo_url ? (
+            <PhotoBlock url={thf.dashboard_vin_photo_url} caption="VIN — Dashboard" />
+          ) : null}
+          {thf.door_jamb_vin_photo_url ? (
+            <PhotoBlock url={thf.door_jamb_vin_photo_url} caption="VIN — Door Jamb" />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function RoadTestResultsSection({ rt }: { rt: RoadTestModule }) {
   if (rt.status !== "completed") return null;
 
@@ -1430,6 +1766,11 @@ export function RideCheckReport({ report, meta }: Props) {
         {/* ── OBD-II Diagnostics (structured module) ── */}
         {meta.obd_module && (
           <OBDDiagnosticsSection obd={meta.obd_module} />
+        )}
+
+        {/* ── Title & History Flags ── */}
+        {meta.title_history_module && (
+          <TitleHistoryFlagsSection thf={meta.title_history_module} />
         )}
 
         {/* ── OBD Table (AI-interpreted entries) ── */}

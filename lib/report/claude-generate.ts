@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import type { GeneratedReport, ReportInput, OBDModule } from "./types";
+import type { GeneratedReport, ReportInput, OBDModule, TitleHistoryModule } from "./types";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -171,6 +171,189 @@ function buildOBDSection(input: ReportInput): string {
   return lines.join("\n");
 }
 
+function buildTitleHistorySection(input: ReportInput): string {
+  const thf = input.title_history_module as TitleHistoryModule | undefined;
+  if (!thf) return "";
+
+  const lines: string[] = ["**Title & History Flags (Observable Indicators Only — Where Available):**"];
+
+  const titleReviewLabels: Record<string, string> = {
+    yes_reviewed:       "Physical title reviewed",
+    partial:            "Partial review only",
+    no_seller:          "Not provided by seller",
+    dealer_unavailable: "Dealer transaction — not available on-site",
+    not_applicable:     "Not applicable",
+  };
+  if (thf.title_review_status) {
+    lines.push(`Title Review Status: ${titleReviewLabels[thf.title_review_status] || thf.title_review_status}`);
+  }
+
+  const titleTypeLabels: Record<string, string> = {
+    clean:       "Clean", salvage: "Salvage", rebuilt: "Rebuilt/Reconstructed",
+    bonded:      "Bonded", lien: "Lien noted", out_of_state: "Out-of-state",
+    unknown:     "Unknown", unable: "Unable to verify",
+  };
+  if (thf.title_type) {
+    lines.push(`Title Type Observed: ${titleTypeLabels[thf.title_type] || thf.title_type}`);
+    if (thf.title_type === "salvage" || thf.title_type === "rebuilt") {
+      lines.push("NOTE: Branded title observed. This may affect financing, resale value, insurance eligibility, and registration requirements.");
+    }
+  }
+
+  const vinMatchLabels: Record<string, string> = {
+    yes:        "Confirmed match",
+    no_mismatch:"DISCREPANCY OBSERVED — VIN on title did not match vehicle VIN",
+    unable:     "Unable to verify",
+    unavailable:"Title unavailable for comparison",
+  };
+  if (thf.vin_match_title) {
+    lines.push(`VIN on Title vs. Vehicle: ${vinMatchLabels[thf.vin_match_title] || thf.vin_match_title}`);
+    if (thf.vin_match_title === "no_mismatch") {
+      lines.push("NOTE: VIN discrepancy is a critical finding. Independent verification is recommended before transaction completion.");
+    }
+  }
+
+  const sellerMatchLabels: Record<string, string> = {
+    yes:           "Name matched title",
+    no_third_party:"Third-party seller — name did not match title holder",
+    unable:        "Unable to verify",
+    dealer:        "Dealer transaction",
+  };
+  if (thf.seller_name_match) {
+    lines.push(`Seller Name vs. Title: ${sellerMatchLabels[thf.seller_name_match] || thf.seller_name_match}`);
+  }
+
+  const signedLabels: Record<string, string> = {
+    yes:   "Signed appropriately",
+    no:    "Unsigned or incomplete",
+    unable:"Unable to verify",
+  };
+  if (thf.title_signed) {
+    lines.push(`Title Signed: ${signedLabels[thf.title_signed] || thf.title_signed}`);
+  }
+
+  const vinVerifyLabels: Record<string, string> = { yes: "Verified", no: "Not verified", unable: "Unable to verify" };
+  if (thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched) {
+    lines.push("VIN Verification:");
+    if (thf.dashboard_vin_verified) lines.push(`  Dashboard VIN: ${vinVerifyLabels[thf.dashboard_vin_verified] || thf.dashboard_vin_verified}`);
+    if (thf.door_jamb_vin_verified) lines.push(`  Door Jamb VIN: ${vinVerifyLabels[thf.door_jamb_vin_verified] || thf.door_jamb_vin_verified}`);
+    if (thf.vins_matched) {
+      const vinsMatchLabels: Record<string, string> = {
+        yes:            "Physical VIN locations matched",
+        no_discrepancy: "DISCREPANCY OBSERVED — physical VIN locations did not match",
+        unable:         "Unable to verify",
+      };
+      lines.push(`  Physical VINs Matched: ${vinsMatchLabels[thf.vins_matched] || thf.vins_matched}`);
+    }
+  }
+
+  const lienLabels: Record<string, string> = {
+    release_present: "Lien release document present",
+    lien_no_release: "Lien noted — no release document present at time of inspection",
+    no_lien:         "No lien observed",
+    unable:          "Unable to verify",
+  };
+  if (thf.lien_status) {
+    lines.push(`Lien Status: ${lienLabels[thf.lien_status] || thf.lien_status}`);
+    if (thf.lien_status === "lien_no_release") {
+      lines.push("NOTE: Lien present with no release document. Independent lien verification is recommended.");
+    }
+  }
+  if (thf.lien_notes) lines.push(`Lien Notes: ${thf.lien_notes}`);
+
+  if (thf.odometer_reading != null) {
+    lines.push(`Odometer Reading at Inspection: ${thf.odometer_reading.toLocaleString()} mi`);
+  }
+  const odometerConsistencyLabels: Record<string, string> = {
+    yes:            "Consistent with disclosure",
+    no_discrepancy: "Discrepancy observed",
+    unable:         "Unable to verify",
+    unavailable:    "Title unavailable for comparison",
+  };
+  if (thf.odometer_consistency) {
+    lines.push(`Odometer Disclosure Consistency: ${odometerConsistencyLabels[thf.odometer_consistency] || thf.odometer_consistency}`);
+  }
+  const tamperingOdomLabels: Record<string, string> = {
+    yes:    "Physical tampering indicators observed (disturbed cluster, inconsistent wear, or replacement indicators)",
+    no:     "No tampering indicators observed",
+    unable: "Unable to determine",
+  };
+  if (thf.odometer_tampering) {
+    lines.push(`Odometer Tampering Indicators: ${tamperingOdomLabels[thf.odometer_tampering] || thf.odometer_tampering}`);
+  }
+  if (thf.odometer_notes) lines.push(`Odometer Notes: ${thf.odometer_notes}`);
+
+  const FLOOD_LABELS: Record<string, string> = {
+    water_staining:      "Water staining on carpet or upholstery",
+    mold_odor:           "Mold or musty odor observed",
+    interior_rust:       "Rust/corrosion inside cabin areas",
+    mud_silt:            "Mud/silt deposits observed",
+    corroded_wiring:     "Corroded wiring/connectors observed",
+    fogged_lights:       "Fogged moisture inside lights",
+    unusual_interior_rust:"Unusual rust on interior metal",
+    none:                "No flood indicators observed",
+  };
+  if (thf.flood_indicators && thf.flood_indicators.length > 0) {
+    const nonNone = thf.flood_indicators.filter((i) => i !== "none");
+    if (thf.flood_indicators.includes("none")) {
+      lines.push("Flood/Water Intrusion Indicators: None observed");
+    } else if (nonNone.length > 0) {
+      lines.push(`Flood/Water Intrusion Indicators: ${nonNone.map((i) => FLOOD_LABELS[i] || i).join("; ")}`);
+    }
+  }
+  if (thf.flood_notes) lines.push(`Flood Notes: ${thf.flood_notes}`);
+
+  const TAMPERING_LABELS: Record<string, string> = {
+    ignition_steering:  "Ignition/steering column tampering observed",
+    vin_plate_altered:  "VIN plate appeared altered/damaged",
+    vin_mismatch:       "VIN mismatch observed",
+    door_jamb_sticker:  "Door jamb sticker missing/replaced",
+    non_oem_keys:       "Non-OEM or mismatched keys observed",
+    aftermarket_wiring: "Unusual aftermarket ignition wiring observed",
+    lock_damage:        "Lock cylinder damage observed",
+    none:               "No tampering indicators observed",
+  };
+  if (thf.tampering_indicators && thf.tampering_indicators.length > 0) {
+    const nonNone = thf.tampering_indicators.filter((i) => i !== "none");
+    if (thf.tampering_indicators.includes("none")) {
+      lines.push("Theft/Tampering Indicators: None observed");
+    } else if (nonNone.length > 0) {
+      lines.push(`Theft/Tampering Indicators: ${nonNone.map((i) => TAMPERING_LABELS[i] || i).join("; ")}`);
+      if (nonNone.some((i) => ["vin_plate_altered", "vin_mismatch"].includes(i))) {
+        lines.push("NOTE: VIN irregularities observed. Independent verification is recommended before transaction completion.");
+      }
+    }
+  }
+  if (thf.tampering_notes) lines.push(`Tampering Notes: ${thf.tampering_notes}`);
+
+  const ACCIDENT_LABELS: Record<string, string> = {
+    mismatched_paint:   "Mismatched paint between panels",
+    overspray:          "Overspray on trim/glass/seals",
+    panel_gaps:         "Inconsistent panel gaps observed",
+    replacement_panels: "Replacement body panels observed",
+    body_filler:        "Body filler/bondo indicators observed",
+    structural_weld:    "Structural straightening/weld indicators observed",
+    airbag_cover:       "Airbag cover replacement indicators observed",
+    none:               "No accident-repair indicators observed",
+  };
+  if (thf.accident_indicators && thf.accident_indicators.length > 0) {
+    const nonNone = thf.accident_indicators.filter((i) => i !== "none");
+    if (thf.accident_indicators.includes("none")) {
+      lines.push("Prior Accident/Repair Indicators: None observed");
+    } else if (nonNone.length > 0) {
+      lines.push(`Prior Accident/Repair Indicators: ${nonNone.map((i) => ACCIDENT_LABELS[i] || i).join("; ")}`);
+    }
+  }
+  if (thf.accident_notes) lines.push(`Accident/Repair Notes: ${thf.accident_notes}`);
+
+  // Internal ops status hint for Claude's tone calibration (not shown to buyer)
+  if (thf.ops_review_status && thf.ops_review_status !== "normal") {
+    lines.push(`INTERNAL FLAG: ${thf.ops_review_status} — Use heightened neutral language and ensure all flagged items are described as indicators warranting independent verification.`);
+  }
+
+  return lines.join("\n");
+}
+
 function buildPrompt(input: ReportInput): string {
   const tires = [
     input.tire_tread_mm_front_left != null ? `FL: ${input.tire_tread_mm_front_left}mm` : null,
@@ -192,8 +375,9 @@ function buildPrompt(input: ReportInput): string {
     ? input.platform_source.replace(/_/g, " ")
     : null;
 
-  const obdSection   = buildOBDSection(input);
-  const roadSection  = buildRoadTestSection(input);
+  const obdSection           = buildOBDSection(input);
+  const roadSection          = buildRoadTestSection(input);
+  const titleHistorySection  = buildTitleHistorySection(input);
 
   return `You are a senior automotive analyst for RideCheck, a Vehicle Transparency Platform based in Lake County, Illinois.
 
@@ -239,6 +423,8 @@ ${input.immediate_concerns}
 ${obdSection}
 
 ${roadSection}
+
+${titleHistorySection}
 
 ## YOUR TASK
 

@@ -1,1 +1,2 @@
 - [OBD Module Architecture](obd-module.md) — full OBD-II diagnostic module added to inspection wizard; structured payload flows from UI → submit API → generate-report → Claude prompt → PDF section.
+- [Title History Flags Module](title-history-module.md) — Part 9 observational title/VIN/flood/tampering/accident module added after OBD step (step 9 of 16); server-side auto-flagging; neutral language throughout.

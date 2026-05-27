@@ -3,7 +3,7 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
 import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
-import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel, OBDModule } from "@/lib/report/types";
+import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel, OBDModule, TitleHistoryModule } from "@/lib/report/types";
 import { validatePhotos, partitionResults } from "@/lib/report/photo-validator";
 import React from "react";
 
@@ -83,7 +83,21 @@ function buildScopeTable(submission: any): ScopeRow[] {
     { system: "Electrical",        level: "Visual Only",                                                  status: "partial"                                           },
     { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"  : "Visual Only",  status: hasTread         ? "assessed"     : "partial"      },
     { system: "Road Test",         level: roadTestLevel,                                                  status: roadTestScopeStatus                                 },
+    ...buildTitleScopeRow(submission),
   ];
+}
+
+function buildTitleScopeRow(submission: any): ScopeRow[] {
+  const thf = submission.title_history_module as TitleHistoryModule | null | undefined;
+  if (!thf?.title_review_status) return [];
+  switch (thf.title_review_status) {
+    case "yes_reviewed":        return [{ system: "Title Review", level: "Physical Title Reviewed",   status: "assessed"     }];
+    case "partial":             return [{ system: "Title Review", level: "Partial Review Only",        status: "partial"      }];
+    case "no_seller":           return [{ system: "Title Review", level: "Not Provided by Seller",     status: "not_assessed" }];
+    case "dealer_unavailable":  return [{ system: "Title Review", level: "Dealer — Not Available",     status: "not_assessed" }];
+    case "not_applicable":      return [{ system: "Title Review", level: "Not Applicable",             status: "not_assessed" }];
+    default:                    return [{ system: "Title Review", level: thf.title_review_status,      status: "not_assessed" }];
+  }
 }
 
 function buildMissingItems(submission: any): string[] {
@@ -126,6 +140,22 @@ function buildMissingItems(submission: any): string[] {
     if (!submission.test_drive_notes || submission.test_drive_notes.trim().length <= 10)
       items.push("Road test not performed");
   }
+
+  // Title & History module
+  const thf = submission.title_history_module as TitleHistoryModule | null | undefined;
+  if (thf) {
+    if (thf.title_review_status === "no_seller")
+      items.push("Physical title was not available for review at time of inspection");
+    if (thf.vin_match_title === "no_mismatch")
+      items.push("VIN discrepancy observed during inspection — independent verification recommended before transaction completion");
+    if (thf.vins_matched === "no_discrepancy")
+      items.push("Physical VIN location discrepancy observed during inspection");
+    if (thf.odometer_consistency === "no_discrepancy")
+      items.push("Odometer disclosure discrepancy noted during inspection");
+    if (thf.lien_status === "lien_no_release")
+      items.push("Lien noted during inspection — no lien release document was present");
+  }
+
   return items;
 }
 
@@ -140,10 +170,24 @@ function buildConfidenceLevel(submission: any, missingCount: number): Confidence
     (obd?.uploaded_files?.length ?? 0) > 0
   );
 
+  const thf = submission.title_history_module as TitleHistoryModule | null | undefined;
+  const thfOpsStatus = thf?.ops_review_status;
+
+  // Severe flag always forces LIMITED CONFIDENCE regardless of other factors
+  if (thfOpsStatus === "severe_attention_flag") return "LIMITED CONFIDENCE";
+
   let effective = missingCount;
   if (roadTestCompleted)  effective = Math.max(0, effective - 1);
   if (obdHasEvidence)     effective = Math.max(0, effective - 1);
-  else if (obdPerformed)  effective = Math.max(0, effective - 0); // performed but no codes — neutral
+
+  // Title reviewed + VINs matched + no major indicators → confidence boost
+  const titleReviewed = thf?.title_review_status === "yes_reviewed";
+  const vinsOk = thf?.vins_matched === "yes" && thf?.vin_match_title === "yes";
+  const noMajorFlags = !thfOpsStatus || thfOpsStatus === "normal";
+  if (titleReviewed && vinsOk && noMajorFlags) effective = Math.max(0, effective - 1);
+
+  // Title unavailable or VIN issues → confidence penalty
+  if (thfOpsStatus === "ops_review_required")   effective += 1;
 
   if (effective === 0) return "HIGH CONFIDENCE";
   if (effective <= 2)  return "MODERATE CONFIDENCE";
@@ -246,6 +290,7 @@ export async function POST(
       extra_photos:          submission.extra_photos || [],
       road_test_module:      submission.road_test_module ?? undefined,
       obd_module:            submission.obd_module ?? undefined,
+      title_history_module:  submission.title_history_module ?? undefined,
     };
 
     // 4. Collect all submission photos for validation
@@ -267,6 +312,11 @@ export async function POST(
       ...(rtMod?.photo_1_url ? [{ url: rtMod.photo_1_url, label: "Road test photo 1" }] : []),
       ...(rtMod?.photo_2_url ? [{ url: rtMod.photo_2_url, label: "Road test photo 2" }] : []),
       ...obdImageFiles,
+      // THF VIN verification photos
+      ...(submission.title_history_module?.dashboard_vin_photo_url
+        ? [{ url: submission.title_history_module.dashboard_vin_photo_url, label: "VIN — dashboard" }] : []),
+      ...(submission.title_history_module?.door_jamb_vin_photo_url
+        ? [{ url: submission.title_history_module.door_jamb_vin_photo_url, label: "VIN — door jamb" }] : []),
     ].filter((p) => !!p.url);
 
     // 4a. Run photo validation + report generation in parallel
@@ -324,8 +374,9 @@ export async function POST(
       scope_table:        scopeTable,
       confidence_level:   buildConfidenceLevel(submission, missingItems.length),
       missing_items:      missingItems,
-      road_test_module:   rtModule,
-      obd_module:         submission.obd_module ?? undefined,
+      road_test_module:       rtModule,
+      obd_module:             submission.obd_module ?? undefined,
+      title_history_module:   submission.title_history_module ?? undefined,
     };
 
     // 6. Generate PDF

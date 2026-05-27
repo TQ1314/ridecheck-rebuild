@@ -36,6 +36,7 @@ import {
   Navigation,
   Upload,
   FileText,
+  Shield,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -110,6 +111,29 @@ interface FormData {
   obd_emissions: string;
   obd_warning_lights: string[];
   obd_warning_other_desc: string;
+  // Title & History Flags module
+  thf_title_review_status: string;
+  thf_title_type: string;
+  thf_vin_match_title: string;
+  thf_seller_name_match: string;
+  thf_title_signed: string;
+  thf_dashboard_vin_verified: string;
+  thf_door_jamb_vin_verified: string;
+  thf_vins_matched: string;
+  thf_dashboard_vin_photo_url: string;
+  thf_door_jamb_vin_photo_url: string;
+  thf_lien_status: string;
+  thf_lien_notes: string;
+  thf_odometer_reading: string;
+  thf_odometer_consistency: string;
+  thf_odometer_tampering: string;
+  thf_odometer_notes: string;
+  thf_flood_indicators: string[];
+  thf_flood_notes: string;
+  thf_tampering_indicators: string[];
+  thf_tampering_notes: string;
+  thf_accident_indicators: string[];
+  thf_accident_notes: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -150,6 +174,29 @@ const EMPTY_FORM: FormData = {
   obd_emissions: "",
   obd_warning_lights: [],
   obd_warning_other_desc: "",
+  // Title & History Flags
+  thf_title_review_status: "",
+  thf_title_type: "",
+  thf_vin_match_title: "",
+  thf_seller_name_match: "",
+  thf_title_signed: "",
+  thf_dashboard_vin_verified: "",
+  thf_door_jamb_vin_verified: "",
+  thf_vins_matched: "",
+  thf_dashboard_vin_photo_url: "",
+  thf_door_jamb_vin_photo_url: "",
+  thf_lien_status: "",
+  thf_lien_notes: "",
+  thf_odometer_reading: "",
+  thf_odometer_consistency: "",
+  thf_odometer_tampering: "",
+  thf_odometer_notes: "",
+  thf_flood_indicators: [],
+  thf_flood_notes: "",
+  thf_tampering_indicators: [],
+  thf_tampering_notes: "",
+  thf_accident_indicators: [],
+  thf_accident_notes: "",
 };
 
 // ── Steps definition ──────────────────────────────────────────────────────────
@@ -163,6 +210,7 @@ const STEPS = [
   { id: "tires",            title: "Tire Tread",         icon: Gauge },
   { id: "brakes",           title: "Brakes",             icon: Wrench },
   { id: "obd",              title: "OBD Scan",           icon: ClipboardCheck },
+  { id: "title_history",   title: "Title & History",    icon: Shield },
   { id: "exterior",         title: "Exterior",           icon: Eye },
   { id: "interior",         title: "Interior",           icon: Eye },
   { id: "mechanical",       title: "Mechanical",         icon: Wrench },
@@ -184,6 +232,7 @@ function isStepComplete(stepId: StepId, form: FormData): boolean {
     case "tires":         return true; // optional numeric
     case "brakes":        return true; // optional
     case "obd":           return true; // optional
+    case "title_history": return true; // optional
     case "exterior":      return form.cosmetic_exterior.trim().length > 0;
     case "interior":      return form.interior_condition.trim().length > 0;
     case "mechanical":    return form.mechanical_issues.trim().length > 0;
@@ -449,6 +498,28 @@ export default function RideCheckerSubmitPage() {
     }
   };
 
+  // ── Title & History Flags helpers ──────────────────────────────────────────
+  const toggleTHFIndicator = (
+    field: "thf_flood_indicators" | "thf_tampering_indicators" | "thf_accident_indicators",
+    item: string
+  ) => {
+    setForm((prev) => {
+      const arr = prev[field] as string[];
+      let updated: string[];
+      if (item === "none") {
+        updated = arr.includes("none") ? [] : ["none"];
+      } else {
+        const without = arr.filter((x) => x !== "none");
+        updated = without.includes(item)
+          ? without.filter((x) => x !== item)
+          : [...without, item];
+      }
+      const next = { ...prev, [field]: updated };
+      saveDraft(next, currentStep);
+      return next;
+    });
+  };
+
   const removeOBDFile = (index: number) => {
     setForm((prev) => {
       const next = { ...prev, obd_uploaded_files: prev.obd_uploaded_files.filter((_, i) => i !== index) };
@@ -569,6 +640,38 @@ export default function RideCheckerSubmitPage() {
         }
 
         payload.obd_module = obdModule;
+      }
+
+      // Build Title & History Flags module payload
+      const hasAnyTHF = form.thf_title_review_status || form.thf_vins_matched ||
+        form.thf_flood_indicators.length > 0 || form.thf_tampering_indicators.length > 0 ||
+        form.thf_accident_indicators.length > 0 || form.thf_odometer_reading.trim() ||
+        form.thf_lien_status || form.thf_dashboard_vin_verified;
+      if (hasAnyTHF) {
+        const thfModule: Record<string, unknown> = {};
+        if (form.thf_title_review_status)       thfModule.title_review_status    = form.thf_title_review_status;
+        if (form.thf_title_type)                thfModule.title_type             = form.thf_title_type;
+        if (form.thf_vin_match_title)           thfModule.vin_match_title        = form.thf_vin_match_title;
+        if (form.thf_seller_name_match)         thfModule.seller_name_match      = form.thf_seller_name_match;
+        if (form.thf_title_signed)              thfModule.title_signed           = form.thf_title_signed;
+        if (form.thf_dashboard_vin_verified)    thfModule.dashboard_vin_verified = form.thf_dashboard_vin_verified;
+        if (form.thf_door_jamb_vin_verified)    thfModule.door_jamb_vin_verified = form.thf_door_jamb_vin_verified;
+        if (form.thf_vins_matched)              thfModule.vins_matched           = form.thf_vins_matched;
+        if (form.thf_dashboard_vin_photo_url.trim()) thfModule.dashboard_vin_photo_url = form.thf_dashboard_vin_photo_url.trim();
+        if (form.thf_door_jamb_vin_photo_url.trim()) thfModule.door_jamb_vin_photo_url = form.thf_door_jamb_vin_photo_url.trim();
+        if (form.thf_lien_status)               thfModule.lien_status            = form.thf_lien_status;
+        if (form.thf_lien_notes.trim())         thfModule.lien_notes             = form.thf_lien_notes.trim();
+        if (form.thf_odometer_reading.trim())   thfModule.odometer_reading       = Number(form.thf_odometer_reading.trim());
+        if (form.thf_odometer_consistency)      thfModule.odometer_consistency   = form.thf_odometer_consistency;
+        if (form.thf_odometer_tampering)        thfModule.odometer_tampering     = form.thf_odometer_tampering;
+        if (form.thf_odometer_notes.trim())     thfModule.odometer_notes         = form.thf_odometer_notes.trim();
+        if (form.thf_flood_indicators.length > 0)    thfModule.flood_indicators     = form.thf_flood_indicators;
+        if (form.thf_flood_notes.trim())             thfModule.flood_notes          = form.thf_flood_notes.trim();
+        if (form.thf_tampering_indicators.length > 0) thfModule.tampering_indicators = form.thf_tampering_indicators;
+        if (form.thf_tampering_notes.trim())         thfModule.tampering_notes      = form.thf_tampering_notes.trim();
+        if (form.thf_accident_indicators.length > 0) thfModule.accident_indicators  = form.thf_accident_indicators;
+        if (form.thf_accident_notes.trim())          thfModule.accident_notes       = form.thf_accident_notes.trim();
+        payload.title_history_module = thfModule;
       }
 
       const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/submit`, {
@@ -1212,6 +1315,459 @@ export default function RideCheckerSubmitPage() {
             )}
 
             <p className="text-xs text-muted-foreground text-center">Optional — tap Next to skip this step.</p>
+          </div>
+        )}
+
+        {/* ── STEP: Title & History Flags ───────────────────────── */}
+        {step.id === "title_history" && (
+          <div className="space-y-5">
+            <StepHeader
+              icon={<Shield className="h-7 w-7 text-[#22774F]" />}
+              title="Title & History Flags"
+              description="Document visible indicators only — where available. This is observational, not a title search or history database lookup."
+            />
+            <div className="rounded-xl border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3">
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-0.5">Observational only</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">Document only what you can physically see or verify on-site. Skip any section where information is unavailable. All fields are optional.</p>
+            </div>
+
+            {/* ── Title Review ─────────────────────────────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-4">
+              <p className="text-sm font-semibold">Title Review</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Was the physical title available during inspection?</Label>
+                {([
+                  { value: "yes_reviewed",       label: "Yes — physical title reviewed" },
+                  { value: "partial",            label: "Partial review only" },
+                  { value: "no_seller",          label: "No — seller did not provide title" },
+                  { value: "dealer_unavailable", label: "Dealer transaction — not available on-site" },
+                  { value: "not_applicable",     label: "Not applicable" },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => updateField("thf_title_review_status", form.thf_title_review_status === value ? "" : value)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${form.thf_title_review_status === value ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                    data-testid={`button-thf-review-${value}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {form.thf_title_review_status && !["not_applicable", "dealer_unavailable"].includes(form.thf_title_review_status) && (
+                <>
+                  <div className="space-y-1.5 pt-1">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Title type observed</Label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {([
+                        { value: "clean",       label: "Clean title" },
+                        { value: "salvage",     label: "Salvage title" },
+                        { value: "rebuilt",     label: "Rebuilt/reconstructed" },
+                        { value: "bonded",      label: "Bonded title" },
+                        { value: "lien",        label: "Lien noted" },
+                        { value: "out_of_state",label: "Out-of-state" },
+                        { value: "unknown",     label: "Unknown" },
+                        { value: "unable",      label: "Unable to verify" },
+                      ] as const).map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => updateField("thf_title_type", form.thf_title_type === value ? "" : value)}
+                          className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${form.thf_title_type === value ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                          data-testid={`button-thf-type-${value}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {(form.thf_title_type === "salvage" || form.thf_title_type === "rebuilt") && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                        Branded title — will be noted in report with neutral language.
+                      </p>
+                    )}
+                  </div>
+
+                  {form.thf_title_review_status === "yes_reviewed" && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wide">VIN on title matched vehicle VIN?</Label>
+                        {([
+                          { value: "yes",         label: "Yes — confirmed" },
+                          { value: "no_mismatch", label: "No — mismatch observed" },
+                          { value: "unable",      label: "Unable to verify" },
+                          { value: "unavailable", label: "Title unavailable" },
+                        ] as const).map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => updateField("thf_vin_match_title", form.thf_vin_match_title === value ? "" : value)}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${form.thf_vin_match_title === value ? (value === "no_mismatch" ? "bg-red-600 text-white border-red-600 font-medium" : "bg-[#22774F] text-white border-[#22774F] font-medium") : "bg-background border-border hover:bg-muted"}`}
+                            data-testid={`button-thf-vinmatch-${value}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        {form.thf_vin_match_title === "no_mismatch" && (
+                          <p className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                            VIN mismatch observed — this will be noted as a discrepancy requiring independent verification.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Seller name matched title?</Label>
+                        {([
+                          { value: "yes",           label: "Yes" },
+                          { value: "no_third_party",label: "No — third-party seller observed" },
+                          { value: "unable",        label: "Unable to verify" },
+                          { value: "dealer",        label: "Dealer transaction" },
+                        ] as const).map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => updateField("thf_seller_name_match", form.thf_seller_name_match === value ? "" : value)}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${form.thf_seller_name_match === value ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                            data-testid={`button-thf-sellermatch-${value}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Title signed appropriately?</Label>
+                        <div className="flex gap-1.5">
+                          {([
+                            { value: "yes",   label: "Yes" },
+                            { value: "no",    label: "No — unsigned/incomplete" },
+                            { value: "unable",label: "Unable to verify" },
+                          ] as const).map(({ value, label }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => updateField("thf_title_signed", form.thf_title_signed === value ? "" : value)}
+                              className={`flex-1 text-center px-2 py-2.5 rounded-lg border text-sm transition-colors ${form.thf_title_signed === value ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                              data-testid={`button-thf-signed-${value}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* ── VIN Verification ─────────────────────────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-4">
+              <p className="text-sm font-semibold">VIN Verification</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Dashboard VIN</Label>
+                  <div className="space-y-1">
+                    {(["yes", "no", "unable"] as const).map((v) => (
+                      <button key={v} type="button"
+                        onClick={() => updateField("thf_dashboard_vin_verified", form.thf_dashboard_vin_verified === v ? "" : v)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${form.thf_dashboard_vin_verified === v ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                        data-testid={`button-thf-dashvin-${v}`}
+                      >
+                        {v === "yes" ? "Verified" : v === "no" ? "Not verified" : "Unable"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Door Jamb VIN</Label>
+                  <div className="space-y-1">
+                    {(["yes", "no", "unable"] as const).map((v) => (
+                      <button key={v} type="button"
+                        onClick={() => updateField("thf_door_jamb_vin_verified", form.thf_door_jamb_vin_verified === v ? "" : v)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${form.thf_door_jamb_vin_verified === v ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-background border-border hover:bg-muted"}`}
+                        data-testid={`button-thf-doorvin-${v}`}
+                      >
+                        {v === "yes" ? "Verified" : v === "no" ? "Not verified" : "Unable"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">VINs matched each other?</Label>
+                <div className="flex gap-1.5">
+                  {([
+                    { value: "yes",            label: "Yes — matched" },
+                    { value: "no_discrepancy", label: "No — discrepancy observed" },
+                    { value: "unable",         label: "Unable to verify" },
+                  ] as const).map(({ value, label }) => (
+                    <button key={value} type="button"
+                      onClick={() => updateField("thf_vins_matched", form.thf_vins_matched === value ? "" : value)}
+                      className={`flex-1 text-center px-2 py-2.5 rounded-lg border text-xs leading-snug transition-colors ${form.thf_vins_matched === value ? (value === "no_discrepancy" ? "bg-red-600 text-white border-red-600 font-medium" : "bg-[#22774F] text-white border-[#22774F] font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-vinsmatch-${value}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {form.thf_vins_matched === "no_discrepancy" && (
+                  <p className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                    Physical VIN discrepancy observed — will be noted as requiring independent verification.
+                  </p>
+                )}
+              </div>
+              {/* Optional VIN photos */}
+              <div className="grid grid-cols-2 gap-3">
+                <PhotoUpload
+                  label="Dashboard VIN (optional)"
+                  hint="Clear photo of dashboard VIN plate"
+                  fieldKey="thf_dashboard_vin_photo"
+                  value={form.thf_dashboard_vin_photo_url}
+                  onChange={(url) => updateField("thf_dashboard_vin_photo_url", url)}
+                  assignmentId={assignmentId}
+                />
+                <PhotoUpload
+                  label="Door Jamb VIN (optional)"
+                  hint="VIN sticker on door jamb"
+                  fieldKey="thf_door_jamb_vin_photo"
+                  value={form.thf_door_jamb_vin_photo_url}
+                  onChange={(url) => updateField("thf_door_jamb_vin_photo_url", url)}
+                  assignmentId={assignmentId}
+                />
+              </div>
+            </div>
+
+            {/* ── Lien Status ──────────────────────────────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold">Lien Status</p>
+              <div className="space-y-1.5">
+                {([
+                  { value: "release_present", label: "Lien release document present" },
+                  { value: "lien_no_release", label: "Lien noted — no release provided" },
+                  { value: "no_lien",         label: "No lien observed" },
+                  { value: "unable",          label: "Unable to verify" },
+                ] as const).map(({ value, label }) => (
+                  <button key={value} type="button"
+                    onClick={() => updateField("thf_lien_status", form.thf_lien_status === value ? "" : value)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${form.thf_lien_status === value ? (value === "lien_no_release" ? "bg-amber-600 text-white border-amber-600 font-medium" : "bg-[#22774F] text-white border-[#22774F] font-medium") : "bg-background border-border hover:bg-muted"}`}
+                    data-testid={`button-thf-lien-${value}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {(form.thf_lien_status === "lien_no_release" || form.thf_lien_status === "unable") && (
+                <Textarea
+                  placeholder="Lien notes (optional)"
+                  value={form.thf_lien_notes}
+                  onChange={(e) => updateField("thf_lien_notes", e.target.value)}
+                  rows={2}
+                  className="resize-none text-sm"
+                  data-testid="textarea-thf-lien-notes"
+                />
+              )}
+            </div>
+
+            {/* ── Odometer Disclosure ───────────────────────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold">Odometer Disclosure</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Odometer reading at inspection (miles)</Label>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="e.g. 87234"
+                  value={form.thf_odometer_reading}
+                  onChange={(e) => updateField("thf_odometer_reading", e.target.value)}
+                  className="text-sm"
+                  data-testid="input-thf-odometer"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Odometer disclosure appeared consistent?</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([
+                    { value: "yes",            label: "Yes" },
+                    { value: "no_discrepancy", label: "No — discrepancy observed" },
+                    { value: "unable",         label: "Unable to verify" },
+                    { value: "unavailable",    label: "Title unavailable" },
+                  ] as const).map(({ value, label }) => (
+                    <button key={value} type="button"
+                      onClick={() => updateField("thf_odometer_consistency", form.thf_odometer_consistency === value ? "" : value)}
+                      className={`px-3 py-2 rounded-lg border text-sm transition-colors ${form.thf_odometer_consistency === value ? (value === "no_discrepancy" ? "bg-amber-600 text-white border-amber-600 font-medium" : "bg-[#22774F] text-white border-[#22774F] font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-odom-consistency-${value}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Physical signs of odometer tampering?</Label>
+                <p className="text-xs text-muted-foreground">Disturbed instrument cluster, inconsistent wear, replacement cluster indicators</p>
+                <div className="flex gap-1.5">
+                  {([
+                    { value: "no",    label: "No" },
+                    { value: "yes",   label: "Yes — indicators observed" },
+                    { value: "unable",label: "Unable to determine" },
+                  ] as const).map(({ value, label }) => (
+                    <button key={value} type="button"
+                      onClick={() => updateField("thf_odometer_tampering", form.thf_odometer_tampering === value ? "" : value)}
+                      className={`flex-1 text-center px-2 py-2 rounded-lg border text-sm transition-colors ${form.thf_odometer_tampering === value ? (value === "yes" ? "bg-amber-600 text-white border-amber-600 font-medium" : "bg-[#22774F] text-white border-[#22774F] font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-odom-tampering-${value}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(form.thf_odometer_consistency === "no_discrepancy" || form.thf_odometer_tampering === "yes") && (
+                <Textarea
+                  placeholder="Odometer notes"
+                  value={form.thf_odometer_notes}
+                  onChange={(e) => updateField("thf_odometer_notes", e.target.value)}
+                  rows={2}
+                  className="resize-none text-sm"
+                  data-testid="textarea-thf-odometer-notes"
+                />
+              )}
+            </div>
+
+            {/* ── Flood / Water Intrusion Indicators ───────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold">Flood / Water Intrusion Indicators</p>
+              <p className="text-xs text-muted-foreground">Observable indicators only — check all that apply</p>
+              <div className="space-y-1.5">
+                {([
+                  { value: "water_staining",      label: "Water staining on carpet or upholstery" },
+                  { value: "mold_odor",            label: "Mold or musty odor observed" },
+                  { value: "interior_rust",        label: "Rust/corrosion inside cabin areas" },
+                  { value: "mud_silt",             label: "Mud/silt deposits observed" },
+                  { value: "corroded_wiring",      label: "Corroded wiring/connectors observed" },
+                  { value: "fogged_lights",        label: "Fogged moisture inside lights" },
+                  { value: "unusual_interior_rust",label: "Unusual rust on interior metal" },
+                  { value: "none",                 label: "No flood indicators observed" },
+                ] as const).map(({ value, label }) => {
+                  const isSelected = form.thf_flood_indicators.includes(value);
+                  return (
+                    <button key={value} type="button"
+                      onClick={() => toggleTHFIndicator("thf_flood_indicators", value)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors flex items-center gap-2 ${isSelected ? (value === "none" ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-amber-50 dark:bg-amber-950/20 border-amber-400 text-amber-900 dark:text-amber-200 font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-flood-${value}`}
+                    >
+                      <span className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${isSelected ? (value === "none" ? "bg-white/30 border-white/50" : "bg-amber-400 border-amber-400") : "border-muted-foreground/30"}`}>
+                        {isSelected && "✓"}
+                      </span>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.thf_flood_indicators.filter((i) => i !== "none").length > 0 && (
+                <Textarea
+                  placeholder="Flood indicator notes (describe what you observed)"
+                  value={form.thf_flood_notes}
+                  onChange={(e) => updateField("thf_flood_notes", e.target.value)}
+                  rows={2}
+                  className="resize-none text-sm"
+                  data-testid="textarea-thf-flood-notes"
+                />
+              )}
+            </div>
+
+            {/* ── Theft / Tampering Indicators ──────────────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold">Theft / Tampering Indicators</p>
+              <p className="text-xs text-muted-foreground">Observable indicators only — check all that apply</p>
+              <div className="space-y-1.5">
+                {([
+                  { value: "ignition_steering", label: "Ignition/steering column tampering observed" },
+                  { value: "vin_plate_altered",  label: "VIN plate appeared altered/damaged" },
+                  { value: "vin_mismatch",       label: "VIN mismatch observed" },
+                  { value: "door_jamb_sticker",  label: "Door jamb sticker missing/replaced" },
+                  { value: "non_oem_keys",       label: "Non-OEM or mismatched keys observed" },
+                  { value: "aftermarket_wiring", label: "Unusual aftermarket ignition wiring observed" },
+                  { value: "lock_damage",        label: "Lock cylinder damage observed" },
+                  { value: "none",               label: "No tampering indicators observed" },
+                ] as const).map(({ value, label }) => {
+                  const isSelected = form.thf_tampering_indicators.includes(value);
+                  return (
+                    <button key={value} type="button"
+                      onClick={() => toggleTHFIndicator("thf_tampering_indicators", value)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors flex items-center gap-2 ${isSelected ? (value === "none" ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-red-50 dark:bg-red-950/20 border-red-400 text-red-900 dark:text-red-200 font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-tampering-${value}`}
+                    >
+                      <span className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${isSelected ? (value === "none" ? "bg-white/30 border-white/50" : "bg-red-400 border-red-400") : "border-muted-foreground/30"}`}>
+                        {isSelected && "✓"}
+                      </span>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.thf_tampering_indicators.filter((i) => i !== "none").length > 0 && (
+                <>
+                  {(form.thf_tampering_indicators.includes("vin_plate_altered") || form.thf_tampering_indicators.includes("vin_mismatch")) && (
+                    <p className="text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                      VIN irregularities will be noted as requiring independent verification before transaction completion.
+                    </p>
+                  )}
+                  <Textarea
+                    placeholder="Tampering indicator notes (describe what you observed)"
+                    value={form.thf_tampering_notes}
+                    onChange={(e) => updateField("thf_tampering_notes", e.target.value)}
+                    rows={2}
+                    className="resize-none text-sm"
+                    data-testid="textarea-thf-tampering-notes"
+                  />
+                </>
+              )}
+            </div>
+
+            {/* ── Prior Accident / Repair Indicators ───────────────── */}
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold">Prior Accident / Repair Indicators</p>
+              <p className="text-xs text-muted-foreground">Observable indicators only — check all that apply</p>
+              <div className="space-y-1.5">
+                {([
+                  { value: "mismatched_paint",   label: "Mismatched paint between panels" },
+                  { value: "overspray",          label: "Overspray on trim/glass/seals" },
+                  { value: "panel_gaps",         label: "Inconsistent panel gaps observed" },
+                  { value: "replacement_panels", label: "Replacement body panels observed" },
+                  { value: "body_filler",        label: "Body filler/bondo indicators observed" },
+                  { value: "structural_weld",    label: "Structural straightening/weld indicators observed" },
+                  { value: "airbag_cover",       label: "Airbag cover replacement indicators observed" },
+                  { value: "none",               label: "No accident-repair indicators observed" },
+                ] as const).map(({ value, label }) => {
+                  const isSelected = form.thf_accident_indicators.includes(value);
+                  return (
+                    <button key={value} type="button"
+                      onClick={() => toggleTHFIndicator("thf_accident_indicators", value)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors flex items-center gap-2 ${isSelected ? (value === "none" ? "bg-[#22774F] text-white border-[#22774F] font-medium" : "bg-amber-50 dark:bg-amber-950/20 border-amber-400 text-amber-900 dark:text-amber-200 font-medium") : "bg-background border-border hover:bg-muted"}`}
+                      data-testid={`button-thf-accident-${value}`}
+                    >
+                      <span className={`h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${isSelected ? (value === "none" ? "bg-white/30 border-white/50" : "bg-amber-400 border-amber-400") : "border-muted-foreground/30"}`}>
+                        {isSelected && "✓"}
+                      </span>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.thf_accident_indicators.filter((i) => i !== "none").length > 0 && (
+                <Textarea
+                  placeholder="Accident/repair notes (describe what you observed)"
+                  value={form.thf_accident_notes}
+                  onChange={(e) => updateField("thf_accident_notes", e.target.value)}
+                  rows={2}
+                  className="resize-none text-sm"
+                  data-testid="textarea-thf-accident-notes"
+                />
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center pb-2">Optional — tap Next to skip this step.</p>
           </div>
         )}
 
