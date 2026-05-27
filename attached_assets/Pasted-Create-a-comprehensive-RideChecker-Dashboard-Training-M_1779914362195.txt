@@ -1,0 +1,217 @@
+Create a comprehensive RideChecker Dashboard Training Manual based on the actual RideCheck production dashboard, workflows, assignment logic, inspection wizard, scoring system, and Ops coordination flow.
+
+IMPORTANT:
+Do NOT expose:
+
+- internal code
+- database schemas
+- API routes
+- admin secrets
+- middleware logic
+- auth internals
+- security implementation details
+
+The document is for:
+
+- RideChecker onboarding
+- field training
+- future training videos
+- future Spanish translation
+- operational standardization
+
+The manual should explain the REAL dashboard and workflows exactly as they currently function in the system.
+
+====================================================
+GOAL
+
+Generate a professional RideChecker Operations & Training Guide that teaches a new RideChecker how to successfully complete inspections using the actual RideCheck dashboard.
+
+The guide should assume:
+
+- the user is NOT a mechanic
+- the user is using a smartphone
+- the user may be completely new
+- the system itself guides the inspection
+
+Tone:
+
+- professional
+- encouraging
+- operational
+- beginner-friendly
+- confidence-building
+
+====================================================
+DOCUMENT STRUCTURE
+
+Generate a polished document with sections including:
+
+1. Welcome to RideCheck
+2. What a RideChecker Does
+3. Required Equipment
+4. Logging In
+5. Understanding the Dashboard
+6. Availability Status
+7. How Assignments Work
+8. Accepting Jobs
+9. Navigating to Seller Location
+10. Understanding Assignment Cards
+11. Guided Inspection Wizard
+12. Required Photos
+13. Vehicle Verification
+14. Exterior Inspection
+15. Tire & Brake Checks
+16. Interior Inspection
+17. Engine Bay Inspection
+18. Undercarriage Inspection
+19. OBD-II Scan Process
+20. Test Drive Procedure
+21. Concern / Critical / Not Accessible Statuses
+22. Using the Report Issue Button
+23. Auto-Save & Resume
+24. Final Submission
+25. Understanding the RideCheck Score
+26. RideChecker Ranking Tiers
+27. Common Mistakes to Avoid
+28. Best Practices
+29. Safety & Professional Conduct
+30. Ops Communication
+31. Frequently Asked Questions
+32. Future Training & Certification
+
+====================================================
+USE THE REAL SYSTEM
+
+Analyze the actual RideChecker dashboard and explain:
+
+- real workflow
+- real inspection flow
+- real scoring behavior
+- real assignment lifecycle
+- real guided inspection process
+- real mobile usage flow
+- real Ops interactions
+
+Do not invent fake functionality.
+
+If functionality already exists:
+
+- explain how it works
+- explain how RideCheckers use it
+- explain what the buttons/actions mean
+
+====================================================
+GUIDED INSPECTION SECTION
+
+This is the most important section.
+
+Explain:
+
+- why the wizard exists
+- why steps cannot be skipped
+- why required photos matter
+- why wide + close-up photos are required
+- how completion locking works
+- how concerns are documented
+- how Ops reviews inspections
+
+Include examples:
+
+- VIN verification
+- odometer
+- engine bay
+- undercarriage
+- tire tread
+- warning lights
+- OBD scan
+- seller refusal situations
+
+====================================================
+MOBILE-FIRST TRAINING
+
+The guide should assume inspections are performed from a phone.
+
+Explain:
+
+- taking photos
+- uploading photos
+- reviewing uploaded photos
+- retaking photos
+- following the step-by-step workflow
+- using flashlight for undercarriage
+- maintaining battery life during inspections
+
+====================================================
+SCORING SYSTEM
+
+Explain the RideCheck Score system in non-technical language.
+
+Include:
+
+- accepting jobs
+- arriving on time
+- completing inspections
+- uploading required photos
+- Ops approval
+- professionalism
+- revisions
+- no-shows
+
+Explain ranking tiers:
+
+- Rookie
+- Trusted
+- Elite
+- Master RideChecker
+
+Explain that:
+
+- safety flags are NOT punished
+- seller refusal properly documented is NOT punished
+
+====================================================
+SAFETY & LEGAL
+
+Include:
+
+- do not diagnose vehicles professionally
+- do not promise repairs
+- do not tell buyers whether to buy
+- do not negotiate pricing
+- do not argue with sellers
+- report unsafe situations immediately
+
+====================================================
+VISUAL & TRAINING READY
+
+Format the document so it can later become:
+
+- onboarding PDFs
+- SOP manuals
+- training videos
+- voiceover scripts
+- Spanish translation
+- certification coursework
+
+Use:
+
+- headers
+- bullet points
+- examples
+- field tips
+- “What good looks like”
+- beginner explanations
+
+====================================================
+DELIVERABLES
+
+Return:
+
+1. Full RideChecker Training Guide
+2. Suggested screenshots/placeholders
+3. Suggested training video modules
+4. Suggested future Spanish translation structure
+5. Suggested certification progression
+6. Areas where the dashboard UX could be improved for new RideCheckers
+
+Do NOT modify production code unless needed to accurately document current functionality.

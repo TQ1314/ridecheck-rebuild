@@ -6,3 +6,9 @@ id = "4TjoVNv2U1cpOw872y8Xz"
 uri = "file://docs/ops-sop.md"
 type = "text"
 title = "RideCheck Operations SOP v1.0"
+
+[[outputs]]
+id = "Co0COUYlBRqrF1o3GB_Zr"
+uri = "file://docs/ridechecker-training-guide.md"
+type = "text"
+title = "RideChecker Operations & Training Guide v1.0"
