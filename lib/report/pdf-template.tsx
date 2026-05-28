@@ -705,7 +705,7 @@ const s = StyleSheet.create({
     borderRadius: 3, backgroundColor: C.gray_50,
   },
   thfBoxTitle: {
-    fontSize: 6.5, fontFamily: "Helvetica-Bold", color: C.gray_500,
+    fontSize: 6.5, fontFamily: "Helvetica-Bold", color: C.muted,
     textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4,
     borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
   },
