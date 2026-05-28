@@ -99,6 +99,28 @@ export async function GET(req: NextRequest) {
 
   const rows = data || [];
 
+  // Enrich with guide completion from ridechecker_training_results
+  const rcIds = rows.map((r: any) => r.id);
+  let guideMap: Map<string, { passed: boolean; completed_at: string | null }> = new Map();
+  if (rcIds.length > 0) {
+    const { data: guideRows } = await supabaseAdmin
+      .from("ridechecker_training_results")
+      .select("ridechecker_id, passed, completed_at")
+      .in("ridechecker_id", rcIds)
+      .eq("module_id", "operations_guide");
+    if (guideRows) {
+      for (const gr of guideRows) {
+        guideMap.set(gr.ridechecker_id, { passed: gr.passed, completed_at: gr.completed_at });
+      }
+    }
+  }
+
+  const enrichedRows = rows.map((r: any) => ({
+    ...r,
+    guide_completed: guideMap.get(r.id)?.passed === true,
+    guide_completed_at: guideMap.get(r.id)?.completed_at ?? null,
+  }));
+
   const stats = {
     total: rows.length,
     pipeline: rows.filter((r: any) => PIPELINE_STAGES.includes(r.workflow_stage)).length,
@@ -107,7 +129,7 @@ export async function GET(req: NextRequest) {
     closed:   rows.filter((r: any) => ["rejected", "suspended"].includes(r.workflow_stage)).length,
   };
 
-  return NextResponse.json({ ridecheckers: rows, stats });
+  return NextResponse.json({ ridecheckers: enrichedRows, stats });
 }
 
 // ─────────────────────────────────────────────

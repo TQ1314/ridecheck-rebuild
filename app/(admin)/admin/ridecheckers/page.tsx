@@ -102,6 +102,8 @@ interface RideChecker {
   ridechecker_jobs_completed: number | null;
   ridechecker_quality_score: number | null;
   training_sip4_completed: boolean | null;
+  guide_completed: boolean | null;
+  guide_completed_at: string | null;
 }
 
 interface StageHistoryEntry {
@@ -415,7 +417,8 @@ export default function RideCheckersAdminPage() {
                   <TableHead>Stage</TableHead>
                   <TableHead>Checklist</TableHead>
                   <TableHead>Assessment</TableHead>
-                  <TableHead>Training</TableHead>
+                  <TableHead>SIP-4 Cert</TableHead>
+                  <TableHead>Guide</TableHead>
                   <TableHead>Applied</TableHead>
                   {canApprove && <TableHead>Actions</TableHead>}
                 </TableRow>
@@ -482,6 +485,30 @@ export default function RideCheckersAdminPage() {
                             "bg-gray-100 text-gray-500 border-gray-200",
                           )}>
                             Not Started
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {rc.guide_completed ? (
+                          <div>
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
+                              "bg-emerald-100 text-emerald-700 border-emerald-200",
+                            )}>
+                              Completed
+                            </span>
+                            {rc.guide_completed_at && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {new Date(rc.guide_completed_at).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
+                            "bg-gray-100 text-gray-500 border-gray-200",
+                          )}>
+                            Not Read
                           </span>
                         )}
                       </TableCell>

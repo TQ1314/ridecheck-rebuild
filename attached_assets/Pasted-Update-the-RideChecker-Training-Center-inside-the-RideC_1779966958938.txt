@@ -1,0 +1,171 @@
+Update the RideChecker Training Center inside the RideChecker dashboard.
+
+Goal:
+RideCheckers should be able to access the RideChecker Operations & Training Guide directly from their dashboard and use it for onboarding, certification, SOP review, and future training videos.
+
+IMPORTANT:
+RideCheck already has an existing certification system.
+Do NOT create a duplicate certification system.
+Do NOT replace the current certification flow.
+Integrate with the existing certification logic, routes, stages, and gating.
+
+Do NOT expose:
+
+* internal code
+* API routes
+* database schemas
+* auth internals
+* security logic
+* middleware details
+
+Build:
+
+1. RideChecker Dashboard Training Tab
+
+* Add or upgrade the existing Training tab in the RideChecker portal.
+* Show:
+
+  * RideChecker Operations & Training Guide
+  * Certification status
+  * Training progress
+  * Current RideChecker tier
+  * Next stage requirements
+
+Sections should include:
+
+* Getting Started
+* Dashboard Basics
+* Accepting Jobs
+* Guided Inspection Wizard
+* Photo Standards
+* OBD-II Scan
+* Seller Conduct
+* Safety & Escalation
+* RideCheck Score
+* Certification
+
+2. Training Guide Page
+   Create protected route:
+
+* /ridechecker/training
+
+Access:
+
+* approved RideCheckers
+* Ops
+* Owner/Admin only
+
+Display the full RideChecker Training Guide in a clean mobile-first format optimized for phones.
+
+Use:
+
+* collapsible sections
+* progress markers
+* section navigation
+* sticky mobile navigation if helpful
+
+3. Existing Certification Integration
+   Locate the current RideCheck certification system and connect the Training Center to it.
+
+Show:
+
+* Not Started
+* In Progress
+* Passed
+* Failed
+* Under Review
+
+Add:
+
+* Start Certification
+* Continue Certification
+* Review Certification Status
+
+If certification is incomplete:
+show:
+“Complete and pass certification before moving to the next RideChecker stage.”
+
+If passed:
+show:
+“Certification passed. You are eligible for the next RideChecker stage.”
+
+Do NOT create fake placeholder certification logic.
+
+4. Downloadable PDF
+   Add:
+
+* Download Training Guide PDF
+
+Use RideCheck branding/colors.
+
+5. Training Progress Tracking
+   Track separately from certification:
+
+* Guide not started
+* Guide in progress
+* Guide completed
+
+Allow RideChecker to:
+
+* mark sections complete
+* resume where they left off
+
+6. Spanish Version Placeholder
+   Add:
+   “Spanish version coming soon.”
+
+Structure the Training Center so multilingual support can be added later without rebuilding the UI.
+
+7. Ops/Admin Visibility
+   Ops/Admin should be able to see:
+
+* training completion status
+* certification status
+* certification date
+* pass/fail state
+* RideChecker stage/tier
+
+8. Security & Access
+   Do NOT make the Training Center public.
+   Only authenticated approved RideCheckers, Ops, and Owner/Admin should access it.
+
+9. UX Requirements
+   Optimize for mobile-first field usage.
+
+The experience should feel:
+
+* professional
+* modern
+* operational
+* beginner-friendly
+* confidence-building
+
+Add:
+
+* progress indicators
+* completion percentages
+* continue learning prompts
+
+10. Future-Ready Architecture
+    Structure the Training Center so it can later support:
+
+* embedded training videos
+* certification quizzes
+* onboarding walkthroughs
+* advanced certifications
+* EV/exotic certifications
+* dealer workflows
+* multilingual training
+* downloadable SOP manuals
+
+11. Final Output
+    Return:
+
+* files changed
+* routes created
+* certification integration discovered
+* whether PDF download works
+* whether progress saves correctly
+* Ops visibility added
+* build status
+* screenshots if possible

@@ -35,6 +35,9 @@ import {
   TrendingUp,
   RefreshCw,
   Layers,
+  ShieldCheck,
+  BookOpen,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -218,6 +221,8 @@ export default function RideCheckerDashboardPage() {
   const availToggleInFlightRef = useRef(false);
   const [isSuspended, setIsSuspended] = useState(false);
   const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
+  const [dashGuideProgress, setDashGuideProgress] = useState<number>(0);
+  const [dashGuideCertified, setDashGuideCertified] = useState<boolean>(false);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -389,6 +394,20 @@ export default function RideCheckerDashboardPage() {
     }
     setAvailSubmitting(false);
   };
+
+  // Load guide progress when training tab becomes active
+  useEffect(() => {
+    if (activeTab !== "training") return;
+    try {
+      const saved = JSON.parse(localStorage.getItem("rc_guide_section_progress") || "{}");
+      const count = Object.values(saved).filter(Boolean).length;
+      setDashGuideProgress(count);
+    } catch { setDashGuideProgress(0); }
+    fetch("/api/ridechecker/training/guide-progress")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.completed) setDashGuideCertified(true); })
+      .catch(() => {});
+  }, [activeTab]);
 
   if (loading) {
     return (
@@ -991,37 +1010,119 @@ export default function RideCheckerDashboardPage() {
             {/* Training */}
             {activeTab === "training" && (
               <div className="space-y-4" data-testid="tab-content-training">
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                    <GraduationCap className="h-12 w-12 text-primary mb-4" />
-                    <h3 className="font-semibold mb-1">RideChecker Basic Certification</h3>
+
+                {/* Status Cards Row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={`rounded-xl border p-3 ${profile?.training_sip4_completed ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-card border-border"}`} data-testid="card-cert-status">
+                    <p className="text-xs text-muted-foreground font-medium mb-1.5 uppercase tracking-wide">SIP-4 Certification</p>
                     {profile?.training_sip4_completed ? (
-                      <>
-                        <p className="text-sm text-emerald-600 font-medium mb-3">✓ Module 1 — Certified</p>
-                        <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                          You have completed Module 1: Standardized Vehicle Assessment Protocol.
-                        </p>
-                        <a href="/ridechecker/training" className="text-sm text-primary underline" data-testid="link-review-training">
-                          Review training material
-                        </a>
-                      </>
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Certified</span>
+                      </div>
                     ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                          Complete Module 1 to unlock vehicle assessment forms. Pass the knowledge check (80%) to become certified.
-                        </p>
-                        <a
-                          href="/ridechecker/training"
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-                          data-testid="link-start-training"
-                        >
-                          <GraduationCap className="h-4 w-4" />
-                          Start Certification
-                        </a>
-                      </>
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Not certified</span>
+                      </div>
                     )}
+                  </div>
+                  <div className={`rounded-xl border p-3 ${dashGuideCertified ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-card border-border"}`} data-testid="card-guide-status">
+                    <p className="text-xs text-muted-foreground font-medium mb-1.5 uppercase tracking-wide">Operations Guide</p>
+                    {dashGuideCertified ? (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Completed</span>
+                      </div>
+                    ) : dashGuideProgress > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold">{dashGuideProgress}/10 read</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-semibold text-muted-foreground">Not started</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cert required banner */}
+                {!profile?.training_sip4_completed && (
+                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Certification required</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+                      Complete and pass Module 1 (80%+) before you can submit vehicle assessment forms.
+                    </p>
+                    <a
+                      href="/ridechecker/training"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-amber-700 text-white rounded-md text-xs font-semibold hover:bg-amber-800 transition-colors"
+                      data-testid="link-start-training"
+                    >
+                      <GraduationCap className="h-3.5 w-3.5" />
+                      Start Certification
+                    </a>
+                  </div>
+                )}
+
+                {/* Training Center links */}
+                <Card>
+                  <CardHeader className="pb-3 pt-4 px-4">
+                    <CardTitle className="text-sm font-semibold">Training Center</CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-4 space-y-2">
+                    <a
+                      href="/ridechecker/training#guide"
+                      className="flex items-center justify-between px-3 py-3 rounded-lg border hover:bg-muted/40 transition-colors"
+                      data-testid="link-training-guide"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">Operations & Training Guide</p>
+                          <p className="text-xs text-muted-foreground">
+                            {dashGuideCertified ? "Completed · 10 sections" : dashGuideProgress > 0 ? `${dashGuideProgress}/10 sections read` : "10 sections · field reference"}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </a>
+                    <a
+                      href="/ridechecker/training#cert"
+                      className="flex items-center justify-between px-3 py-3 rounded-lg border hover:bg-muted/40 transition-colors"
+                      data-testid="link-training-cert"
+                    >
+                      <div className="flex items-center gap-3">
+                        <GraduationCap className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">Module 1 — SIP-4 Certification</p>
+                          <p className="text-xs text-muted-foreground">
+                            {profile?.training_sip4_completed ? "Certified · 80% pass threshold" : "Not yet certified · 5 questions · 80% to pass"}
+                          </p>
+                        </div>
+                      </div>
+                      {profile?.training_sip4_completed
+                        ? <ShieldCheck className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                        : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      }
+                    </a>
                   </CardContent>
                 </Card>
+
+                {/* Certified user — success state */}
+                {profile?.training_sip4_completed && (
+                  <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 flex gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Certification passed</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        You are eligible to submit vehicle assessment forms. Advance to Trusted RideChecker with 10+ jobs at 80%+ average score.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </>
