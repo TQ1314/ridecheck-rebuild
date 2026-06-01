@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -33,11 +34,16 @@ import {
   ShieldCheck,
   Loader2,
   Clock,
+  Lock,
+  AlertTriangle,
+  CheckCircle2,
+  CircleDollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { canUpdateStatus, canAssignOps, canSendPayment, type Role } from "@/lib/utils/roles";
 import { packageLabel } from "@/lib/utils/format";
+import { canProceedWithRideCheck } from "@/lib/payment/payment-gate";
 
 const PACKAGE_OPTIONS = [
   { value: "standard", label: "Basic — $139" },
@@ -56,6 +62,28 @@ function formatAge(isoDate: string | undefined | null): { label: string; color: 
   if (hrs < 48)  return { label: `${hrs}h at this stage`, color: "text-amber-700 bg-amber-50 border-amber-200" };
   const days = Math.floor(hrs / 24);
   return { label: `${days}d ${hrs % 24}h at this stage`, color: "text-red-700 bg-red-50 border-red-200" };
+}
+
+function paymentStatusBadge(status: string | null | undefined) {
+  if (!status) return null;
+  const map: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
+    paid:                 { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" />, label: "Payment Secured" },
+    paid_manual_verified: { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" />, label: "Manually Verified" },
+    override_approved:    { cls: "bg-amber-100 text-amber-700 border-amber-200",       icon: <ShieldCheck className="h-3 w-3" />,  label: "Override Approved" },
+    requested:            { cls: "bg-blue-100 text-blue-700 border-blue-200",           icon: <CircleDollarSign className="h-3 w-3" />, label: "Payment Requested" },
+    not_requested:        { cls: "bg-red-100 text-red-700 border-red-200",              icon: <Lock className="h-3 w-3" />,         label: "Payment Pending" },
+    pending:              { cls: "bg-red-100 text-red-700 border-red-200",              icon: <Lock className="h-3 w-3" />,         label: "Payment Pending" },
+    failed:               { cls: "bg-red-100 text-red-700 border-red-200",              icon: <AlertTriangle className="h-3 w-3" />, label: "Payment Failed" },
+    refunded:             { cls: "bg-gray-100 text-gray-500 border-gray-200",           icon: null,                                  label: "Refunded" },
+  };
+  const entry = map[status] ?? { cls: "bg-gray-100 text-gray-500 border-gray-200", icon: null, label: status.replace(/_/g, " ") };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${entry.cls}`}
+      data-testid="badge-payment-status">
+      {entry.icon}
+      {entry.label}
+    </span>
+  );
 }
 
 function statusBadge(status: string) {
@@ -90,6 +118,12 @@ export default function OpsOrderDetailPage() {
   const [overrideReason,  setOverrideReason]  = useState("");
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [sendingPayment,  setSendingPayment]  = useState(false);
+
+  // Payment override state
+  const [paymentOverrideReason,    setPaymentOverrideReason]    = useState("");
+  const [paymentOverrideConfirmed, setPaymentOverrideConfirmed] = useState(false);
+  const [paymentOverrideLoading,   setPaymentOverrideLoading]   = useState(false);
+  const [showPaymentOverrideCard,  setShowPaymentOverrideCard]  = useState(false);
 
   const loadData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -167,6 +201,37 @@ export default function OpsOrderDetailPage() {
     }
   };
 
+  const handlePaymentOverride = async () => {
+    if (!paymentOverrideReason.trim() || paymentOverrideReason.trim().length < 5) {
+      toast({ title: "Reason required", description: "Enter at least 5 characters.", variant: "destructive" });
+      return;
+    }
+    if (!paymentOverrideConfirmed) {
+      toast({ title: "Confirmation required", description: "Check the confirmation box first.", variant: "destructive" });
+      return;
+    }
+    setPaymentOverrideLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/payment-override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: paymentOverrideReason, confirmed: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Override failed", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Payment override approved", description: "Field work is now unblocked for this order." });
+      setPaymentOverrideReason("");
+      setPaymentOverrideConfirmed(false);
+      setShowPaymentOverrideCard(false);
+      loadData();
+    } finally {
+      setPaymentOverrideLoading(false);
+    }
+  };
+
   const handlePackageOverride = async () => {
     if (!overridePackage) {
       toast({ title: "Select a package first", variant: "destructive" });
@@ -210,8 +275,10 @@ export default function OpsOrderDetailPage() {
     );
   }
 
-  const role       = (profile?.role || "operations") as Role;
-  const canOverride = ["admin", "operations", "operations_lead", "owner"].includes(role);
+  const role              = (profile?.role || "operations") as Role;
+  const canOverride       = ["admin", "operations", "operations_lead", "owner"].includes(role);
+  const canPaymentOverride = ["admin", "operations_lead", "ops_lead", "owner"].includes(profile?.role || "");
+  const paymentAuthorized = canProceedWithRideCheck(order);
   const vehicle    = [order.vehicle_year, order.vehicle_make, order.vehicle_model]
     .filter(Boolean).join(" ");
 
@@ -244,6 +311,7 @@ export default function OpsOrderDetailPage() {
                   {order.ops_status.replace(/_/g, " ")}
                 </Badge>
               )}
+              {paymentStatusBadge(order.payment_status)}
               {(() => {
                 const age = formatAge(order.updated_at);
                 return age ? (
@@ -334,6 +402,52 @@ export default function OpsOrderDetailPage() {
         );
       })()}
 
+      {/* ── Payment gate banner ─────────────────────────────── */}
+      {!paymentAuthorized && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 px-4 py-3"
+          data-testid="banner-payment-gate">
+          <Lock className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+              Field Work Locked — Payment Not Confirmed
+            </p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+              Seller outreach, RideChecker assignment, inspection, report generation, and buyer delivery are all blocked until payment is received.
+              {order.payment_status === "override_approved"
+                ? null
+                : canPaymentOverride
+                  ? " Use the Payment Override card below to unlock this order."
+                  : " Contact your Ops Lead or Admin to approve a payment override."}
+            </p>
+          </div>
+          {canPaymentOverride && !showPaymentOverrideCard && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 text-xs border-red-300 text-red-700 hover:bg-red-100"
+              onClick={() => setShowPaymentOverrideCard(true)}
+              data-testid="button-open-payment-override"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+              Approve Override
+            </Button>
+          )}
+        </div>
+      )}
+
+      {order.payment_status === "override_approved" && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-2.5"
+          data-testid="banner-override-approved">
+          <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            <span className="font-semibold">Payment Override Active</span>
+            {order.payment_override_reason && (
+              <span className="font-normal"> — {order.payment_override_reason}</span>
+            )}
+          </p>
+        </div>
+      )}
+
       {/* ── 2-column dashboard ──────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
         {/* ── LEFT column ─────────────────────────────────── */}
@@ -351,6 +465,73 @@ export default function OpsOrderDetailPage() {
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />
           <ConnecteamPanel order={order} onRefresh={loadData} />
+
+          {/* Payment Override — ops_lead / admin / owner only */}
+          {canPaymentOverride && showPaymentOverrideCard && !paymentAuthorized && (
+            <Card className="border-red-200 dark:border-red-800" data-testid="card-payment-override">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <ShieldCheck className="h-4 w-4" />
+                  Approve Payment Override
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  This unlocks seller outreach, RideChecker assignment, inspection, and report delivery
+                  for an order where payment has not been collected. Use only in exceptional circumstances.
+                </p>
+                <div className="space-y-1">
+                  <Label htmlFor="payment-override-reason" className="text-xs">Override reason <span className="text-red-500">*</span></Label>
+                  <Textarea
+                    id="payment-override-reason"
+                    className="min-h-[64px] text-xs resize-none"
+                    placeholder="e.g. Internal test, payment collected offline, pre-approved exception…"
+                    value={paymentOverrideReason}
+                    onChange={(e) => setPaymentOverrideReason(e.target.value)}
+                    data-testid="textarea-payment-override-reason"
+                  />
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="payment-override-confirm"
+                    checked={paymentOverrideConfirmed}
+                    onCheckedChange={(v) => setPaymentOverrideConfirmed(v === true)}
+                    data-testid="checkbox-payment-override-confirm"
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="payment-override-confirm" className="text-xs leading-snug cursor-pointer">
+                    I understand this allows field work to proceed without confirmed payment
+                    and that this action is logged for audit.
+                  </Label>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1 text-xs"
+                    onClick={handlePaymentOverride}
+                    disabled={paymentOverrideLoading || !paymentOverrideReason.trim() || !paymentOverrideConfirmed}
+                    data-testid="button-confirm-payment-override"
+                  >
+                    {paymentOverrideLoading ? (
+                      <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Approving…</>
+                    ) : (
+                      "Approve Override"
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => setShowPaymentOverrideCard(false)}
+                    data-testid="button-cancel-payment-override"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Package Override */}
           {canOverride && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +31,26 @@ export async function POST(
 
     const { data: assignment, error: fetchError } = await supabaseAdmin
       .from("ridechecker_job_assignments")
-      .select("id, status")
+      .select("id, status, order_id")
       .eq("id", params.assignmentId)
       .eq("ridechecker_id", session.user.id)
       .maybeSingle();
 
     if (fetchError || !assignment) {
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    }
+
+    // Payment gate — backend enforcement before inspection starts
+    if (assignment.order_id) {
+      const { data: gateOrder } = await supabaseAdmin
+        .from("orders")
+        .select("payment_status, payment_required, payment_override_approved")
+        .eq("id", assignment.order_id)
+        .single();
+
+      if (!gateOrder || !canProceedWithRideCheck(gateOrder)) {
+        return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
+      }
     }
 
     if (assignment.status !== "accepted") {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
 
 const outcomeSchema = z.object({
@@ -26,6 +27,17 @@ export async function POST(
     }
 
     const { outcome, notes } = parsed.data;
+
+    // Payment gate
+    const { data: gateOrder } = await supabaseAdmin
+      .from("orders")
+      .select("payment_status, payment_required, payment_override_approved")
+      .eq("id", params.orderId)
+      .single();
+
+    if (!gateOrder || !canProceedWithRideCheck(gateOrder)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
+    }
 
     if (outcome === "no_response") {
       const { data: order } = await supabaseAdmin

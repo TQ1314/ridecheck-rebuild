@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
 
 const attemptSchema = z.object({
@@ -29,6 +30,17 @@ export async function POST(
     }
 
     const { channel, destination, message_template_key, message_body, status } = parsed.data;
+
+    // Payment gate — check before recording any outreach
+    const { data: gateOrder } = await supabaseAdmin
+      .from("orders")
+      .select("payment_status, payment_required, payment_override_approved")
+      .eq("id", params.orderId)
+      .single();
+
+    if (!gateOrder || !canProceedWithRideCheck(gateOrder)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
+    }
 
     let attemptNumber = 1;
     if (channel !== "buyer_message") {

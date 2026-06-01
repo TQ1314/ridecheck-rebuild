@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { generateReportWithClaude } from "@/lib/report/claude-generate";
 import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
 import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel, OBDModule, TitleHistoryModule } from "@/lib/report/types";
@@ -230,6 +231,11 @@ export async function POST(
 
     if (orderError || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Payment gate
+    if (!canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.report_generation }, { status: 402 });
     }
 
     // 2. Fetch raw submission

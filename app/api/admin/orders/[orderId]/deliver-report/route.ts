@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,18 @@ export async function POST(
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model"
+        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, payment_status, payment_required, payment_override_approved"
       )
       .eq("id", params.orderId)
       .single();
 
     if (fetchError || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Payment gate
+    if (!canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.report_delivery }, { status: 402 });
     }
 
     const deliverableStatuses = ["approved", "generated", "report_ready"];

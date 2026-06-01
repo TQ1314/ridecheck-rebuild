@@ -38,7 +38,8 @@ export type PaymentStatus =
   | "paid"
   | "paid_manual_verified"
   | "failed"
-  | "refunded";
+  | "refunded"
+  | "override_approved";
 
 export interface Order {
   id: string;
@@ -65,6 +66,11 @@ export interface Order {
   payment_status: PaymentStatus;
   payment_intent_id: string | null;
   paid_at: string | null;
+  payment_required?: boolean | null;
+  payment_override_approved?: boolean | null;
+  payment_override_reason?: string | null;
+  payment_override_by?: string | null;
+  payment_override_at?: string | null;
   status: OrderStatus;
   preferred_date: string | null;
   scheduled_date: string | null;

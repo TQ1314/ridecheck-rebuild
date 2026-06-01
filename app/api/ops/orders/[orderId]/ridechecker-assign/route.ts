@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +31,17 @@ export async function PATCH(
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount")
+      .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved")
       .eq("id", params.orderId)
       .single();
 
     if (fetchErr || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Payment gate — only check when actually assigning (not unassigning)
+    if (ridechecker_id && !canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.assignment }, { status: 402 });
     }
 
     // Enforce pay-before-assign rule
