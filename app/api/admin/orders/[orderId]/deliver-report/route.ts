@@ -32,6 +32,33 @@ export async function POST(
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.report_delivery }, { status: 402 });
     }
 
+    // ── Risk Intelligence QC check ──────────────────────────────────────────
+    // If a risk check record exists but is incomplete (score not yet saved),
+    // block delivery. If no record exists at all, allow (backward compat) with warning.
+    const { data: riskChk } = await supabaseAdmin
+      .from("vehicle_risk_checks")
+      .select("id, overall_risk_score, overall_risk_level")
+      .eq("order_id", params.orderId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (riskChk && riskChk.overall_risk_score == null) {
+      return NextResponse.json(
+        {
+          error:
+            "Risk intelligence was started but did not complete. Re-run Risk Intelligence before delivering this report.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!riskChk) {
+      console.warn(
+        `[deliver-report] No risk intelligence found for order ${params.orderId} — proceeding without it.`
+      );
+    }
+
     const deliverableStatuses = ["approved", "generated", "report_ready"];
     if (!deliverableStatuses.includes(order.report_status ?? "") && !order.report_storage_path && !order.ops_report_url) {
       return NextResponse.json(

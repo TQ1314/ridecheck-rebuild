@@ -822,6 +822,109 @@ const s = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
+
+  // ── Risk Intelligence section ──────────────────────────────────────────────
+  riskBanner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  riskScoreBlock: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
+  riskScoreNum: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    lineHeight: 1,
+  },
+  riskScoreLabel: {
+    fontSize: 7,
+    marginTop: 2,
+  },
+  riskLevelBig: {
+    fontSize: 15,
+    fontFamily: "Helvetica-Bold",
+  },
+  riskModulesTable: {
+    borderWidth: 1,
+    borderRadius: 3,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  riskModuleRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  riskModuleRowLast: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  riskModuleName: {
+    width: 130,
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: "#374151",
+  },
+  riskModuleValue: {
+    flex: 1,
+    fontSize: 8,
+    color: "#374151",
+  },
+  riskModuleBadge: {
+    width: 80,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    alignSelf: "flex-start",
+  },
+  riskModuleBadgeText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+  },
+  riskReasonsList: {
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  riskReasonItem: {
+    flexDirection: "row",
+    marginBottom: 3,
+    paddingLeft: 2,
+  },
+  riskReasonBullet: {
+    width: 10,
+    fontSize: 7,
+    color: "#6b7280",
+  },
+  riskReasonText: {
+    flex: 1,
+    fontSize: 7.5,
+    color: "#374151",
+    lineHeight: 1.35,
+  },
+  riskHardStopBanner: {
+    flexDirection: "row",
+    padding: 8,
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderWidth: 1,
+    borderRadius: 4,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  riskHardStopText: {
+    fontSize: 7.5,
+    color: "#991B1B",
+    fontFamily: "Helvetica-Bold",
+    flex: 1,
+  },
 });
 
 // ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
@@ -1629,6 +1732,140 @@ function PhotoBlock({ url, caption }: { url?: string; caption: string }) {
   );
 }
 
+// ─── RISK INTELLIGENCE SECTION ───────────────────────────────────────────────
+
+function riskLevelColors(level: string): { bg: string; border: string; text: string } {
+  switch (level) {
+    case "HIGH":     return { bg: C.fail_bg,    border: "#FECACA", text: C.fail };
+    case "ELEVATED": return { bg: C.risk_bg,    border: "#FED7AA", text: C.risk };
+    case "MODERATE": return { bg: C.monitor_bg, border: "#FDE68A", text: C.monitor };
+    default:         return { bg: C.good_bg,    border: "#BBF7D0", text: C.good };
+  }
+}
+
+function riskLevelLabel(level: string): string {
+  switch (level) {
+    case "HIGH":     return "HIGH RISK";
+    case "ELEVATED": return "ELEVATED RISK";
+    case "MODERATE": return "MODERATE RISK";
+    default:         return "LOW RISK";
+  }
+}
+
+function RiskModuleBadge({ value, good }: { value: string; good: boolean }) {
+  const bg   = good ? C.good_bg    : C.monitor_bg;
+  const tc   = good ? C.good       : C.monitor;
+  const bord = good ? "#BBF7D0"    : "#FDE68A";
+  return (
+    <View style={[s.riskModuleBadge, { backgroundColor: bg, borderWidth: 1, borderColor: bord }]}>
+      <Text style={[s.riskModuleBadgeText, { color: tc }]}>{value}</Text>
+    </View>
+  );
+}
+
+function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_intelligence"]> }) {
+  const colors    = riskLevelColors(ri.overall_level);
+  const levelText = riskLevelLabel(ri.overall_level);
+
+  const vinOk     = ri.vin_valid === true;
+  const recallOk  = ri.recall_count === 0;
+  const floodOk   = ri.flood_level === "LOW";
+  const theftOk   = ri.theft_status === "CLEAR";
+  const marketOk  = ri.pricing_risk == null || ri.pricing_risk === "NONE" || ri.pricing_risk === "UNAVAILABLE";
+
+  const vinLabel    = ri.vin_valid === true ? "Verified"
+    : ri.vin_valid === false ? "Invalid / Unverified" : "Not checked";
+  const recallLabel = ri.recall_count === 0
+    ? "No recalls found" : `${ri.recall_count} recall(s) — ${ri.recall_severity}`;
+  const floodLabel  = ri.flood_level === "LOW"      ? "LOW — No significant indicators"
+    : ri.flood_level === "MODERATE" ? `MODERATE — score ${ri.flood_score}`
+    : `HIGH — score ${ri.flood_score} (${ri.flood_active_count} indicators)`;
+  const theftLabel  = ri.theft_status === "CLEAR"            ? "CLEAR"
+    : ri.theft_status === "FLAGGED"          ? "FLAGGED — manual review required"
+    : "Unable to verify — manual NICB check recommended";
+  const marketLabel = ri.market_variance_pct != null
+    ? `${ri.pricing_risk?.replace(/_/g, " ") ?? "N/A"} (${ri.market_variance_pct}% below market)`
+    : "Market data unavailable";
+
+  const modules: Array<{ name: string; value: string; good: boolean; isLast: boolean }> = [
+    { name: "VIN Verification",   value: vinLabel,    good: vinOk,    isLast: false },
+    { name: "Recall Status",       value: recallLabel, good: recallOk, isLast: false },
+    { name: "Flood Risk",          value: floodLabel,  good: floodOk,  isLast: false },
+    { name: "Theft / Salvage",     value: theftLabel,  good: theftOk,  isLast: false },
+    { name: "Price Analysis",      value: marketLabel, good: marketOk, isLast: true  },
+  ];
+
+  return (
+    <View style={s.content} break>
+      <SectionTitle title="Risk Intelligence Summary" />
+
+      {/* Overall risk banner */}
+      <View style={[s.riskBanner, { backgroundColor: colors.bg, borderColor: colors.border }]} wrap={false}>
+        <View style={s.riskScoreBlock}>
+          <Text style={[s.riskScoreNum, { color: colors.text }]}>{ri.overall_score}</Text>
+          <Text style={[s.riskScoreLabel, { color: colors.text }]}>COMPOSITE RISK SCORE</Text>
+        </View>
+        <Text style={[s.riskLevelBig, { color: colors.text }]}>{levelText}</Text>
+        <View>
+          <Text style={{ fontSize: 7, color: colors.text, textAlign: "right" }}>0–14 LOW · 15–29 MODERATE</Text>
+          <Text style={{ fontSize: 7, color: colors.text, textAlign: "right" }}>30–49 ELEVATED · 50+ HIGH</Text>
+          <Text style={{ fontSize: 7, color: colors.text, marginTop: 3, textAlign: "right" }}>
+            Checked {new Date(ri.checked_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </Text>
+        </View>
+      </View>
+
+      {/* Hard stops (if any) */}
+      {ri.hard_stops.length > 0 && (
+        <View style={s.riskHardStopBanner} wrap={false}>
+          <Text style={s.riskHardStopText}>
+            ⚠ Critical Flags: {ri.hard_stops.join(" · ")}
+          </Text>
+        </View>
+      )}
+
+      {/* Per-module table */}
+      <View style={[s.riskModulesTable, { borderColor: C.border }]}>
+        {modules.map((mod, i) => (
+          <View
+            key={i}
+            style={[
+              mod.isLast ? s.riskModuleRowLast : s.riskModuleRow,
+              { borderColor: C.border, backgroundColor: i % 2 === 0 ? "#f9fafb" : "#fff" },
+            ]}
+            wrap={false}
+          >
+            <Text style={s.riskModuleName}>{mod.name}</Text>
+            <Text style={s.riskModuleValue}>{mod.value}</Text>
+            <RiskModuleBadge value={mod.good ? "PASS" : "REVIEW"} good={mod.good} />
+          </View>
+        ))}
+      </View>
+
+      {/* Contributing risk reasons */}
+      {ri.reasons.length > 0 && (
+        <View style={s.riskReasonsList}>
+          <Text style={{ fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.gray_700, marginBottom: 4 }}>
+            Risk Contributing Factors
+          </Text>
+          {ri.reasons.map((reason, i) => (
+            <View key={i} style={s.riskReasonItem}>
+              <Text style={s.riskReasonBullet}>▸</Text>
+              <Text style={s.riskReasonText}>{reason}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>
+        Risk scores are computed from NHTSA recall data, physical flood indicators, VIN verification,
+        and listing price analysis. Theft/salvage status requires manual NICB or NMVTIS verification
+        when no provider is configured. This section supplements — and does not replace — physical inspection findings.
+      </Text>
+    </View>
+  );
+}
+
 // ─── MAIN DOCUMENT ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -1771,6 +2008,11 @@ export function RideCheckReport({ report, meta }: Props) {
         {/* ── Title & History Flags ── */}
         {meta.title_history_module && (
           <TitleHistoryFlagsSection thf={meta.title_history_module} />
+        )}
+
+        {/* ── Risk Intelligence Summary ── */}
+        {meta.risk_intelligence && (
+          <RiskIntelligenceSection ri={meta.risk_intelligence} />
         )}
 
         {/* ── OBD Table (AI-interpreted entries) ── */}

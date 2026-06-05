@@ -325,10 +325,19 @@ export async function POST(
         ? [{ url: submission.title_history_module.door_jamb_vin_photo_url, label: "VIN — door jamb" }] : []),
     ].filter((p) => !!p.url);
 
-    // 4a. Run photo validation + report generation in parallel
-    const [generatedReport, photoValidationResults] = await Promise.all([
+    // 4a. Run report generation, photo validation, and risk check fetch in parallel
+    const riskCheckPromise = supabaseAdmin
+      .from("vehicle_risk_checks")
+      .select("overall_risk_score, overall_risk_level, score_reasons, updated_at")
+      .eq("order_id", params.orderId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const [generatedReport, photoValidationResults, riskCheckResult] = await Promise.all([
       generateReportWithClaude(reportInput),
       validatePhotos(rawPhotos),
+      riskCheckPromise,
     ]);
 
     const { approved, excluded } = partitionResults(photoValidationResults);
@@ -385,7 +394,42 @@ export async function POST(
       title_history_module:   submission.title_history_module ?? undefined,
     };
 
-    // 6. Generate PDF
+    // 5b. Attach risk intelligence to meta if available (riskCheckResult from parallel block above)
+    if (riskCheckResult.data?.overall_risk_score != null) {
+      const rc = riskCheckResult.data;
+
+      // Fetch sub-checks to build summary
+      const [vinChk, recallChk, floodChk, theftChk, marketChk] = await Promise.all([
+        supabaseAdmin.from("vehicle_vin_checks").select("*").eq("order_id", params.orderId).order("checked_at", { ascending: false }).limit(1).maybeSingle(),
+        supabaseAdmin.from("vehicle_recall_checks").select("*").eq("order_id", params.orderId).order("checked_at", { ascending: false }).limit(1).maybeSingle(),
+        supabaseAdmin.from("vehicle_flood_checks").select("*").eq("order_id", params.orderId).order("checked_at", { ascending: false }).limit(1).maybeSingle(),
+        supabaseAdmin.from("vehicle_theft_checks").select("*").eq("order_id", params.orderId).order("checked_at", { ascending: false }).limit(1).maybeSingle(),
+        supabaseAdmin.from("vehicle_market_value_checks").select("*").eq("order_id", params.orderId).order("checked_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+
+      reportMeta.risk_intelligence = {
+        overall_score:       rc.overall_risk_score as number,
+        overall_level:       rc.overall_risk_level as "LOW" | "MODERATE" | "ELEVATED" | "HIGH",
+        vin_valid:           (vinChk.data?.vin_valid ?? null) as boolean | null,
+        vin_decoded_make:    (vinChk.data?.decoded_make ?? null) as string | null,
+        vin_decoded_year:    (vinChk.data?.decoded_year ?? null) as string | null,
+        recall_count:        (recallChk.data?.recall_count ?? 0) as number,
+        recall_severity:     (recallChk.data?.highest_severity ?? "NONE") as string,
+        flood_score:         (floodChk.data?.flood_risk_score ?? 0) as number,
+        flood_level:         (floodChk.data?.flood_risk_level ?? "LOW") as string,
+        flood_active_count:  (() => {
+          const findings = floodChk.data?.findings as { indicators?: Array<{ present: boolean }> } | null;
+          return (findings?.indicators ?? []).filter((i) => i.present).length;
+        })(),
+        theft_status:        (theftChk.data?.theft_status ?? "UNABLE_TO_VERIFY") as string,
+        market_variance_pct: (marketChk.data?.variance_percent ?? null) as number | null,
+        pricing_risk:        (marketChk.data?.pricing_risk_level ?? null) as string | null,
+        reasons:             (Array.isArray(rc.score_reasons) ? rc.score_reasons : []) as string[],
+        hard_stops:          [] as string[],
+        checked_at:          (rc.updated_at ?? new Date().toISOString()) as string,
+      };
+    }
+
     const { renderToBuffer } = await import("@react-pdf/renderer");
     const { RideCheckReport }  = await import("@/lib/report/pdf-template");
 

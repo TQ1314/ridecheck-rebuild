@@ -167,6 +167,26 @@ export interface ReportMeta {
   road_test_module?: RoadTestModule;
   obd_module?: OBDModule;
   title_history_module?: TitleHistoryModule;
+  risk_intelligence?: RiskIntelligenceSummary;
+}
+
+export interface RiskIntelligenceSummary {
+  overall_score:       number;
+  overall_level:       "LOW" | "MODERATE" | "ELEVATED" | "HIGH";
+  vin_valid:           boolean | null;
+  vin_decoded_make:    string | null;
+  vin_decoded_year:    string | null;
+  recall_count:        number;
+  recall_severity:     string;
+  flood_score:         number;
+  flood_level:         string;
+  flood_active_count:  number;
+  theft_status:        string;
+  market_variance_pct: number | null;
+  pricing_risk:        string | null;
+  reasons:             string[];
+  hard_stops:          string[];
+  checked_at:          string;
 }
 
 export interface ReportInput {
