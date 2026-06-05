@@ -1,0 +1,382 @@
+RIDECHECK TITLE & TRANSFER READINESS WORKFLOW
+
+Goal:
+Add a Title & Transfer Readiness section into the existing RideChecker inspection workflow.
+
+This should NOT overhaul the inspection flow.
+It should become a required workflow section near VIN / document verification.
+
+Purpose:
+RideCheck should help buyers identify transfer-document risks before they hand over money.
+
+RideCheck is NOT providing legal advice, DMV services, notary services, or ownership guarantees.
+RideCheck is documenting visible title/transfer readiness indicators only.
+
+════════════════════════════════════
+PHASE 1 — DATABASE
+════════════════════════════════════
+
+Create a migration for:
+
+vehicle_title_transfer_checks
+
+Fields:
+
+- id UUID primary key default gen_random_uuid()
+- order_id UUID not null references orders(id) on delete cascade
+- vin TEXT
+
+- title_present BOOLEAN
+- seller_name_on_title TEXT NULL
+- buyer_name_completed BOOLEAN
+- odometer_disclosure_completed BOOLEAN
+- lien_release_present BOOLEAN
+- title_signed BOOLEAN
+- open_title BOOLEAN
+- vin_matches_title BOOLEAN
+- state_of_title TEXT NULL
+
+- title_photo_url TEXT NULL
+- lien_release_photo_url TEXT NULL
+- odometer_disclosure_photo_url TEXT NULL
+
+- transfer_readiness_status TEXT DEFAULT 'unknown'
+  Allowed values:
+  ready
+  caution
+  concern
+  unknown
+
+- risk_flags JSONB DEFAULT '[]'
+- notes TEXT NULL
+
+- checked_at TIMESTAMPTZ DEFAULT now()
+- created_at TIMESTAMPTZ DEFAULT now()
+- updated_at TIMESTAMPTZ DEFAULT now()
+
+Add indexes:
+- order_id
+- vin
+- transfer_readiness_status
+
+════════════════════════════════════
+PHASE 2 — RIDECHECKER WORKFLOW UI
+════════════════════════════════════
+
+Add a required section:
+
+Title & Transfer Readiness
+
+Place it after:
+- VIN verification
+- odometer capture
+
+Before:
+- exterior inspection
+
+Fields:
+
+1. Title present?
+Type: Yes / No / Unable to verify
+Required
+
+2. Seller name on title?
+Type: Text input or Unable to verify
+Required if title present = Yes
+
+3. Buyer name completed?
+Type: Yes / No / Not applicable / Unable to verify
+Required
+
+4. Odometer disclosure section completed?
+Type: Yes / No / Not applicable / Unable to verify
+Required
+
+5. Lien release present?
+Type: Yes / No / Not applicable / Unable to verify
+Required
+
+6. Title signed?
+Type: Yes / No / Not applicable / Unable to verify
+Required
+
+7. Open title?
+Type: Yes / No / Unable to verify
+Required
+
+Definition helper text:
+"An open title may mean the title has been signed by a prior owner but the buyer section is blank or incomplete."
+
+8. VIN matches title?
+Type: Yes / No / Unable to verify
+Required
+
+9. State of title?
+Type: Dropdown
+Options:
+- Illinois
+- Wisconsin
+- Indiana
+- Michigan
+- Iowa
+- Missouri
+- Other
+- Unable to verify
+
+10. Title photo upload
+Required if title present = Yes
+
+11. Lien release photo upload
+Required if lien_release_present = Yes
+
+12. Notes
+Optional
+
+Add helper text:
+"Do not provide legal advice. Do not tell buyer or seller whether the document is legally valid. Record only what is visible."
+
+════════════════════════════════════
+PHASE 3 — TRANSFER READINESS LOGIC
+════════════════════════════════════
+
+Create:
+
+/lib/risk-intelligence/title-transfer-check.ts
+
+Export:
+
+calculateTransferReadiness(input)
+
+Logic:
+
+Start with status = ready.
+
+Set status = concern if any of these are true:
+
+- title_present = false
+- vin_matches_title = false
+- open_title = true
+- lien_release_present = false when lien is indicated
+- seller_name_on_title missing/unverified
+- odometer_disclosure_completed = false when applicable
+
+Set status = caution if:
+
+- buyer_name_completed = false
+- title_signed = false
+- state_of_title = Other
+- any required field = unable_to_verify
+
+Risk flags:
+
+TITLE_NOT_PRESENT
+VIN_TITLE_MISMATCH
+OPEN_TITLE
+SELLER_NAME_UNVERIFIED
+ODOMETER_DISCLOSURE_INCOMPLETE
+LIEN_RELEASE_MISSING
+TITLE_UNSIGNED
+OUT_OF_STATE_TITLE
+BUYER_NAME_NOT_COMPLETED
+UNABLE_TO_VERIFY_DOCUMENTS
+
+Return:
+
+{
+  transferReadinessStatus,
+  riskFlags,
+  summary
+}
+
+════════════════════════════════════
+PHASE 4 — API ROUTES
+════════════════════════════════════
+
+Create or update:
+
+POST
+/api/ridechecker/orders/[orderId]/title-transfer-check
+
+GET
+/api/ridechecker/orders/[orderId]/title-transfer-check
+
+Rules:
+- Must require authenticated RideChecker assigned to the order OR ops/admin
+- Must require payment authorization OR payment override
+- Save checklist data
+- Run calculateTransferReadiness()
+- Store result in vehicle_title_transfer_checks
+
+If unpaid and no override:
+Return HTTP 402:
+"Payment is required before title transfer review can be submitted."
+
+════════════════════════════════════
+PHASE 5 — RISK INTELLIGENCE INTEGRATION
+════════════════════════════════════
+
+Update overall risk scoring.
+
+If transfer_readiness_status = ready:
++0
+
+If caution:
++8
+
+If concern:
++20
+
+Hard escalation:
+If VIN_TITLE_MISMATCH or OPEN_TITLE or TITLE_NOT_PRESENT:
+overall transaction risk must be at least elevated.
+
+If lien release missing when lien is indicated:
+overall transaction risk must be at least elevated.
+
+════════════════════════════════════
+PHASE 6 — REPORT INTEGRATION
+════════════════════════════════════
+
+Add buyer-facing report section:
+
+TITLE & TRANSFER READINESS
+
+Display:
+
+- Title present
+- VIN matches title
+- Seller name consistency
+- Buyer name completed
+- Odometer disclosure completed
+- Lien release present
+- Title signed
+- Open title indicator
+- State of title
+- Transfer readiness status
+
+Statuses:
+
+GREEN:
+Ready
+
+YELLOW:
+Caution
+
+RED:
+Concern
+
+GRAY:
+Unable to verify
+
+Safe wording:
+
+"RideCheck reviewed visible title/transfer indicators provided at the time of inspection."
+
+"RideCheck does not verify legal ownership, guarantee transferability, provide notary services, or replace DMV/title verification."
+
+"Transfer concern identified. Buyer should verify title status with the appropriate state motor vehicle authority before completing purchase."
+
+Do NOT say:
+
+- Seller is not the owner
+- Title is fraudulent
+- Vehicle cannot be transferred
+- Buyer should or should not buy
+
+════════════════════════════════════
+PHASE 7 — QC DELIVERY GATE
+════════════════════════════════════
+
+Before report delivery, QC must verify:
+
+- Title & Transfer section completed
+- If title present = Yes, title photo is uploaded
+- If lien release present = Yes, lien release photo uploaded
+- VIN/title mismatch is clearly flagged
+- Any concern status is supported by checklist data
+- Buyer-facing wording is neutral and evidence-based
+
+If incomplete:
+Block report delivery with:
+
+"Title & Transfer Readiness review incomplete."
+
+════════════════════════════════════
+PHASE 8 — OPS DASHBOARD
+════════════════════════════════════
+
+On order detail page, show:
+
+Title & Transfer Readiness card
+
+Fields:
+- Status
+- Risk flags
+- VIN matches title
+- Open title
+- Lien release present
+- State of title
+- Photo links
+
+Use badges:
+
+GREEN Ready
+YELLOW Caution
+RED Concern
+GRAY Unable to Verify
+
+════════════════════════════════════
+PHASE 9 — TESTING
+════════════════════════════════════
+
+Test cases:
+
+1. Clean title
+- title present yes
+- VIN matches yes
+- no lien issue
+- odometer disclosure completed
+Expected: ready
+
+2. No title present
+Expected: concern
+
+3. VIN does not match title
+Expected: concern + elevated transaction risk
+
+4. Open title detected
+Expected: concern + elevated transaction risk
+
+5. Out-of-state title
+Expected: caution
+
+6. Missing lien release
+Expected: concern
+
+7. Unpaid order
+Expected: HTTP 402 and workflow locked
+
+8. Regular RideChecker not assigned to order
+Expected: access denied
+
+════════════════════════════════════
+DELIVERABLES
+════════════════════════════════════
+
+Return:
+
+1. Files created
+2. Files modified
+3. Migration added
+4. API routes added
+5. RideChecker UI section added
+6. Risk scoring updated
+7. Report section added
+8. QC delivery gate added
+9. Ops dashboard card added
+10. Build result
+11. Test result
+
+Important:
+Do not overhaul the inspection workflow.
+Add Title & Transfer Readiness as a required document-verification section inside the existing RideChecker workflow.

@@ -88,7 +88,50 @@ export function computeRiskScore(input: RiskScoreInput): RiskScoreOutput {
     reasons.push("Listing price is moderately below estimated market value");
   }
 
-  const level = toLevel(score);
+  // ── Title & Transfer Readiness ────────────────────────────────────────────
+  if (input.titleTransfer) {
+    const tt = input.titleTransfer;
+
+    if (tt.transferReadinessStatus === "concern") {
+      score += 20;
+      const concernFlags = tt.riskFlags.filter((f) =>
+        ["VIN_TITLE_MISMATCH", "OPEN_TITLE", "TITLE_NOT_PRESENT", "LIEN_RELEASE_MISSING"].includes(f)
+      );
+      reasons.push(
+        `Title & Transfer concern — ${tt.riskFlags.slice(0, 3).join(", ")}${tt.riskFlags.length > 3 ? "…" : ""}`,
+      );
+      if (concernFlags.includes("VIN_TITLE_MISMATCH")) {
+        hardStops.push("VIN does not match title documentation");
+      }
+      if (concernFlags.includes("OPEN_TITLE")) {
+        hardStops.push("Open title detected — prior ownership chain may be incomplete");
+      }
+      if (concernFlags.includes("TITLE_NOT_PRESENT")) {
+        hardStops.push("Title not present at time of inspection");
+      }
+      if (concernFlags.includes("LIEN_RELEASE_MISSING")) {
+        hardStops.push("Lien indicated but release not present");
+      }
+    } else if (tt.transferReadinessStatus === "caution") {
+      score += 8;
+      reasons.push(
+        `Title & Transfer caution — ${tt.riskFlags.slice(0, 3).join(", ")}${tt.riskFlags.length > 3 ? "…" : ""}`,
+      );
+    }
+  }
+
+  let level = toLevel(score);
+
+  // Hard-stop escalation: title concern forces at least ELEVATED
+  if (
+    input.titleTransfer &&
+    ["VIN_TITLE_MISMATCH", "OPEN_TITLE", "TITLE_NOT_PRESENT", "LIEN_RELEASE_MISSING"].some((f) =>
+      input.titleTransfer!.riskFlags.includes(f)
+    ) &&
+    (level === "LOW" || level === "MODERATE")
+  ) {
+    level = "ELEVATED";
+  }
 
   // Hard-stop escalation: add hard stops for combined HIGH + flood
   if (level === "HIGH" && input.floodResult.floodRiskLevel === "HIGH" && highRecalls.length > 0) {

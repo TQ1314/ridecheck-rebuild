@@ -43,6 +43,7 @@ const createOrderSchema = z.object({
   listing_source: z.enum(["online_marketplace", "dealership", "roadside"]).optional(),
   platform_source: z.string().max(60).nullable().optional(),
   vehicle_seen_location: z.string().max(300).nullable().optional(),
+  seller_type: z.enum(["private_party", "dealership", "auction", "other"]).optional(),
 });
 
 function safeString(v: unknown, fallback = "") {
@@ -183,6 +184,7 @@ export async function POST(req: NextRequest) {
       vehicle_seen_location: data.vehicle_seen_location ?? null,
       seller_name: data.seller_name ?? null,
       seller_phone: data.seller_phone ?? null,
+      seller_type: data.seller_type ?? "private_party",
 
       package: serverPackage,
       preferred_date: data.preferred_date ?? null,

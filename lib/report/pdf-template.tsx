@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import type { GeneratedReport, ReportMeta, RoadTestModule, OBDModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel } from "./types";
+import type { GeneratedReport, ReportMeta, RoadTestModule, OBDModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel, TitleTransferReadinessSummary } from "./types";
 
 Font.register({
   family: "Helvetica",
@@ -1763,6 +1763,103 @@ function RiskModuleBadge({ value, good }: { value: string; good: boolean }) {
   );
 }
 
+function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSummary }) {
+  const statusColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
+    ready:   { bg: C.green_light, border: C.green_medium, text: C.green_dark, label: "READY" },
+    caution: { bg: "#fef9c3",     border: "#ca8a04",      text: "#713f12",   label: "CAUTION" },
+    concern: { bg: "#fee2e2",     border: "#dc2626",      text: "#7f1d1d",   label: "CONCERN" },
+    unknown: { bg: C.gray_100,    border: C.gray_400,     text: C.gray_700,  label: "UNKNOWN" },
+  };
+  const sc = statusColors[ttr.transfer_readiness_status] ?? statusColors.unknown;
+
+  const flagLabels: Record<string, string> = {
+    TITLE_NOT_PRESENT:              "Title not present at inspection",
+    VIN_TITLE_MISMATCH:             "VIN on vehicle does not match title",
+    OPEN_TITLE:                     "Open/blank title observed — chain-of-title concern",
+    SELLER_NAME_UNVERIFIED:         "Seller name on title could not be verified",
+    ODOMETER_DISCLOSURE_INCOMPLETE: "Odometer disclosure not completed",
+    LIEN_RELEASE_MISSING:           "Lien release document not present",
+    TITLE_UNSIGNED:                 "Title not signed by seller",
+    OUT_OF_STATE_TITLE:             "Out-of-state title may require additional transfer steps",
+    BUYER_NAME_NOT_COMPLETED:       "Buyer name section not filled in",
+    UNABLE_TO_VERIFY_DOCUMENTS:     "One or more documents could not be fully verified",
+  };
+
+  const checkItems: { label: string; value: string | boolean | null; }[] = [
+    { label: "Title Present",               value: ttr.title_present === true ? "Yes" : ttr.title_present === false ? "No" : "N/A" },
+    { label: "VIN Matches Title",           value: ttr.vin_matches_title ?? "—" },
+    { label: "Open Title",                  value: ttr.open_title ?? "—" },
+    { label: "Title Signed",                value: ttr.title_signed ?? "—" },
+    { label: "Odometer Disclosure",         value: ttr.odometer_disclosure_completed ?? "—" },
+    { label: "Lien Release",                value: ttr.lien_release_present ?? "—" },
+    { label: "Buyer Name Completed",        value: ttr.buyer_name_completed ?? "—" },
+    { label: "State of Title",              value: ttr.state_of_title ?? "—" },
+  ];
+
+  return (
+    <View style={s.content} wrap={false}>
+      <SectionTitle title="Title & Transfer Readiness" />
+
+      {/* Status banner */}
+      <View style={[s.thfIndicatorGroup, { backgroundColor: sc.bg, borderColor: sc.border, marginBottom: 8 }]}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: sc.text, marginBottom: 2 }}>
+              Transfer Readiness: {sc.label}
+            </Text>
+            <Text style={{ fontSize: 7.5, color: sc.text, lineHeight: 1.4 }}>{ttr.summary}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Checklist grid */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+        {checkItems.map((item) => {
+          const val = String(item.value ?? "—");
+          const isBad = val === "no" || val === "No" || val === "unable_to_verify";
+          const isGood = val === "yes" || val === "Yes";
+          const dotColor = isGood ? C.good : isBad ? C.fail : C.gray_400;
+          return (
+            <View key={item.label} style={{ width: "48%", flexDirection: "row", alignItems: "flex-start", gap: 5 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: dotColor, marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 7, color: C.gray_600, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.3 }}>{item.label}</Text>
+                <Text style={{ fontSize: 8, color: C.gray_900 }}>{val}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Flags */}
+      {ttr.risk_flags.length > 0 && (
+        <View style={[s.thfIndicatorGroup, { borderColor: sc.border }]}>
+          <Text style={s.thfIndicatorGroupTitle}>Flags Identified</Text>
+          {ttr.risk_flags.map((flag, i) => (
+            <View key={i} style={s.thfIndicatorRow}>
+              <View style={[s.thfIndicatorDot, { backgroundColor: C.fail }]} />
+              <Text style={s.thfIndicatorText}>{flagLabels[flag] ?? flag}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Seller name */}
+      {ttr.seller_name_on_title && (
+        <View style={{ marginBottom: 6 }}>
+          <Text style={s.thfNotesLabel}>Seller Name on Title</Text>
+          <Text style={s.thfNotesText}>{ttr.seller_name_on_title}</Text>
+        </View>
+      )}
+
+      <Text style={{ fontSize: 6.5, color: C.gray_400, marginTop: 2 }}>
+        Reviewed at inspection on {ttr.checked_at ? new Date(ttr.checked_at).toLocaleDateString("en-US") : "—"}.
+        This review is observational only and does not constitute legal title verification.
+      </Text>
+    </View>
+  );
+}
+
 function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_intelligence"]> }) {
   const colors    = riskLevelColors(ri.overall_level);
   const levelText = riskLevelLabel(ri.overall_level);
@@ -2008,6 +2105,11 @@ export function RideCheckReport({ report, meta }: Props) {
         {/* ── Title & History Flags ── */}
         {meta.title_history_module && (
           <TitleHistoryFlagsSection thf={meta.title_history_module} />
+        )}
+
+        {/* ── Title & Transfer Readiness ── */}
+        {meta.title_transfer_readiness && (
+          <TitleTransferReadinessSection ttr={meta.title_transfer_readiness} />
         )}
 
         {/* ── Risk Intelligence Summary ── */}

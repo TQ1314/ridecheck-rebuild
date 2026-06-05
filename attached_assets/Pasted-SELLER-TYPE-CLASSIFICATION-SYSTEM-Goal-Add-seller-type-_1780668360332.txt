@@ -1,0 +1,379 @@
+SELLER TYPE CLASSIFICATION SYSTEM
+
+Goal:
+
+Add seller_type classification to RideCheck so workflows can dynamically adapt based on who is selling the vehicle.
+
+This should become a foundational field used throughout:
+
+* Order creation
+* Ops workflow
+* Seller contact
+* RideChecker workflow
+* Risk Intelligence
+* Report generation
+* QC review
+
+Do NOT create separate order systems.
+
+Create one order workflow with conditional logic based on seller_type.
+
+════════════════════════════════════
+PHASE 1 — DATABASE
+════════════════════════════════════
+
+Add column to orders table:
+
+seller_type TEXT DEFAULT 'private_party'
+
+Allowed values:
+
+* private_party
+* dealership
+* auction
+* other
+
+Add index:
+
+CREATE INDEX idx_orders_seller_type
+ON orders(seller_type);
+
+Backfill existing records:
+
+seller_type = 'private_party'
+
+for all existing orders.
+
+════════════════════════════════════
+PHASE 2 — ORDER CREATION
+════════════════════════════════════
+
+Buyer must select seller type during order creation.
+
+Add field:
+
+"Who is selling this vehicle?"
+
+Options:
+
+○ Private Seller
+○ Dealership
+○ Auction
+○ Other
+
+Store selected value in:
+
+seller_type
+
+Required field.
+
+Default:
+
+private_party
+
+════════════════════════════════════
+PHASE 3 — OPS DASHBOARD
+════════════════════════════════════
+
+Show Seller Type badge on:
+
+* Order list
+* Order detail page
+* Assignment page
+* QC page
+
+Display:
+
+👤 Private Seller
+
+🏢 Dealership
+
+🔨 Auction
+
+❓ Other
+
+Allow filtering by seller_type.
+
+════════════════════════════════════
+PHASE 4 — WORKFLOW BRANCHING
+════════════════════════════════════
+
+Create helper:
+
+getSellerWorkflowType(order)
+
+Returns:
+
+private_party
+dealership
+auction
+other
+
+Used everywhere.
+
+════════════════════════════════════
+PRIVATE PARTY WORKFLOW
+════════════════════════════════════
+
+Show:
+
+Title & Transfer Readiness
+
+Fields:
+
+* Title present
+* Seller name on title
+* Buyer name completed
+* Odometer disclosure completed
+* Lien release present
+* Title signed
+* Open title
+* VIN matches title
+* State of title
+
+Generate:
+
+Transfer Readiness Status
+
+════════════════════════════════════
+DEALERSHIP WORKFLOW
+════════════════════════════════════
+
+Hide:
+
+Title & Transfer Readiness
+
+Show:
+
+Dealer Documentation Review
+
+Fields:
+
+* Dealer name
+* Dealer address
+* Dealer license visible
+* VIN matches vehicle
+* Buyer's Guide displayed
+* Dealer discloses title status
+* Dealer indicates title available at sale
+* Odometer disclosure available
+* Service records available
+* Road test allowed
+* OBD scan allowed
+
+Generate:
+
+Dealer Documentation Status
+
+Statuses:
+
+complete
+partial
+concern
+
+════════════════════════════════════
+AUCTION WORKFLOW
+════════════════════════════════════
+
+Hide:
+
+Private title workflow
+
+Hide:
+
+Dealer documentation workflow
+
+Show:
+
+Auction Disclosure Review
+
+Fields:
+
+* Auction name
+* Auction type
+* VIN verified
+* Vehicle starts
+* Keys available
+* Title status disclosed
+* Odometer status disclosed
+* Run/drive status disclosed
+* Arbitration eligibility disclosed
+
+Generate:
+
+Auction Transparency Status
+
+Statuses:
+
+complete
+partial
+concern
+
+════════════════════════════════════
+OTHER WORKFLOW
+════════════════════════════════════
+
+Show simplified workflow.
+
+Fields:
+
+* Seller description
+* VIN verified
+* Documentation available
+* Ownership documentation visible
+* Notes
+
+Generate:
+
+Documentation Status
+
+════════════════════════════════════
+PHASE 5 — REPORT INTEGRATION
+════════════════════════════════════
+
+Add seller type section near vehicle information.
+
+Display:
+
+Seller Type
+
+Private Seller
+
+Dealership
+
+Auction
+
+Other
+
+Then dynamically render:
+
+Private Seller:
+Title & Transfer Readiness
+
+Dealership:
+Dealer Documentation Review
+
+Auction:
+Auction Disclosure Review
+
+Other:
+Documentation Review
+
+Never display irrelevant sections.
+
+════════════════════════════════════
+PHASE 6 — RISK INTELLIGENCE
+════════════════════════════════════
+
+Use seller_type in scoring.
+
+Private Party:
+
+Increase weight of:
+
+* title issues
+* lien issues
+* ownership inconsistencies
+
+Dealership:
+
+Increase weight of:
+
+* disclosure issues
+* denied OBD scan
+* denied road test
+
+Auction:
+
+Increase weight of:
+
+* missing disclosures
+* title uncertainty
+* arbitration limitations
+
+Other:
+
+Use neutral weighting.
+
+════════════════════════════════════
+PHASE 7 — QC REVIEW
+════════════════════════════════════
+
+QC must verify:
+
+Correct seller_type selected.
+
+If:
+
+seller_type = private_party
+
+Require:
+
+Title & Transfer Readiness completed.
+
+If:
+
+seller_type = dealership
+
+Require:
+
+Dealer Documentation Review completed.
+
+If:
+
+seller_type = auction
+
+Require:
+
+Auction Disclosure Review completed.
+
+Block report delivery if required workflow is incomplete.
+
+════════════════════════════════════
+PHASE 8 — API TYPES
+════════════════════════════════════
+
+Create:
+
+export type SellerType =
+| 'private_party'
+| 'dealership'
+| 'auction'
+| 'other';
+
+Update:
+
+Order interface
+
+Order creation schema
+
+Order update schema
+
+Risk Intelligence types
+
+Report types
+
+QC types
+
+════════════════════════════════════
+DELIVERABLES
+════════════════════════════════════
+
+Return:
+
+1. Files modified
+2. Database migration
+3. Order creation changes
+4. Dashboard changes
+5. Workflow branching added
+6. Report integration
+7. Risk Intelligence updates
+8. QC enforcement
+9. Build result
+10. Test result
+
+Important:
+
+Do not create four separate systems.
+
+Create one RideCheck workflow that dynamically adapts based on seller_type.

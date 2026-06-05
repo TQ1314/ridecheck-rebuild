@@ -78,6 +78,10 @@ export default function InspectWizardPage() {
   const [issueSaving, setIssueSaving] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [saveState, setSaveState]     = useState<"idle" | "saving" | "saved">("idle");
+  const [sellerType, setSellerType]   = useState<string | null>(null);
+  const [showTTInterstitial, setShowTTInterstitial] = useState(false);
+  const [ttPending, setTtPending]     = useState(false);
+  const [ttSaved, setTtSaved]         = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localKey  = `inspect_draft_${assignmentId}`;
@@ -105,6 +109,7 @@ export default function InspectWizardPage() {
             address: d.order?.inspection_address, location: d.order?.vehicle_location,
           });
           if (d.order?.id) setOrderId(d.order.id);
+          if (d.order?.seller_type) setSellerType(d.order.seller_type);
         }
       } catch { /* vehicle info is non-blocking */ }
 
@@ -650,7 +655,15 @@ export default function InspectWizardPage() {
             style={{ background: currentComplete ? RC_GREEN : undefined }}
             variant={currentComplete ? "default" : "secondary"}
             disabled={!currentComplete}
-            onClick={() => { setStepIndex((i) => i + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            onClick={() => {
+              const step = INSPECTION_STEPS[stepIndex];
+              if (step.key === "title_paperwork" && sellerType === "private_party") {
+                setShowTTInterstitial(true);
+                return;
+              }
+              setStepIndex((i) => i + 1);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             data-testid="button-next-step"
           >
             {!currentComplete
@@ -672,6 +685,46 @@ export default function InspectWizardPage() {
           </Button>
         )}
       </div>
+
+      {/* ── Title Transfer Interstitial ─────────────────────────────────────── */}
+      {showTTInterstitial && (
+        <TitleTransferInterstitial
+          orderId={orderId}
+          assignmentId={assignmentId}
+          saved={ttSaved}
+          pending={ttPending}
+          onSave={async (data) => {
+            setTtPending(true);
+            try {
+              const res = await fetch(`/api/ridechecker/orders/${orderId}/title-transfer-check`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+              });
+              if (res.ok) {
+                setTtSaved(true);
+                setTimeout(() => {
+                  setShowTTInterstitial(false);
+                  setStepIndex((i) => i + 1);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }, 800);
+              } else {
+                const d = await res.json() as { error?: string };
+                toast({ title: d.error ?? "Failed to save title check", variant: "destructive" });
+              }
+            } catch {
+              toast({ title: "Failed to save title check", variant: "destructive" });
+            } finally {
+              setTtPending(false);
+            }
+          }}
+          onSkip={() => {
+            setShowTTInterstitial(false);
+            setStepIndex((i) => i + 1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
 
       {/* ── Section nav drawer ─────────────────────────────────────────────── */}
       {showSectionNav && (
@@ -818,6 +871,230 @@ function PhotoCountBadge({ count, required }: { count: number; required: number 
     }`}>
       {count}/{required} photos
     </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TitleTransferInterstitial — shown after title_paperwork for private_party
+// ─────────────────────────────────────────────────────────────────────────────
+
+type TTField = "yes" | "no" | "not_applicable" | "unable_to_verify";
+type TTYesNoUnable = "yes" | "no" | "unable_to_verify";
+
+interface TTFormData {
+  title_present:                 boolean | null;
+  seller_name_on_title:          string;
+  buyer_name_completed:          TTField | "";
+  odometer_disclosure_completed: TTField | "";
+  lien_release_present:          TTField | "";
+  title_signed:                  TTField | "";
+  open_title:                    TTYesNoUnable | "";
+  vin_matches_title:             TTYesNoUnable | "";
+  state_of_title:                string;
+  notes:                         string;
+}
+
+function SelectRow({
+  label, value, options, onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+              value === o.value
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/40"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TitleTransferInterstitial({
+  saved, pending, onSave, onSkip,
+}: {
+  orderId: string;
+  assignmentId: string;
+  saved: boolean;
+  pending: boolean;
+  onSave: (data: Partial<TTFormData>) => void;
+  onSkip: () => void;
+}) {
+  const [form, setForm] = useState<TTFormData>({
+    title_present: null,
+    seller_name_on_title: "",
+    buyer_name_completed: "",
+    odometer_disclosure_completed: "",
+    lien_release_present: "",
+    title_signed: "",
+    open_title: "",
+    vin_matches_title: "",
+    state_of_title: "",
+    notes: "",
+  });
+
+  const set = (k: keyof TTFormData, v: TTFormData[keyof TTFormData]) =>
+    setForm((prev) => ({ ...prev, [k]: v }));
+
+  const ynaOptions = [
+    { value: "yes",              label: "Yes" },
+    { value: "no",               label: "No" },
+    { value: "unable_to_verify", label: "Unable to verify" },
+  ];
+  const ynnaOptions = [
+    { value: "yes",              label: "Yes" },
+    { value: "no",               label: "No" },
+    { value: "not_applicable",   label: "N/A" },
+    { value: "unable_to_verify", label: "Unable" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center">
+      <div className="bg-background w-full max-w-lg rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-background border-b px-5 py-4 flex items-center justify-between z-10">
+          <div>
+            <h2 className="font-bold text-base flex items-center gap-2">
+              <span>📋</span> Title &amp; Transfer Check
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Private-party transaction — title review required</p>
+          </div>
+          <button
+            onClick={onSkip}
+            className="text-xs text-muted-foreground underline ml-4 shrink-0"
+            data-testid="button-tt-skip"
+          >
+            Skip
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-5">
+          {/* Title present */}
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Title Present at Inspection?</p>
+            <div className="flex gap-2">
+              {[{ v: true, label: "Yes, present" }, { v: false, label: "Not present" }].map(({ v, label }) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => set("title_present", v)}
+                  className={`flex-1 text-xs px-3 py-2 rounded-lg border font-medium transition-colors ${
+                    form.title_present === v
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                  data-testid={`button-tt-title-present-${String(v)}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.title_present !== null && (
+            <>
+              <SelectRow label="VIN Matches Title?" value={form.vin_matches_title} options={ynaOptions} onChange={(v) => set("vin_matches_title", v as TTYesNoUnable)} />
+              <SelectRow label="Open / Blank Title?" value={form.open_title} options={ynaOptions} onChange={(v) => set("open_title", v as TTYesNoUnable)} />
+
+              {form.title_present === true && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Seller Name on Title</p>
+                  <input
+                    type="text"
+                    value={form.seller_name_on_title}
+                    onChange={(e) => set("seller_name_on_title", e.target.value)}
+                    placeholder="As printed on the title"
+                    className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    data-testid="input-tt-seller-name"
+                  />
+                </div>
+              )}
+
+              <SelectRow label="Title Signed by Seller?" value={form.title_signed} options={ynnaOptions} onChange={(v) => set("title_signed", v as TTField)} />
+              <SelectRow label="Buyer Name Section Completed?" value={form.buyer_name_completed} options={ynnaOptions} onChange={(v) => set("buyer_name_completed", v as TTField)} />
+              <SelectRow label="Odometer Disclosure Completed?" value={form.odometer_disclosure_completed} options={ynnaOptions} onChange={(v) => set("odometer_disclosure_completed", v as TTField)} />
+              <SelectRow label="Lien Release Present?" value={form.lien_release_present} options={ynnaOptions} onChange={(v) => set("lien_release_present", v as TTField)} />
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">State of Title (if visible)</p>
+                <input
+                  type="text"
+                  value={form.state_of_title}
+                  onChange={(e) => set("state_of_title", e.target.value)}
+                  placeholder="e.g. IL, WI, or Out of State"
+                  className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  data-testid="input-tt-state-of-title"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes (optional)</p>
+            <textarea
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Any other observations about the title or transfer documents…"
+              rows={2}
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              data-testid="textarea-tt-notes"
+            />
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            This review is observational only. Do not provide legal advice. If you are uncertain, select "Unable to verify."
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-background border-t px-5 py-4 flex gap-3">
+          <button
+            onClick={onSkip}
+            className="flex-none text-sm px-4 py-2 rounded-lg border border-border text-muted-foreground hover:bg-muted/40"
+            data-testid="button-tt-skip-footer"
+          >
+            Skip
+          </button>
+          <button
+            disabled={pending || saved}
+            onClick={() => onSave({
+              title_present:                 form.title_present,
+              seller_name_on_title:          form.seller_name_on_title || undefined,
+              buyer_name_completed:          (form.buyer_name_completed || undefined) as TTField | undefined,
+              odometer_disclosure_completed: (form.odometer_disclosure_completed || undefined) as TTField | undefined,
+              lien_release_present:          (form.lien_release_present || undefined) as TTField | undefined,
+              title_signed:                  (form.title_signed || undefined) as TTField | undefined,
+              open_title:                    (form.open_title || undefined) as TTYesNoUnable | undefined,
+              vin_matches_title:             (form.vin_matches_title || undefined) as TTYesNoUnable | undefined,
+              state_of_title:                form.state_of_title || undefined,
+              notes:                         form.notes || undefined,
+            })}
+            className={`flex-1 text-sm px-4 py-2 rounded-lg font-semibold text-white transition-colors ${
+              saved ? "bg-green-600" : pending ? "bg-primary/60 cursor-not-allowed" : "bg-primary"
+            }`}
+            style={{ background: saved ? undefined : RC_GREEN }}
+            data-testid="button-tt-save"
+          >
+            {saved ? "✓ Saved!" : pending ? "Saving…" : "Save & Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

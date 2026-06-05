@@ -38,6 +38,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleDollarSign,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +53,106 @@ const PACKAGE_OPTIONS = [
   { value: "plus",     label: "Plus — $169" },
   { value: "exotic",   label: "Exotic — $299" },
 ];
+
+// ── Title Transfer Card ───────────────────────────────────────────────────────
+function TitleTransferCard({ orderId, sellerType }: { orderId: string; sellerType?: string }) {
+  const [data, setData] = useState<{
+    transfer_readiness_status: string;
+    risk_flags: string[];
+    title_present: boolean | null;
+    seller_name_on_title: string | null;
+    vin_matches_title: string | null;
+    open_title: string | null;
+    summary: string;
+    checked_at: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!orderId) return;
+    fetch(`/api/ridechecker/orders/${orderId}/title-transfer-check`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.check) setData(d.check); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [orderId]);
+
+  const statusConfig: Record<string, { cls: string; label: string }> = {
+    ready:   { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "READY" },
+    caution: { cls: "bg-amber-100  text-amber-700  border-amber-200",  label: "CAUTION" },
+    concern: { cls: "bg-red-100    text-red-700    border-red-200",    label: "CONCERN" },
+    unknown: { cls: "bg-gray-100   text-gray-600   border-gray-200",   label: "UNKNOWN" },
+  };
+
+  const sc = data ? (statusConfig[data.transfer_readiness_status] ?? statusConfig.unknown) : null;
+  const showWarning = sellerType === "private_party" && !loading && !data;
+
+  return (
+    <Card data-testid="card-title-transfer">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            Title &amp; Transfer Readiness
+          </div>
+          {data && (
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-toggle-title-transfer"
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {loading && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        )}
+        {!loading && showWarning && (
+          <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>No title transfer check recorded. Private-party orders require this before report delivery.</span>
+          </div>
+        )}
+        {!loading && data && sc && (
+          <>
+            <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded border text-xs font-semibold ${sc.cls}`}>
+              {sc.label === "READY" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+              Transfer Readiness: {sc.label}
+            </div>
+            <p className="text-xs text-muted-foreground">{data.summary}</p>
+            {data.risk_flags?.length > 0 && (
+              <ul className="text-xs text-red-600 dark:text-red-400 space-y-0.5 pl-3 list-disc">
+                {data.risk_flags.map((f: string) => <li key={f}>{f.replace(/_/g, " ")}</li>)}
+              </ul>
+            )}
+            {expanded && (
+              <div className="pt-2 border-t space-y-1 text-xs text-muted-foreground">
+                <p><span className="font-medium">Title present:</span> {String(data.title_present ?? "—")}</p>
+                <p><span className="font-medium">VIN matches title:</span> {data.vin_matches_title ?? "—"}</p>
+                <p><span className="font-medium">Open title:</span> {data.open_title ?? "—"}</p>
+                {data.seller_name_on_title && (
+                  <p><span className="font-medium">Seller on title:</span> {data.seller_name_on_title}</p>
+                )}
+                <p className="text-[10px] text-muted-foreground/70">
+                  Checked {data.checked_at ? new Date(data.checked_at).toLocaleString() : "—"}
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        {!loading && !data && !showWarning && (
+          <p className="text-xs text-muted-foreground">Not applicable for this seller type.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function formatAge(isoDate: string | undefined | null): { label: string; color: string } | null {
   if (!isoDate) return null;
@@ -311,6 +414,22 @@ export default function OpsOrderDetailPage() {
                   {order.ops_status.replace(/_/g, " ")}
                 </Badge>
               )}
+              {(() => {
+                const st = (order as unknown as Record<string, unknown>).seller_type as string | undefined;
+                if (!st) return null;
+                const config: Record<string, { cls: string; label: string }> = {
+                  private_party: { cls: "bg-blue-100  text-blue-700  border-blue-200",  label: "👤 Private" },
+                  dealership:    { cls: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "🏢 Dealer" },
+                  auction:       { cls: "bg-amber-100 text-amber-700  border-amber-200", label: "🔨 Auction" },
+                  other:         { cls: "bg-gray-100  text-gray-600   border-gray-200",  label: "❓ Other"  },
+                };
+                const c = config[st] ?? config.other;
+                return (
+                  <span className={`inline-flex items-center text-xs font-medium border rounded px-1.5 py-0.5 ${c.cls}`} data-testid="badge-seller-type">
+                    {c.label}
+                  </span>
+                );
+              })()}
               {paymentStatusBadge(order.payment_status)}
               {(() => {
                 const age = formatAge(order.updated_at);
@@ -464,6 +583,7 @@ export default function OpsOrderDetailPage() {
           <PayPanel order={order} onRefresh={loadData} userRole={role} />
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />
+          <TitleTransferCard orderId={orderId} sellerType={(order as unknown as Record<string, unknown>).seller_type as string | undefined} />
           <ConnecteamPanel order={order} onRefresh={loadData} />
 
           {/* Payment Override — ops_lead / admin / owner only */}

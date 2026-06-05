@@ -69,6 +69,8 @@ function BookInner() {
   ];
 
   type ListingSource = "online_marketplace" | "dealership" | "roadside";
+  type SellerType = "private_party" | "dealership" | "auction" | "other";
+  const [sellerType, setSellerType] = useState<SellerType>("private_party");
   const [listingSource, setListingSource] = useState<ListingSource>("online_marketplace");
   const [platformSource, setPlatformSource] = useState<string>("");
   const [vehicleSeenLocation, setVehicleSeenLocation] = useState("");
@@ -203,6 +205,7 @@ function BookInner() {
         listing_platform: listingPlatform,
         listing_source: listingSource,
         platform_source: platformSource || null,
+        seller_type: sellerType,
         vehicle_seen_location: vehicleSeenLocation || null,
         service_zip: serviceZip,
         vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
@@ -357,6 +360,35 @@ function BookInner() {
 
         {step === 0 && (
           <div className="space-y-6">
+            {/* ── Who is selling? ── */}
+            <div>
+              <Label className="text-base font-semibold mb-1 block">Who is selling this vehicle? *</Label>
+              <p className="text-sm text-muted-foreground mb-3">This helps us tailor the inspection workflow.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {([
+                  { value: "private_party" as SellerType, icon: "👤", label: "Private Seller" },
+                  { value: "dealership"   as SellerType, icon: "🏢", label: "Dealership" },
+                  { value: "auction"      as SellerType, icon: "🔨", label: "Auction" },
+                  { value: "other"        as SellerType, icon: "❓", label: "Other" },
+                ]).map((st) => (
+                  <button
+                    key={st.value}
+                    type="button"
+                    onClick={() => setSellerType(st.value)}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-3 py-3 text-sm font-medium transition-colors ${
+                      sellerType === st.value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    }`}
+                    data-testid={`card-seller-type-${st.value}`}
+                  >
+                    <span className="text-xl">{st.icon}</span>
+                    <span className="text-xs">{st.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <Label className="text-base font-semibold mb-1 block">{t("booking.source.title", lang)}</Label>
               <p className="text-sm text-muted-foreground mb-3">{t("booking.source.subtitle", lang)}</p>

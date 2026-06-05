@@ -76,6 +76,14 @@ export interface MarketValueResult {
   error?: string;
 }
 
+// ── Title Transfer ──────────────────────────────────────────────────────────
+export type TransferReadinessStatus = "ready" | "caution" | "concern" | "unknown";
+
+export interface TitleTransferRiskInput {
+  transferReadinessStatus: TransferReadinessStatus;
+  riskFlags: string[];
+}
+
 // ── Risk Score ───────────────────────────────────────────────────────────────
 export interface RiskScoreInput {
   vinResult: VinDecodeResult;
@@ -85,6 +93,7 @@ export interface RiskScoreInput {
   marketValueResult: MarketValueResult;
   vinMismatch?: boolean;
   hasOBDSafetyCodes?: boolean;
+  titleTransfer?: TitleTransferRiskInput;
 }
 
 export interface RiskScoreOutput {

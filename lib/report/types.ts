@@ -145,6 +145,22 @@ export interface GeneratedReport {
   overall_summary: string;
 }
 
+export interface TitleTransferReadinessSummary {
+  transfer_readiness_status:     "ready" | "caution" | "concern" | "unknown";
+  risk_flags:                    string[];
+  title_present:                 boolean | null;
+  seller_name_on_title:          string | null;
+  buyer_name_completed:          string | null;
+  odometer_disclosure_completed: string | null;
+  lien_release_present:          string | null;
+  title_signed:                  string | null;
+  open_title:                    string | null;
+  vin_matches_title:             string | null;
+  state_of_title:                string | null;
+  summary:                       string;
+  checked_at:                    string;
+}
+
 export interface ReportMeta {
   report_number: string;
   inspection_date: string;
@@ -167,7 +183,9 @@ export interface ReportMeta {
   road_test_module?: RoadTestModule;
   obd_module?: OBDModule;
   title_history_module?: TitleHistoryModule;
+  title_transfer_readiness?: TitleTransferReadinessSummary;
   risk_intelligence?: RiskIntelligenceSummary;
+  seller_type?: string;
 }
 
 export interface RiskIntelligenceSummary {

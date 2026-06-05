@@ -18,7 +18,7 @@ export async function POST(
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, payment_status, payment_required, payment_override_approved"
+        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, payment_status, payment_required, payment_override_approved, seller_type"
       )
       .eq("id", params.orderId)
       .single();
@@ -57,6 +57,26 @@ export async function POST(
       console.warn(
         `[deliver-report] No risk intelligence found for order ${params.orderId} — proceeding without it.`
       );
+    }
+
+    // ── Title & Transfer Readiness QC gate ──────────────────────────────────
+    // For private-party orders, require a completed title transfer check.
+    const sellerType = (order as Record<string, unknown>).seller_type ?? "private_party";
+    if (sellerType === "private_party") {
+      const { data: ttc } = await supabaseAdmin
+        .from("vehicle_title_transfer_checks")
+        .select("id, transfer_readiness_status")
+        .eq("order_id", params.orderId)
+        .order("checked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!ttc) {
+        return NextResponse.json(
+          { error: "Title & Transfer Readiness review incomplete. Complete the title review before delivering this report." },
+          { status: 400 }
+        );
+      }
     }
 
     const deliverableStatuses = ["approved", "generated", "report_ready"];
