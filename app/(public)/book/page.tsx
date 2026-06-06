@@ -293,10 +293,10 @@ function BookInner() {
             <MapPin className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
-                Pilot Mode: Lake County, IL only
+                Now Serving: Lake County &amp; McHenry County, IL
               </p>
               <p className="text-amber-700 dark:text-amber-300 text-xs mt-0.5">
-                We&apos;re rolling out in phases. Confirm availability with your ZIP before booking.
+                Enter your ZIP below to confirm service availability in your area.
               </p>
             </div>
           </div>
@@ -673,7 +673,7 @@ function BookInner() {
                 {zipStatus === "valid" && (
                   <p className="text-sm text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-valid">
                     <CheckCircle2 className="h-4 w-4" />
-                    Available in Lake County
+                    Available in your area
                   </p>
                 )}
                 {zipStatus === "invalid" && (

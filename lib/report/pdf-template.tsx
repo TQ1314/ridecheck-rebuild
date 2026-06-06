@@ -1299,7 +1299,7 @@ function PageFooter() {
       <View style={s.footerLeft}>
         <Text style={s.footerBrand}>RideCheck Vehicle Transparency Platform</Text>
         <Text style={s.footerContact}>
-          ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois
+          ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake &amp; McHenry County, IL
         </Text>
       </View>
       <Text
@@ -1465,7 +1465,7 @@ function CoverPage({ report, meta }: { report: GeneratedReport; meta: ReportMeta
           <Text style={s.coverTaglineText}>
             RideCheck is a Vehicle Transparency Platform — not a purchase advisor or legal authority.{"\n"}
             This report reflects field observations at the time of inspection.{"\n"}
-            ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois
+            ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake &amp; McHenry County, IL
           </Text>
         </View>
       </View>

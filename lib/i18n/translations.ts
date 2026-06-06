@@ -129,7 +129,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "footer.whatsapp": "Chat with us on WhatsApp",
     "footer.copyright": "RideCheck. All rights reserved.",
 
-    "pilot.banner": "Now serving: Lake County, IL only",
+    "pilot.banner": "Now serving: Lake County & McHenry County, IL",
     "pilot.bannerDetail": " — We're in pilot mode. Enter your ZIP to confirm availability before booking.",
     "pilot.bookNow": "Book Now",
 

@@ -77,8 +77,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error: "service_unavailable",
-            message: "RideCheck is currently available only in Lake County, IL during our pilot. We're expanding soon!",
-            allowed_counties: ["lake"],
+            message: "RideCheck is currently available in Lake County and McHenry County, IL. We're expanding soon!",
+            allowed_counties: ["lake", "mchenry"],
             state: "IL",
           },
           { status: 409 }

@@ -41,7 +41,7 @@ export default function FaqPage() {
           />
           <FaqItem
             q="What areas do you serve?"
-            a="We are currently operating in Lake County, IL during our pilot phase. More areas are coming soon."
+            a="We currently serve Lake County and McHenry County, IL. Cook County is next — more areas are coming soon."
           />
           <FaqItem
             q="What if the car turns out to be in great condition?"

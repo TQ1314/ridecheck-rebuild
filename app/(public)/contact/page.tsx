@@ -111,8 +111,8 @@ export default function ContactPage() {
               </div>
               <ul className="text-sm text-muted-foreground space-y-1.5">
                 <li>Lake County</li>
-                <li>Chicago Metro</li>
-                <li className="text-primary text-xs font-medium">More cities coming soon!</li>
+                <li>McHenry County</li>
+                <li className="text-muted-foreground text-xs">Cook County — coming soon</li>
               </ul>
             </CardContent>
           </Card>

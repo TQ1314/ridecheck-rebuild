@@ -176,7 +176,7 @@ export default function SpanishHomePage() {
               </div>
 
               <p className="mt-4 text-xs text-gray-500 text-center md:text-left">
-                Servicio disponible en Lake County, IL · Sin costo para el vendedor
+                Servicio disponible en Lake County y McHenry County, IL · Sin costo para el vendedor
               </p>
             </div>
           </div>

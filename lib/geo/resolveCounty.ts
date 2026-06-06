@@ -28,7 +28,7 @@ export function resolveCounty(zip: string): ServiceCounty {
 
 export function getServiceAreaFromZip(zip: string): ServiceAreaResult {
   const county = resolveCounty(zip);
-  const isAllowed = county === "lake";
+  const isAllowed = county === "lake" || county === "mchenry";
   return { state: "IL", county, isAllowed };
 }
 
@@ -61,10 +61,8 @@ export function checkPilotPhase(
   let allowedCounties: ServiceCounty[];
   let currentPhase: "lake" | "mchenry" | "cook";
 
-  if (totalOrders < lake_unlock_end) {
-    allowedCounties = ["lake"];
-    currentPhase = "lake";
-  } else if (totalOrders < mchenry_unlock_end) {
+  if (totalOrders < mchenry_unlock_end) {
+    // Lake + McHenry open from launch; Cook unlocks at mchenry_unlock_end
     allowedCounties = ["lake", "mchenry"];
     currentPhase = "mchenry";
   } else {
