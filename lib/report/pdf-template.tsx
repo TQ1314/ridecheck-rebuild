@@ -9,50 +9,83 @@ import {
   StyleSheet,
   Font,
 } from "@react-pdf/renderer";
-import type { GeneratedReport, ReportMeta, RoadTestModule, OBDModule, SystemStatus, RepairPriority, VerdictType, ScopeRow, ConfidenceLevel, TitleTransferReadinessSummary } from "./types";
+import type {
+  GeneratedReport,
+  ReportMeta,
+  RoadTestModule,
+  OBDModule,
+  SystemStatus,
+  RepairPriority,
+  VerdictType,
+  ScopeRow,
+  ConfidenceLevel,
+  TitleTransferReadinessSummary,
+} from "./types";
 
-Font.register({
-  family: "Helvetica",
-  fonts: [],
-});
+Font.register({ family: "Helvetica", fonts: [] });
 
+// ─── COLOR PALETTE ────────────────────────────────────────────────────────────
 const C = {
-  green_dark:    "#14532d",
-  green_medium:  "#16a34a",
-  green_light:   "#dcfce7",
-  white:         "#ffffff",
-  gray_50:       "#f9fafb",
-  gray_100:      "#f3f4f6",
-  gray_200:      "#e5e7eb",
-  gray_400:      "#9ca3af",
-  gray_600:      "#4b5563",
-  gray_700:      "#374151",
-  gray_900:      "#111827",
-  muted:         "#6b7280",
-  border:        "#e5e7eb",
-  good:          "#16a34a",
-  good_bg:       "#f0fdf4",
-  monitor:       "#d97706",
-  monitor_bg:    "#fffbeb",
-  risk:          "#ea580c",
-  risk_bg:       "#fff7ed",
-  fail:          "#dc2626",
-  fail_bg:       "#fef2f2",
+  green_dark:   "#14532d",
+  green_medium: "#16a34a",
+  green_light:  "#dcfce7",
+  green_100:    "#d1fae5",
+  white:        "#ffffff",
+  gray_50:      "#f9fafb",
+  gray_100:     "#f3f4f6",
+  gray_200:     "#e5e7eb",
+  gray_300:     "#d1d5db",
+  gray_400:     "#9ca3af",
+  gray_600:     "#4b5563",
+  gray_700:     "#374151",
+  gray_900:     "#111827",
+  muted:        "#6b7280",
+  border:       "#e5e7eb",
+  good:         "#16a34a",
+  good_bg:      "#f0fdf4",
+  monitor:      "#d97706",
+  monitor_bg:   "#fffbeb",
+  risk:         "#ea580c",
+  risk_bg:      "#fff7ed",
+  fail:         "#dc2626",
+  fail_bg:      "#fef2f2",
+  black:        "#000000",
 };
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 function verdictColor(v: VerdictType): string {
   switch (v) {
     case "LOW_RISK":      return "#15803d";
-    case "MODERATE_RISK": return "#d97706";
-    case "HIGH_RISK":     return "#dc2626";
+    case "MODERATE_RISK": return "#b45309";
+    case "HIGH_RISK":     return "#b91c1c";
   }
 }
-
+function verdictBg(v: VerdictType): string {
+  switch (v) {
+    case "LOW_RISK":      return "#f0fdf4";
+    case "MODERATE_RISK": return "#fffbeb";
+    case "HIGH_RISK":     return "#fef2f2";
+  }
+}
+function verdictBorder(v: VerdictType): string {
+  switch (v) {
+    case "LOW_RISK":      return "#bbf7d0";
+    case "MODERATE_RISK": return "#fde68a";
+    case "HIGH_RISK":     return "#fecaca";
+  }
+}
 function verdictLabel(v: VerdictType): string {
   switch (v) {
     case "LOW_RISK":      return "LOW RISK OBSERVED";
     case "MODERATE_RISK": return "MODERATE RISK OBSERVED";
     case "HIGH_RISK":     return "HIGH FINANCIAL RISK OBSERVED";
+  }
+}
+function verdictDot(v: VerdictType): string {
+  switch (v) {
+    case "LOW_RISK":      return "●";
+    case "MODERATE_RISK": return "●";
+    case "HIGH_RISK":     return "●";
   }
 }
 
@@ -64,7 +97,6 @@ function statusColor(s: SystemStatus): string {
     case "FAIL":    return C.fail;
   }
 }
-
 function statusBg(s: SystemStatus): string {
   switch (s) {
     case "GOOD":    return C.good_bg;
@@ -73,7 +105,6 @@ function statusBg(s: SystemStatus): string {
     case "FAIL":    return C.fail_bg;
   }
 }
-
 function priorityColor(p: RepairPriority): string {
   switch (p) {
     case "Immediate": return C.fail;
@@ -82,149 +113,416 @@ function priorityColor(p: RepairPriority): string {
     case "Monitor":   return C.gray_600;
   }
 }
-
+function confidenceColor(c: ConfidenceLevel): string {
+  switch (c) {
+    case "HIGH CONFIDENCE":     return C.good;
+    case "MODERATE CONFIDENCE": return C.monitor;
+    case "LIMITED CONFIDENCE":  return C.fail;
+  }
+}
+function confidenceBg(c: ConfidenceLevel): string {
+  switch (c) {
+    case "HIGH CONFIDENCE":     return C.good_bg;
+    case "MODERATE CONFIDENCE": return C.monitor_bg;
+    case "LIMITED CONFIDENCE":  return C.fail_bg;
+  }
+}
+function riskLevelColors(level: string): { bg: string; border: string; text: string } {
+  switch (level) {
+    case "HIGH":     return { bg: C.fail_bg,    border: "#FECACA", text: C.fail };
+    case "ELEVATED": return { bg: C.risk_bg,    border: "#FED7AA", text: C.risk };
+    case "MODERATE": return { bg: C.monitor_bg, border: "#FDE68A", text: C.monitor };
+    default:         return { bg: C.good_bg,    border: "#BBF7D0", text: C.good };
+  }
+}
+function riskLevelLabel(level: string): string {
+  switch (level) {
+    case "HIGH":     return "HIGH RISK";
+    case "ELEVATED": return "ELEVATED RISK";
+    case "MODERATE": return "MODERATE RISK";
+    default:         return "LOW RISK";
+  }
+}
+function dtcStatusColor(status: string): string {
+  switch (status.toLowerCase()) {
+    case "active":  return C.fail;
+    case "pending": return C.monitor;
+    case "stored":  return C.gray_600;
+    default:        return C.gray_400;
+  }
+}
+function scopeDotStyle(status: ScopeRow["status"]) {
+  switch (status) {
+    case "assessed":     return s.scopeDotAssessed;
+    case "partial":      return s.scopeDotPartial;
+    case "not_assessed": return s.scopeDotNotAssessed;
+  }
+}
 function fmt(n?: number): string {
   if (n == null) return "—";
   return `$${n.toLocaleString()}`;
 }
 
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   page: {
     backgroundColor: C.white,
     fontSize: 8.5,
     color: C.gray_900,
-    paddingBottom: 45,
+    paddingBottom: 50,
   },
 
-  // ─── HEADER ──────────────────────────────────────────────────────────────
-  header: {
+  // ── COVER PAGE ──────────────────────────────────────────────────────────────
+  coverPage: {
+    backgroundColor: C.white,
+    fontSize: 8.5,
+    color: C.gray_900,
+  },
+  coverTopBand: {
     backgroundColor: C.green_dark,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
+    paddingVertical: 18,
+    paddingHorizontal: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerLeft: { flexDirection: "column" },
-  headerBrand: {
-    fontSize: 18,
+  coverBrand: {
+    fontSize: 22,
     fontFamily: "Helvetica-Bold",
     color: C.white,
-    letterSpacing: 3,
+    letterSpacing: 4,
   },
-  headerSub: {
-    fontSize: 7.5,
-    color: "#bbf7d0",
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
-  headerRight: { alignItems: "flex-end" },
-  headerUrl: {
+  coverBrandSub: {
     fontSize: 8,
     color: "#86efac",
-    fontFamily: "Helvetica-Oblique",
+    marginTop: 3,
+    letterSpacing: 0.8,
   },
-
-  // ─── VEHICLE BLOCK ───────────────────────────────────────────────────────
-  vehicleBlock: {
-    paddingHorizontal: 36,
-    paddingTop: 14,
-    paddingBottom: 10,
+  coverTopRight: {
+    alignItems: "flex-end",
+  },
+  coverTopRightLabel: {
+    fontSize: 7,
+    color: "#86efac",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  coverTopRightValue: {
+    fontSize: 9,
+    color: C.white,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 2,
+  },
+  coverHeroContainer: {
+    height: 200,
+    backgroundColor: C.gray_100,
+    overflow: "hidden",
+  },
+  coverHeroImage: {
+    width: "100%",
+    height: 200,
+    objectFit: "cover",
+  },
+  coverHeroPlaceholder: {
+    height: 200,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  vehicleTitle: {
-    fontSize: 20,
+  coverHeroPlaceholderText: {
+    fontSize: 8,
+    color: C.gray_400,
+    letterSpacing: 0.5,
+  },
+  coverBody: {
+    paddingHorizontal: 40,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  coverVehicleTitle: {
+    fontSize: 26,
     fontFamily: "Helvetica-Bold",
     color: C.green_dark,
     marginBottom: 2,
+    lineHeight: 1.1,
   },
-  vehicleSubtitle: {
-    fontSize: 9,
+  coverVehicleSub: {
+    fontSize: 12,
     color: C.gray_600,
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  metaGrid: {
+  coverMetaGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 4,
+    overflow: "hidden",
   },
-  metaCell: {
-    width: "50%",
-    flexDirection: "row",
-    marginBottom: 3,
+  coverMetaCell: {
+    width: "33.33%",
+    padding: 8,
+    borderRightWidth: 1,
+    borderRightColor: C.border,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
-  metaLabel: {
-    fontSize: 7,
+  coverMetaCellLast: {
+    width: "33.33%",
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  coverMetaLabel: {
+    fontSize: 6.5,
     fontFamily: "Helvetica-Bold",
     color: C.gray_400,
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    width: 90,
+    marginBottom: 2,
   },
-  metaValue: {
-    fontSize: 7.5,
+  coverMetaValue: {
+    fontSize: 9,
     color: C.gray_900,
+    fontFamily: "Helvetica-Bold",
+  },
+  coverBadgeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+  },
+  coverRiskBadge: {
     flex: 1,
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 2,
+    alignItems: "center",
+  },
+  coverRiskLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  coverRiskValue: {
+    fontSize: 16,
+    fontFamily: "Helvetica-Bold",
+  },
+  coverConfidenceBadge: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  coverConfLabel: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  coverConfValue: {
+    fontSize: 13,
+    fontFamily: "Helvetica-Bold",
+  },
+  coverFindingsTitle: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.green_dark,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: C.green_dark,
+  },
+  coverFindingRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: C.gray_50,
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: C.green_medium,
+  },
+  coverFindingNum: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.green_dark,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    flexShrink: 0,
+  },
+  coverFindingNumText: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.white,
+  },
+  coverFindingBody: { flex: 1 },
+  coverFindingTitle: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_900,
+    marginBottom: 2,
+  },
+  coverFindingText: {
+    fontSize: 7.5,
+    color: C.gray_700,
+    lineHeight: 1.4,
+  },
+  coverTagline: {
+    marginTop: 16,
+    padding: 10,
+    backgroundColor: C.gray_50,
+    borderRadius: 3,
+    borderTopWidth: 3,
+    borderTopColor: C.green_dark,
+    textAlign: "center",
+  },
+  coverTaglineText: {
+    fontSize: 7.5,
+    color: C.gray_600,
+    lineHeight: 1.5,
+    textAlign: "center",
   },
 
-  // ─── VERDICT ─────────────────────────────────────────────────────────────
-  verdictBanner: {
-    marginHorizontal: 36,
-    marginVertical: 10,
-    padding: 11,
-    borderRadius: 4,
+  // ── INTERIOR PAGE HEADER ────────────────────────────────────────────────────
+  header: {
+    backgroundColor: C.green_dark,
+    paddingVertical: 10,
+    paddingHorizontal: 36,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  verdictLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  verdictSquare: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    marginRight: 8,
-  },
-  verdictLabel: {
-    fontSize: 11,
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerBrand: {
+    fontSize: 13,
     fontFamily: "Helvetica-Bold",
     color: C.white,
-    flex: 1,
+    letterSpacing: 3,
   },
-  verdictTagline: {
-    fontSize: 7.5,
-    color: "rgba(255,255,255,0.88)",
-    textAlign: "right",
-    maxWidth: 180,
+  headerDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: "#4ade80",
+    marginHorizontal: 2,
+  },
+  headerSub: {
+    fontSize: 7,
+    color: "#86efac",
+    letterSpacing: 0.5,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  headerReportLine: {
+    fontSize: 7,
+    color: "#86efac",
+    fontFamily: "Helvetica-Bold",
+  },
+  headerDateLine: {
+    fontSize: 6.5,
+    color: "#bbf7d0",
+    marginTop: 1,
   },
 
-  // ─── CONTENT ─────────────────────────────────────────────────────────────
+  // ── FOOTER ──────────────────────────────────────────────────────────────────
+  footer: {
+    position: "absolute",
+    bottom: 12,
+    left: 36,
+    right: 36,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 5,
+  },
+  footerLeft: { flex: 1 },
+  footerBrand: {
+    fontSize: 6.5,
+    color: C.muted,
+    fontFamily: "Helvetica-Bold",
+  },
+  footerContact: {
+    fontSize: 6,
+    color: C.gray_400,
+    marginTop: 1,
+  },
+  footerPage: {
+    fontSize: 6.5,
+    color: C.muted,
+    textAlign: "right",
+  },
+
+  // ── CONTENT AREA ────────────────────────────────────────────────────────────
   content: {
     paddingHorizontal: 36,
     paddingTop: 6,
   },
+
+  // ── SECTION HEADER ──────────────────────────────────────────────────────────
   sectionRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
   sectionBar: {
-    width: 3,
-    height: 12,
+    width: 4,
+    height: 14,
     backgroundColor: C.green_medium,
     borderRadius: 2,
-    marginRight: 6,
+    marginRight: 7,
   },
   sectionTitle: {
     fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     color: C.green_dark,
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
 
-  // ─── INSIGHTS ────────────────────────────────────────────────────────────
+  // ── VERDICT BANNER ──────────────────────────────────────────────────────────
+  verdictBanner: {
+    marginHorizontal: 36,
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  verdictLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  verdictDot: {
+    fontSize: 18,
+    marginRight: 10,
+    lineHeight: 1,
+  },
+  verdictLabel: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    flex: 1,
+  },
+  verdictTagline: {
+    fontSize: 7.5,
+    color: C.gray_600,
+    textAlign: "right",
+    maxWidth: 200,
+    lineHeight: 1.4,
+  },
+
+  // ── ON-SITE KEY FINDINGS (insights) ─────────────────────────────────────────
   insightBlock: {
     flexDirection: "row",
     marginBottom: 9,
@@ -233,13 +531,13 @@ const s = StyleSheet.create({
     borderBottomColor: C.gray_100,
   },
   insightBulletBox: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: C.green_dark,
-    borderRadius: 2,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 9,
     marginTop: 1,
     flexShrink: 0,
   },
@@ -261,7 +559,7 @@ const s = StyleSheet.create({
     lineHeight: 1.45,
   },
 
-  // ─── SYSTEMS ─────────────────────────────────────────────────────────────
+  // ── SYSTEM OBSERVATIONS ──────────────────────────────────────────────────────
   systemRow: {
     flexDirection: "row",
     marginBottom: 8,
@@ -315,188 +613,7 @@ const s = StyleSheet.create({
     lineHeight: 1.3,
   },
 
-  // ─── OBD TABLE ───────────────────────────────────────────────────────────
-  table: {
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 3,
-  },
-  tableHead: {
-    flexDirection: "row",
-    backgroundColor: C.gray_100,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray_100,
-  },
-  tableRowLast: {
-    flexDirection: "row",
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-  },
-  thText: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    color: C.gray_600,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  tdText: { fontSize: 8, color: C.gray_900 },
-  tdMuted: { fontSize: 7.5, color: C.muted },
-  col_sys:    { width: 95 },
-  col_stat:   { width: 60 },
-  col_codes:  { width: 85 },
-  col_desc:   { flex: 1 },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dot_on:  { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.fail,  marginRight: 4 },
-  dot_off: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.good,  marginRight: 4 },
-  dot_ok:  { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.monitor, marginRight: 4 },
-
-  // ─── PHOTO GRID ──────────────────────────────────────────────────────────
-  photoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  photoBlock: {
-    width: "48%",
-    marginBottom: 8,
-  },
-  photoImg: {
-    width: "100%",
-    height: 110,
-    objectFit: "cover",
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  photoCaption: {
-    fontSize: 6.5,
-    color: C.muted,
-    marginTop: 3,
-    textAlign: "center",
-  },
-  photoPlaceholder: {
-    width: "100%",
-    height: 110,
-    backgroundColor: C.gray_100,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  photoPlaceholderText: {
-    fontSize: 7,
-    color: C.gray_400,
-  },
-
-  // ─── REPAIR ESTIMATES ────────────────────────────────────────────────────
-  repairRow: {
-    flexDirection: "row",
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray_100,
-    alignItems: "center",
-  },
-  repairTotalRow: {
-    flexDirection: "row",
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    backgroundColor: C.gray_50,
-    borderTopWidth: 2,
-    borderTopColor: C.gray_200,
-    alignItems: "center",
-  },
-  rCol_item:     { flex: 1 },
-  rCol_priority: { width: 75 },
-  rCol_low:      { width: 65, textAlign: "right" },
-  rCol_high:     { width: 65, textAlign: "right" },
-  priorityBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-    alignSelf: "flex-start",
-  },
-  priorityText: {
-    fontSize: 6.5,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-
-  // ─── NEGOTIATION ─────────────────────────────────────────────────────────
-  negotiationOption: {
-    marginBottom: 8,
-    padding: 10,
-    backgroundColor: C.gray_50,
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: C.green_medium,
-  },
-  negotiationLabel: {
-    fontSize: 8.5,
-    fontFamily: "Helvetica-Bold",
-    color: C.green_dark,
-    marginBottom: 4,
-  },
-  negotiationDesc: {
-    fontSize: 8,
-    color: C.gray_700,
-    lineHeight: 1.4,
-  },
-
-  // ─── DISCLAIMER ──────────────────────────────────────────────────────────
-  disclaimer: {
-    marginTop: 10,
-    padding: 9,
-    backgroundColor: C.gray_50,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  disclaimerText: {
-    fontSize: 6.5,
-    color: C.muted,
-    lineHeight: 1.4,
-    textAlign: "center",
-  },
-
-  // ─── FOOTER ──────────────────────────────────────────────────────────────
-  footer: {
-    position: "absolute",
-    bottom: 14,
-    left: 36,
-    right: 36,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingTop: 5,
-  },
-  footerText: { fontSize: 6.5, color: C.muted },
-  footerPage: { fontSize: 6.5, color: C.muted },
-
-  divider: {
-    height: 1,
-    backgroundColor: C.border,
-    marginVertical: 8,
-    marginHorizontal: 36,
-  },
-
-  // ─── INSPECTION SCOPE TABLE ──────────────────────────────────────────────
+  // ── SCOPE TABLE ─────────────────────────────────────────────────────────────
   scopeTable: {
     borderWidth: 1,
     borderColor: C.border,
@@ -530,9 +647,9 @@ const s = StyleSheet.create({
   scopeColDot:    { width: 20, alignItems: "center" },
   scopeDotAssessed:    { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.good },
   scopeDotPartial:     { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.monitor },
-  scopeDotNotAssessed: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.gray_400 },
+  scopeDotNotAssessed: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.gray_300 },
 
-  // ─── CONFIDENCE + MISSING ────────────────────────────────────────────────
+  // ── CONFIDENCE + MISSING ────────────────────────────────────────────────────
   confidenceRow: {
     flexDirection: "row",
     gap: 10,
@@ -543,7 +660,6 @@ const s = StyleSheet.create({
     padding: 10,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: C.border,
   },
   confidenceLabel: {
     fontSize: 6.5,
@@ -551,16 +667,16 @@ const s = StyleSheet.create({
     color: C.gray_400,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   confidenceValue: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
   },
   confidenceNote: {
     fontSize: 6.5,
     color: C.muted,
-    marginTop: 3,
+    marginTop: 4,
     lineHeight: 1.4,
   },
   missingBox: {
@@ -593,50 +709,13 @@ const s = StyleSheet.create({
   missingText: { fontSize: 7.5, color: C.gray_700, flex: 1, lineHeight: 1.3 },
   missingNone: { fontSize: 7.5, color: C.good, fontFamily: "Helvetica-Bold" },
 
-  // ─── BUYER CONSIDERATIONS ────────────────────────────────────────────────
-  buyerConsiderationsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
-  },
-  buyerCol: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  buyerColHeader: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  buyerItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 4,
-  },
-  buyerIcon: {
-    fontSize: 8,
-    marginRight: 5,
-    lineHeight: 1.4,
-  },
-  buyerText: {
-    fontSize: 7.5,
-    color: C.gray_700,
-    flex: 1,
-    lineHeight: 1.4,
-  },
-
-  // ─── OBD DIAGNOSTICS SECTION ─────────────────────────────────────────────────
+  // ── OBD DIAGNOSTICS ──────────────────────────────────────────────────────────
   obdScanBanner: {
-    padding: 8, borderRadius: 3, marginBottom: 8, borderWidth: 1,
+    padding: 9, borderRadius: 3, marginBottom: 8, borderWidth: 1,
   },
   obdScanLabel: {
     fontSize: 6.5, fontFamily: "Helvetica-Bold", textTransform: "uppercase",
-    letterSpacing: 0.4, marginBottom: 2, color: C.gray_400,
+    letterSpacing: 0.4, marginBottom: 2,
   },
   obdScanValue: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   obdTwoCol:  { flexDirection: "row", gap: 8, marginBottom: 8 },
@@ -686,9 +765,69 @@ const s = StyleSheet.create({
   obdFileName: { fontSize: 7.5, color: C.gray_700 },
   obdPhotoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
 
-  // ─── TITLE & HISTORY FLAGS SECTION ───────────────────────────────────────
+  // ── ODOMETER SECTION ────────────────────────────────────────────────────────
+  odometerGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  odometerBox: {
+    flex: 1,
+    padding: 9,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 3,
+    backgroundColor: C.gray_50,
+  },
+  odometerBoxTitle: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_600,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingBottom: 3,
+  },
+  odometerValue: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_900,
+    marginBottom: 2,
+  },
+  odometerSub: {
+    fontSize: 7.5,
+    color: C.gray_600,
+    lineHeight: 1.3,
+  },
+  odometerFlagRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 4,
+    padding: 6,
+    backgroundColor: C.monitor_bg,
+    borderRadius: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: C.monitor,
+  },
+  odometerFlagText: {
+    fontSize: 7.5,
+    color: "#92400e",
+    flex: 1,
+    lineHeight: 1.4,
+  },
+  odometerNote: {
+    fontSize: 7.5,
+    color: C.muted,
+    lineHeight: 1.4,
+    marginTop: 4,
+    fontFamily: "Helvetica-Oblique",
+  },
+
+  // ── TITLE & HISTORY FLAGS ───────────────────────────────────────────────────
   thfBanner: {
-    padding: 8, borderRadius: 3, marginBottom: 8,
+    padding: 9, borderRadius: 3, marginBottom: 8,
     borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10,
   },
   thfBannerLabel: {
@@ -710,8 +849,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
   },
   thfBoxValue: { fontSize: 8, fontFamily: "Helvetica-Bold", color: C.gray_900, marginBottom: 2 },
-  thfBoxSub:   { fontSize: 7.5, color: C.gray_600 },
-  thfOdomRow:  { flexDirection: "row", gap: 8, marginBottom: 8 },
+  thfBoxSub:   { fontSize: 7, color: C.gray_600 },
   thfIndicatorGroup: {
     marginBottom: 8, padding: 8, borderWidth: 1, borderColor: C.border,
     borderRadius: 3, backgroundColor: C.gray_50,
@@ -722,7 +860,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 3,
   },
   thfIndicatorRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 3 },
-  thfIndicatorDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6, marginTop: 1 },
+  thfIndicatorDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6, marginTop: 2 },
   thfIndicatorText: { fontSize: 7.5, color: C.gray_900, flex: 1, lineHeight: 1.3 },
   thfNoneText:      { fontSize: 7.5, color: C.good, flex: 1, lineHeight: 1.3 },
   thfNotesBox: {
@@ -736,7 +874,7 @@ const s = StyleSheet.create({
   thfNotesText: { fontSize: 8, color: C.gray_700, lineHeight: 1.4 },
   thfVinPhotoRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
 
-  // ─── ROAD TEST RESULTS ───────────────────────────────────────────────────
+  // ── ROAD TEST ───────────────────────────────────────────────────────────────
   rtGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -769,7 +907,7 @@ const s = StyleSheet.create({
     marginBottom: 3,
   },
   rtCheckOn:  { fontSize: 7.5, color: C.good,    marginRight: 4, fontFamily: "Helvetica-Bold" },
-  rtCheckOff: { fontSize: 7.5, color: C.gray_400, marginRight: 4 },
+  rtCheckOff: { fontSize: 7.5, color: C.gray_300, marginRight: 4 },
   rtItemOn:   { fontSize: 7.5, color: C.gray_900, flex: 1, lineHeight: 1.3 },
   rtItemOff:  { fontSize: 7.5, color: C.gray_400, flex: 1, lineHeight: 1.3 },
   rtOtherRow: {
@@ -823,7 +961,195 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // ── Risk Intelligence section ──────────────────────────────────────────────
+  // ── PHOTO DOCUMENTATION ─────────────────────────────────────────────────────
+  photoGroupHeader: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_600,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 8,
+    paddingBottom: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  photoBlock: {
+    width: "48%",
+    marginBottom: 8,
+  },
+  photoImg: {
+    width: "100%",
+    height: 110,
+    objectFit: "cover",
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  photoCaption: {
+    fontSize: 6.5,
+    color: C.muted,
+    marginTop: 3,
+    textAlign: "center",
+  },
+  photoPlaceholder: {
+    width: "100%",
+    height: 110,
+    backgroundColor: C.gray_100,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoPlaceholderText: {
+    fontSize: 7,
+    color: C.gray_400,
+  },
+
+  // ── REPAIR ESTIMATES ────────────────────────────────────────────────────────
+  table: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 3,
+  },
+  tableHead: {
+    flexDirection: "row",
+    backgroundColor: C.gray_100,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  tableRow: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray_100,
+  },
+  tableRowLast: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  thText: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray_600,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  tdText: { fontSize: 8, color: C.gray_900 },
+  tdMuted: { fontSize: 7.5, color: C.muted },
+  col_sys:    { width: 95 },
+  col_stat:   { width: 60 },
+  col_codes:  { width: 85 },
+  col_desc:   { flex: 1 },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dot_on:  { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.fail,  marginRight: 4 },
+  dot_off: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.good,  marginRight: 4 },
+
+  repairRow: {
+    flexDirection: "row",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray_100,
+    alignItems: "center",
+  },
+  repairTotalRow: {
+    flexDirection: "row",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: C.gray_50,
+    borderTopWidth: 2,
+    borderTopColor: C.gray_200,
+    alignItems: "center",
+  },
+  rCol_item:     { flex: 1 },
+  rCol_priority: { width: 75 },
+  rCol_low:      { width: 65, textAlign: "right" },
+  rCol_high:     { width: 65, textAlign: "right" },
+  priorityBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    alignSelf: "flex-start",
+  },
+  priorityText: {
+    fontSize: 6.5,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  // ── BUYER CONSIDERATIONS ────────────────────────────────────────────────────
+  buyerConsiderationsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  buyerCol: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  buyerColHeader: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  buyerItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  buyerIcon: {
+    fontSize: 8,
+    marginRight: 5,
+    lineHeight: 1.4,
+  },
+  buyerText: {
+    fontSize: 7.5,
+    color: C.gray_700,
+    flex: 1,
+    lineHeight: 1.4,
+  },
+
+  // ── NEGOTIATION ─────────────────────────────────────────────────────────────
+  negotiationOption: {
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: C.gray_50,
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: C.green_medium,
+  },
+  negotiationLabel: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.green_dark,
+    marginBottom: 4,
+  },
+  negotiationDesc: {
+    fontSize: 8,
+    color: C.gray_700,
+    lineHeight: 1.4,
+  },
+
+  // ── RISK INTELLIGENCE ───────────────────────────────────────────────────────
   riskBanner: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -871,12 +1197,12 @@ const s = StyleSheet.create({
     width: 130,
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: "#374151",
+    color: C.gray_700,
   },
   riskModuleValue: {
     flex: 1,
     fontSize: 8,
-    color: "#374151",
+    color: C.gray_700,
   },
   riskModuleBadge: {
     width: 80,
@@ -901,12 +1227,12 @@ const s = StyleSheet.create({
   riskReasonBullet: {
     width: 10,
     fontSize: 7,
-    color: "#6b7280",
+    color: C.gray_600,
   },
   riskReasonText: {
     flex: 1,
     fontSize: 7.5,
-    color: "#374151",
+    color: C.gray_700,
     lineHeight: 1.35,
   },
   riskHardStopBanner: {
@@ -925,35 +1251,60 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     flex: 1,
   },
+
+  // ── DISCLAIMER ──────────────────────────────────────────────────────────────
+  disclaimer: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: C.gray_50,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  disclaimerText: {
+    fontSize: 6.5,
+    color: C.muted,
+    lineHeight: 1.45,
+    textAlign: "center",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginVertical: 8,
+    marginHorizontal: 36,
+  },
 });
 
-// ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
 
-function Header() {
+function PageHeader({ meta }: { meta: ReportMeta }) {
   return (
     <View style={s.header} fixed>
       <View style={s.headerLeft}>
         <Text style={s.headerBrand}>RIDECHECK</Text>
-        <Text style={s.headerSub}>Vehicle Transparency Report</Text>
+        <View style={s.headerDivider} />
+        <Text style={s.headerSub}>Vehicle Transparency Report  ·  Field Inspection Document</Text>
       </View>
       <View style={s.headerRight}>
-        <Text style={s.headerUrl}>ridecheckauto.com</Text>
+        <Text style={s.headerReportLine}>Report #{meta.report_number}</Text>
+        <Text style={s.headerDateLine}>{meta.inspection_date}</Text>
       </View>
     </View>
   );
 }
 
-function Footer({ meta }: { meta: ReportMeta }) {
+function PageFooter() {
   return (
     <View style={s.footer} fixed>
-      <Text style={s.footerText}>
-        Report #{meta.report_number} | Inspection Date: {meta.inspection_date}
-      </Text>
+      <View style={s.footerLeft}>
+        <Text style={s.footerBrand}>RideCheck Vehicle Transparency Platform</Text>
+        <Text style={s.footerContact}>
+          ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois
+        </Text>
+      </View>
       <Text
         style={s.footerPage}
-        render={({ pageNumber, totalPages }) =>
-          `Page ${pageNumber} of ${totalPages}`
-        }
+        render={({ pageNumber }) => `Page ${pageNumber}`}
       />
     </View>
   );
@@ -971,48 +1322,167 @@ function SectionTitle({ title }: { title: string }) {
 function StatusBadge({ status }: { status: SystemStatus }) {
   return (
     <View style={[s.statusBadge, { backgroundColor: statusBg(status) }]}>
-      <Text style={[s.statusText, { color: statusColor(status) }]}>
-        ■ {status}
-      </Text>
+      <Text style={[s.statusText, { color: statusColor(status) }]}>■ {status}</Text>
     </View>
   );
 }
 
 function PriorityBadge({ priority }: { priority: RepairPriority }) {
   return (
-    <View style={[s.priorityBadge, { backgroundColor: `${priorityColor(priority)}15` }]}>
-      <Text style={[s.priorityText, { color: priorityColor(priority) }]}>
-        ■ {priority}
-      </Text>
+    <View style={[s.priorityBadge, { backgroundColor: `${priorityColor(priority)}18` }]}>
+      <Text style={[s.priorityText, { color: priorityColor(priority) }]}>■ {priority}</Text>
     </View>
   );
 }
 
-function confidenceColor(c: ConfidenceLevel): string {
-  switch (c) {
-    case "HIGH CONFIDENCE":     return C.good;
-    case "MODERATE CONFIDENCE": return C.monitor;
-    case "LIMITED CONFIDENCE":  return C.fail;
-  }
+function PhotoBlock({ url, caption }: { url?: string; caption: string }) {
+  return (
+    <View style={s.photoBlock}>
+      {url ? (
+        <Image style={s.photoImg} src={url} />
+      ) : (
+        <View style={s.photoPlaceholder}>
+          <Text style={s.photoPlaceholderText}>Photo unavailable</Text>
+        </View>
+      )}
+      <Text style={s.photoCaption}>■ {caption}</Text>
+    </View>
+  );
 }
 
-function scopeDotStyle(status: ScopeRow["status"]) {
-  switch (status) {
-    case "assessed":     return s.scopeDotAssessed;
-    case "partial":      return s.scopeDotPartial;
-    case "not_assessed": return s.scopeDotNotAssessed;
-  }
+function RiskModuleBadge({ value, good }: { value: string; good: boolean }) {
+  const bg   = good ? C.good_bg    : C.monitor_bg;
+  const tc   = good ? C.good       : C.monitor;
+  const bord = good ? "#BBF7D0"    : "#FDE68A";
+  return (
+    <View style={[s.riskModuleBadge, { backgroundColor: bg, borderWidth: 1, borderColor: bord }]}>
+      <Text style={[s.riskModuleBadgeText, { color: tc }]}>{value}</Text>
+    </View>
+  );
 }
 
-function InspectionScopeSections({ meta }: { meta: ReportMeta }) {
+// ─── COVER PAGE ───────────────────────────────────────────────────────────────
+
+function CoverPage({ report, meta }: { report: GeneratedReport; meta: ReportMeta }) {
+  const heroUrl = meta.under_hood_photo_url || meta.vin_photo_url || "";
+  const vc = verdictColor(report.verdict);
+  const vbg = verdictBg(report.verdict);
+  const vbord = verdictBorder(report.verdict);
+  const cc = confidenceColor(meta.confidence_level);
+  const cbg = confidenceBg(meta.confidence_level);
+
+  return (
+    <>
+      {/* Top branding band */}
+      <View style={s.coverTopBand}>
+        <View>
+          <Text style={s.coverBrand}>RIDECHECK</Text>
+          <Text style={s.coverBrandSub}>Vehicle Transparency Report  ·  Field Inspection Document</Text>
+        </View>
+        <View style={s.coverTopRight}>
+          <Text style={s.coverTopRightLabel}>Report Number</Text>
+          <Text style={s.coverTopRightValue}>{meta.report_number}</Text>
+        </View>
+      </View>
+
+      {/* Hero photo */}
+      {heroUrl ? (
+        <View style={s.coverHeroContainer}>
+          <Image style={s.coverHeroImage} src={heroUrl} />
+        </View>
+      ) : (
+        <View style={s.coverHeroPlaceholder}>
+          <Text style={s.coverHeroPlaceholderText}>VEHICLE INSPECTION DOCUMENTATION</Text>
+        </View>
+      )}
+
+      {/* Cover body */}
+      <View style={s.coverBody}>
+
+        {/* Vehicle identity */}
+        <Text style={s.coverVehicleTitle}>
+          {meta.vehicle_year} {meta.vehicle_make} {meta.vehicle_model}
+          {meta.vehicle_trim ? ` ${meta.vehicle_trim}` : ""}
+        </Text>
+        <Text style={s.coverVehicleSub}>{meta.package_tier}</Text>
+
+        {/* Meta grid */}
+        <View style={s.coverMetaGrid}>
+          <View style={s.coverMetaCell}>
+            <Text style={s.coverMetaLabel}>Mileage</Text>
+            <Text style={s.coverMetaValue}>{meta.vehicle_mileage}</Text>
+          </View>
+          <View style={s.coverMetaCell}>
+            <Text style={s.coverMetaLabel}>Asking Price</Text>
+            <Text style={s.coverMetaValue}>{meta.vehicle_price}</Text>
+          </View>
+          <View style={s.coverMetaCellLast}>
+            <Text style={s.coverMetaLabel}>Inspection Date</Text>
+            <Text style={s.coverMetaValue}>{meta.inspection_date}</Text>
+          </View>
+          <View style={[s.coverMetaCell, { borderBottomWidth: 0 }]}>
+            <Text style={s.coverMetaLabel}>Location</Text>
+            <Text style={s.coverMetaValue}>{meta.inspection_location}</Text>
+          </View>
+          <View style={[s.coverMetaCell, { borderBottomWidth: 0 }]}>
+            <Text style={s.coverMetaLabel}>Inspector</Text>
+            <Text style={s.coverMetaValue}>RideCheck Field Inspector</Text>
+          </View>
+          <View style={[s.coverMetaCellLast, { borderBottomWidth: 0 }]}>
+            <Text style={s.coverMetaLabel}>Inspection Tier</Text>
+            <Text style={s.coverMetaValue}>{meta.package_tier.split(" (")[0]}</Text>
+          </View>
+        </View>
+
+        {/* Risk + Confidence badges */}
+        <View style={s.coverBadgeRow}>
+          <View style={[s.coverRiskBadge, { backgroundColor: vbg, borderColor: vbord }]}>
+            <Text style={[s.coverRiskLabel, { color: vc }]}>Field Risk Assessment</Text>
+            <Text style={[s.coverRiskValue, { color: vc }]}>{verdictLabel(report.verdict)}</Text>
+          </View>
+          <View style={[s.coverConfidenceBadge, { backgroundColor: cbg, borderColor: cc }]}>
+            <Text style={[s.coverConfLabel, { color: cc }]}>Inspection Confidence</Text>
+            <Text style={[s.coverConfValue, { color: cc }]}>{meta.confidence_level}</Text>
+          </View>
+        </View>
+
+        {/* Top 3 Field Findings */}
+        <Text style={s.coverFindingsTitle}>Top 3 Field Findings</Text>
+        {report.top_insights.slice(0, 3).map((insight, i) => (
+          <View key={i} style={s.coverFindingRow}>
+            <View style={s.coverFindingNum}>
+              <Text style={s.coverFindingNumText}>{i + 1}</Text>
+            </View>
+            <View style={s.coverFindingBody}>
+              <Text style={s.coverFindingTitle}>{insight.title}</Text>
+              <Text style={s.coverFindingText}>{insight.body}</Text>
+            </View>
+          </View>
+        ))}
+
+        {/* Platform tagline */}
+        <View style={s.coverTagline}>
+          <Text style={s.coverTaglineText}>
+            RideCheck is a Vehicle Transparency Platform — not a purchase advisor or legal authority.{"\n"}
+            This report reflects field observations at the time of inspection.{"\n"}
+            ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+}
+
+// ─── INSPECTION CONFIDENCE & SCOPE ────────────────────────────────────────────
+
+function InspectionConfidenceScope({ meta }: { meta: ReportMeta }) {
   return (
     <View style={s.content}>
-      {/* ── Scope Table ── */}
-      <SectionTitle title="Inspection Scope Status" />
+      <SectionTitle title="Inspection Scope" />
       <View style={s.scopeTable}>
         <View style={s.scopeHead}>
           <View style={s.scopeColDot} />
-          <Text style={[s.thText, s.scopeColSystem]}>System</Text>
+          <Text style={[s.thText, s.scopeColSystem]}>System / Area</Text>
           <Text style={[s.thText, s.scopeColLevel]}>Inspection Level</Text>
         </View>
         {meta.scope_table.map((row, i) => {
@@ -1029,10 +1499,13 @@ function InspectionScopeSections({ meta }: { meta: ReportMeta }) {
         })}
       </View>
 
-      {/* ── Confidence + Missing ── */}
+      <SectionTitle title="Inspection Confidence" />
       <View style={s.confidenceRow}>
-        <View style={s.confidenceBox}>
-          <Text style={s.confidenceLabel}>Inspection Confidence</Text>
+        <View style={[s.confidenceBox, {
+          backgroundColor: confidenceBg(meta.confidence_level),
+          borderColor: confidenceColor(meta.confidence_level),
+        }]}>
+          <Text style={s.confidenceLabel}>Confidence Level</Text>
           <Text style={[s.confidenceValue, { color: confidenceColor(meta.confidence_level) }]}>
             {meta.confidence_level}
           </Text>
@@ -1058,79 +1531,44 @@ function InspectionScopeSections({ meta }: { meta: ReportMeta }) {
   );
 }
 
-function BuyerConsiderations({ report }: { report: GeneratedReport }) {
-  const repairLow  = report.total_repair_low  ?? 0;
-  const repairHigh = report.total_repair_high ?? 0;
-  const hasRepairs = repairHigh > 0;
-  const isHigh     = report.verdict === "HIGH_RISK";
-  const isMod      = report.verdict === "MODERATE_RISK";
+// ─── VEHICLE SYSTEM OBSERVATIONS ─────────────────────────────────────────────
 
-  const moreFor: string[] = [];
-  if (hasRepairs) {
-    moreFor.push("Buyers comfortable with near-term mechanical repairs");
-    moreFor.push("Buyers with access to a trusted mechanic or service center");
-  }
-  if (isHigh || isMod) {
-    moreFor.push("Secondary or occasional-use vehicle buyers");
-  }
-  if (hasRepairs) {
-    moreFor.push(
-      `Buyers prepared for ${fmt(repairLow)}\u2013${fmt(repairHigh)} in near-term repair costs`
-    );
-  }
-  if (!hasRepairs) {
-    moreFor.push("Buyers seeking a lower-maintenance pre-owned vehicle");
-    moreFor.push("Daily-use buyers comfortable with standard upkeep");
-  }
-
-  const lessFor: string[] = [];
-  if (isHigh || isMod) {
-    lessFor.push("Buyers requiring immediate, uninterrupted daily reliability");
-  }
-  if (repairHigh > 1000) {
-    lessFor.push("Buyers without a repair budget contingency");
-  }
-  if (isHigh) {
-    lessFor.push("Long-distance commuters without a repair plan");
-    lessFor.push("Buyers without access to independent mechanical assessment");
-  }
-
-  if (moreFor.length === 0 && lessFor.length === 0) return null;
-
+function VehicleSystemObservations({ report }: { report: GeneratedReport }) {
   return (
-    <View wrap={false}>
-      <SectionTitle title="Buyer Considerations" />
-      <View style={s.buyerConsiderationsRow}>
-        {moreFor.length > 0 && (
-          <View style={[s.buyerCol, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
-            <Text style={[s.buyerColHeader, { color: C.green_dark }]}>
-              This vehicle may be more appropriate for
-            </Text>
-            {moreFor.map((item, i) => (
-              <View key={i} style={s.buyerItem}>
-                <Text style={s.buyerIcon}>✓</Text>
-                <Text style={s.buyerText}>{item}</Text>
-              </View>
-            ))}
+    <View style={s.content} break>
+      <SectionTitle title="Vehicle System Observations" />
+      {report.systems.map((sys, i) => (
+        <View key={i} style={s.systemRow} wrap={false}>
+          <View style={s.systemNameCol}>
+            <Text style={s.systemName}>{sys.name}</Text>
+            <StatusBadge status={sys.status} />
           </View>
-        )}
-        {lessFor.length > 0 && (
-          <View style={[s.buyerCol, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
-            <Text style={[s.buyerColHeader, { color: "#92400e" }]}>
-              This vehicle may be less appropriate for
-            </Text>
-            {lessFor.map((item, i) => (
-              <View key={i} style={s.buyerItem}>
-                <Text style={s.buyerIcon}>!</Text>
-                <Text style={s.buyerText}>{item}</Text>
-              </View>
-            ))}
+          <View style={s.systemDescCol}>
+            <Text style={[s.systemFieldLabel, { marginTop: 0 }]}>Observed</Text>
+            <Text style={s.systemFieldText}>{sys.observed}</Text>
+            <Text style={s.systemFieldLabel}>Consideration</Text>
+            <Text style={s.systemFieldText}>{sys.consideration}</Text>
           </View>
-        )}
-      </View>
+          <View style={s.systemCostCol}>
+            {sys.cost_low != null && sys.cost_high != null ? (
+              <Text style={s.systemCost}>
+                {fmt(sys.cost_low)} – {fmt(sys.cost_high)}
+              </Text>
+            ) : null}
+            {sys.cost_note ? (
+              <Text style={s.systemCostNote}>{sys.cost_note}</Text>
+            ) : null}
+            {sys.cost_low == null && sys.cost_high == null && !sys.cost_note ? (
+              <Text style={[s.systemCostNote, { color: C.good }]}>No action needed</Text>
+            ) : null}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
+
+// ─── ROAD TEST RESULTS ────────────────────────────────────────────────────────
 
 const RT_PDF_SECTIONS: Array<{
   title: string;
@@ -1175,6 +1613,74 @@ const RT_PDF_SECTIONS: Array<{
   ]},
 ];
 
+function RoadTestResultsSection({ rt }: { rt: RoadTestModule }) {
+  if (rt.status !== "completed") return null;
+  const overallItems = [
+    { id: "vehicle_drove_as_expected",    label: "Vehicle drove as expected for age and mileage" },
+    { id: "noticeable_concerns_observed", label: "Noticeable concerns observed during drive" },
+  ];
+  return (
+    <View style={s.content}>
+      <SectionTitle title="Road Test Results" />
+      <View style={s.rtGrid}>
+        {RT_PDF_SECTIONS.map(({ title, key, items }) => {
+          const checked = (rt[key] as string[] | undefined) ?? [];
+          return (
+            <View key={title} style={s.rtSubSection} wrap={false}>
+              <Text style={s.rtSubTitle}>{title}</Text>
+              {items.map(({ id, label }) => {
+                const isOn = checked.includes(id);
+                return (
+                  <View key={id} style={s.rtItem}>
+                    <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
+                    <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
+      <View style={s.rtOtherRow} wrap={false}>
+        <View style={s.rtOtherBox}>
+          <Text style={s.rtOtherTitle}>Other Warning Lights</Text>
+          <Text style={rt.other_lights_noted
+            ? [s.rtItemOn, { fontSize: 8 }] as any
+            : [s.rtItemOff, { fontSize: 8 }] as any}>
+            {rt.other_lights_noted ? `Yes — ${rt.other_lights_description || "noted"}` : "None noted"}
+          </Text>
+        </View>
+        <View style={s.rtOtherBox}>
+          <Text style={s.rtOtherTitle}>Overall Drive Impression</Text>
+          {overallItems.map(({ id, label }) => {
+            const isOn = rt.overall?.includes(id);
+            return (
+              <View key={id} style={s.rtItem}>
+                <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
+                <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+      {rt.concerns_notes && (
+        <View style={s.rtConcernsBox} wrap={false}>
+          <Text style={s.rtConcernsLabel}>Drive Concerns Noted</Text>
+          <Text style={s.rtConcernsText}>{rt.concerns_notes}</Text>
+        </View>
+      )}
+      {(rt.photo_1_url || rt.photo_2_url) && (
+        <View style={s.rtPhotosRow} wrap={false}>
+          {rt.photo_1_url && <PhotoBlock url={rt.photo_1_url} caption="Road test — Photo 1" />}
+          {rt.photo_2_url && <PhotoBlock url={rt.photo_2_url} caption="Road test — Photo 2" />}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── OBD-II FIELD SCAN RESULTS ────────────────────────────────────────────────
+
 const OBD_WARNING_LIGHT_LABELS: Record<string, string> = {
   check_engine: "Check Engine",
   abs:          "ABS",
@@ -1186,34 +1692,24 @@ const OBD_WARNING_LIGHT_LABELS: Record<string, string> = {
   none:         "No warning lights observed",
   other:        "Other",
 };
-
 const OBD_HIGH_SEVERITY_LIGHTS = new Set(["check_engine", "oil_pressure", "airbag_srs", "brake"]);
 
-function dtcStatusColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case "active":  return C.fail;
-    case "pending": return C.monitor;
-    case "stored":  return C.gray_600;
-    default:        return C.gray_400;
-  }
-}
-
-function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
+function OBDFieldScanSection({ obd }: { obd: OBDModule }) {
   const scanPerformedLabels: Record<string, string> = {
-    yes:           "OBD-II Scan Performed",
-    no:            "OBD-II Scan Not Performed",
-    not_available: "OBD-II Scan Not Available — Scanner / Connection Issue",
-    not_permitted: "OBD-II Scan Not Permitted by Seller",
+    yes:           "OBD-II Field Scan Performed",
+    no:            "OBD-II Field Scan Not Performed",
+    not_available: "OBD-II Field Scan Not Available — Scanner / Connection Issue",
+    not_permitted: "OBD-II Field Scan Not Permitted by Seller",
   };
-
-  const scanColor = obd.scan_performed === "yes" ? C.good : C.monitor;
-  const scanBg    = obd.scan_performed === "yes" ? C.good_bg : C.monitor_bg;
+  const scanPerformed = obd.scan_performed === "yes";
+  const hasCodes = (obd.dtc_codes?.length ?? 0) > 0;
+  const scanColor = scanPerformed ? C.good : C.monitor;
+  const scanBg    = scanPerformed ? C.good_bg : C.monitor_bg;
 
   const warningLights  = obd.warning_lights || [];
   const activeWarnings = warningLights.filter((l) => l !== "none" && OBD_HIGH_SEVERITY_LIGHTS.has(l));
   const visibleLights  = warningLights.filter((l) => l !== "none" && l !== "other");
   const noneSelected   = warningLights.includes("none");
-
   const dtcCodes    = obd.dtc_codes || [];
   const imageFiles  = (obd.uploaded_files || []).filter((f) => f.fileType === "image");
   const pdfFiles    = (obd.uploaded_files || []).filter((f) => f.fileType === "pdf");
@@ -1226,19 +1722,23 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
 
   return (
     <View style={s.content}>
-      <SectionTitle title="OBD-II Diagnostic Data" />
+      <SectionTitle title="OBD-II Field Scan Results" />
 
-      {/* Scan status banner */}
       <View style={[s.obdScanBanner, { backgroundColor: scanBg, borderColor: scanColor }]} wrap={false}>
         <Text style={[s.obdScanLabel, { color: scanColor }]}>Scan Status</Text>
         <Text style={[s.obdScanValue, { color: scanColor }]}>
           {scanPerformedLabels[obd.scan_performed] || obd.scan_performed}
         </Text>
+        {scanPerformed && (
+          <Text style={{ fontSize: 7.5, color: scanColor, marginTop: 2 }}>
+            {hasCodes
+              ? `${dtcCodes.length} diagnostic trouble code${dtcCodes.length !== 1 ? "s" : ""} retrieved`
+              : "Scan completed — no diagnostic trouble codes retrieved"}
+          </Text>
+        )}
       </View>
 
-      {/* Warning lights + Emissions side-by-side */}
       <View style={s.obdTwoCol} wrap={false}>
-        {/* Warning lights */}
         <View style={s.obdBox}>
           <Text style={s.obdBoxTitle}>Warning Lights Observed</Text>
           {noneSelected && (
@@ -1264,8 +1764,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
             </Text>
           )}
         </View>
-
-        {/* Emissions readiness */}
         <View style={s.obdBox}>
           <Text style={s.obdBoxTitle}>Emissions Readiness</Text>
           {obd.emissions_readiness ? (
@@ -1284,8 +1782,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
               {obd.scan_performed === "yes" ? "Not recorded" : "Scan not performed"}
             </Text>
           )}
-
-          {/* Active high-severity count callout */}
           {activeWarnings.length > 0 && (
             <View style={{ marginTop: 6, padding: 5, backgroundColor: "#fef2f2", borderRadius: 2, borderWidth: 1, borderColor: "#fecaca" }}>
               <Text style={{ fontSize: 7, color: C.fail, fontFamily: "Helvetica-Bold" }}>
@@ -1296,7 +1792,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
         </View>
       </View>
 
-      {/* DTC codes table */}
       {dtcCodes.length > 0 && (
         <View style={s.obdDTCTable} wrap={false}>
           <View style={s.obdDTCHead}>
@@ -1326,7 +1821,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
         </View>
       )}
 
-      {/* OBD notes */}
       {obd.notes && (
         <View style={s.obdNotesBox} wrap={false}>
           <Text style={s.obdNotesLabel}>Inspector OBD Notes</Text>
@@ -1334,7 +1828,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
         </View>
       )}
 
-      {/* Uploaded image thumbnails */}
       {imageFiles.length > 0 && (
         <View style={s.obdPhotoRow} wrap={false}>
           {imageFiles.slice(0, 4).map((f, i) => (
@@ -1343,7 +1836,6 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
         </View>
       )}
 
-      {/* PDF file references */}
       {pdfFiles.length > 0 && (
         <View style={[s.obdNotesBox, { marginBottom: 0 }]} wrap={false}>
           <Text style={s.obdNotesLabel}>Uploaded Diagnostic Files (PDF)</Text>
@@ -1358,6 +1850,103 @@ function OBDDiagnosticsSection({ obd }: { obd: OBDModule }) {
     </View>
   );
 }
+
+// ─── ODOMETER & MILEAGE VERIFICATION ─────────────────────────────────────────
+
+function OdometerSection({ thf, vehicleMileage }: {
+  thf: NonNullable<ReportMeta["title_history_module"]>;
+  vehicleMileage: string;
+}) {
+  const hasOdometer = thf.odometer_reading != null;
+  const hasConsistency = !!thf.odometer_consistency;
+  const hasTampering  = !!thf.odometer_tampering;
+  if (!hasOdometer && !hasConsistency && !hasTampering && !thf.odometer_notes) return null;
+
+  const consistencyLabels: Record<string, string> = {
+    yes:          "Consistent with disclosure",
+    no_discrepancy: "Discrepancy observed",
+    unable:       "Unable to verify",
+    unavailable:  "Title unavailable for comparison",
+  };
+  const tamperingLabels: Record<string, string> = {
+    yes:    "Indicators observed",
+    no:     "None observed",
+    unable: "Unable to determine",
+  };
+
+  const hasDiscrepancy = thf.odometer_consistency === "no_discrepancy";
+  const hasTamperingIndicators = thf.odometer_tampering === "yes";
+
+  return (
+    <View style={s.content} wrap={false}>
+      <SectionTitle title="Odometer & Mileage Verification" />
+
+      <View style={s.odometerGrid}>
+        {hasOdometer && (
+          <View style={s.odometerBox}>
+            <Text style={s.odometerBoxTitle}>Observed at Inspection</Text>
+            <Text style={s.odometerValue}>{thf.odometer_reading!.toLocaleString()} mi</Text>
+            {vehicleMileage && vehicleMileage !== "Not recorded" && (
+              <Text style={s.odometerSub}>Listed mileage: {vehicleMileage}</Text>
+            )}
+          </View>
+        )}
+
+        {hasConsistency && (
+          <View style={[s.odometerBox, hasDiscrepancy ? {
+            borderColor: C.monitor, backgroundColor: C.monitor_bg,
+          } : {}]}>
+            <Text style={s.odometerBoxTitle}>Disclosure Consistency</Text>
+            <Text style={[s.odometerValue, { fontSize: 10, color: hasDiscrepancy ? C.monitor : C.gray_900 }]}>
+              {consistencyLabels[thf.odometer_consistency!] || thf.odometer_consistency}
+            </Text>
+            {hasDiscrepancy && (
+              <Text style={[s.odometerSub, { color: "#92400e", marginTop: 3 }]}>
+                Discrepancy observed — independent verification recommended
+              </Text>
+            )}
+          </View>
+        )}
+
+        {hasTampering && (
+          <View style={[s.odometerBox, hasTamperingIndicators ? {
+            borderColor: C.monitor, backgroundColor: C.monitor_bg,
+          } : {}]}>
+            <Text style={s.odometerBoxTitle}>Cluster Tampering Indicators</Text>
+            <Text style={[s.odometerValue, { fontSize: 10, color: hasTamperingIndicators ? C.monitor : C.gray_900 }]}>
+              {tamperingLabels[thf.odometer_tampering!] || thf.odometer_tampering}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {(hasDiscrepancy || hasTamperingIndicators) && (
+        <View style={s.odometerFlagRow}>
+          <Text style={s.odometerFlagText}>
+            {hasDiscrepancy && "Mileage discrepancy observed during inspection. "}
+            {hasTamperingIndicators && "Odometer cluster tampering indicators noted. "}
+            Discrepancies may affect vehicle value, maintenance expectations, resale value, and title documentation.
+            Independent verification is recommended before completing any transaction.
+          </Text>
+        </View>
+      )}
+
+      {thf.odometer_notes && (
+        <View style={s.thfNotesBox} wrap={false}>
+          <Text style={s.thfNotesLabel}>Odometer Inspector Notes</Text>
+          <Text style={s.thfNotesText}>{thf.odometer_notes}</Text>
+        </View>
+      )}
+
+      <Text style={s.odometerNote}>
+        Mileage observations are based on physical odometer reading and title documentation review at time of inspection only.
+        RideCheck does not access third-party vehicle history databases. Independent verification recommended.
+      </Text>
+    </View>
+  );
+}
+
+// ─── TITLE & HISTORY FLAGS ────────────────────────────────────────────────────
 
 function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_history_module"]> }) {
   const titleReviewLabels: Record<string, string> = {
@@ -1387,13 +1976,6 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
     lien_no_release: "Lien Noted — No Release",
     no_lien:         "No Lien Observed",
     unable:          "Unable to Verify",
-  };
-  const odometerConsistencyLabels: Record<string, string> = {
-    yes: "Consistent with Disclosure", no_discrepancy: "Discrepancy Observed",
-    unable: "Unable to Verify", unavailable: "Title Unavailable",
-  };
-  const odometerTamperingLabels: Record<string, string> = {
-    yes: "Indicators Observed", no: "None Observed", unable: "Unable to Determine",
   };
 
   const FLOOD_LABELS: Record<string, string> = {
@@ -1457,7 +2039,7 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
           ))
         ) : (
           <View style={s.thfIndicatorRow}>
-            <View style={[s.thfIndicatorDot, { backgroundColor: C.gray_400 }]} />
+            <View style={[s.thfIndicatorDot, { backgroundColor: C.gray_300 }]} />
             <Text style={[s.thfIndicatorText, { color: C.gray_400 }]}>Not assessed</Text>
           </View>
         )}
@@ -1475,7 +2057,6 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
     <View style={s.content}>
       <SectionTitle title="Title & History Flags" />
 
-      {/* Title status banner */}
       <View style={[s.thfBanner, { backgroundColor: bannerBg, borderColor: bannerBorder }]} wrap={false}>
         <View style={s.thfBannerCol}>
           <Text style={s.thfBannerLabel}>Title Review</Text>
@@ -1510,11 +2091,10 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
         ) : null}
       </View>
 
-      {/* VIN Verification + Seller */}
       {(thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched ||
         thf.seller_name_match || thf.title_signed) ? (
         <View style={s.thfGrid3} wrap={false}>
-          {thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched ? (
+          {(thf.dashboard_vin_verified || thf.door_jamb_vin_verified || thf.vins_matched) ? (
             <View style={s.thfBox}>
               <Text style={s.thfBoxTitle}>VIN Verification</Text>
               {thf.dashboard_vin_verified ? (
@@ -1554,35 +2134,8 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
                   <Text style={s.thfBoxSub}>Title Signed</Text>
                   <Text style={[s.thfBoxValue, { fontSize: 7.5 }]}>
                     {thf.title_signed === "yes" ? "Appropriately signed" :
-                     thf.title_signed === "no" ? "Unsigned / Incomplete" :
+                     thf.title_signed === "no"  ? "Unsigned / Incomplete" :
                      "Unable to verify"}
-                  </Text>
-                </>
-              ) : null}
-            </View>
-          ) : null}
-          {thf.odometer_consistency || thf.odometer_reading != null ? (
-            <View style={s.thfBox}>
-              <Text style={s.thfBoxTitle}>Odometer</Text>
-              {thf.odometer_reading != null ? (
-                <>
-                  <Text style={s.thfBoxSub}>Reading at Inspection</Text>
-                  <Text style={[s.thfBoxValue, { marginBottom: 5 }]}>{thf.odometer_reading.toLocaleString()} mi</Text>
-                </>
-              ) : null}
-              {thf.odometer_consistency ? (
-                <>
-                  <Text style={s.thfBoxSub}>Disclosure Consistency</Text>
-                  <Text style={[s.thfBoxValue, { fontSize: 7.5, color: thf.odometer_consistency === "no_discrepancy" ? C.monitor : C.gray_900 }]}>
-                    {odometerConsistencyLabels[thf.odometer_consistency] || thf.odometer_consistency}
-                  </Text>
-                </>
-              ) : null}
-              {thf.odometer_tampering ? (
-                <>
-                  <Text style={[s.thfBoxSub, { marginTop: 3 }]}>Tampering Indicators</Text>
-                  <Text style={[s.thfBoxValue, { fontSize: 7.5, color: thf.odometer_tampering === "yes" ? C.monitor : C.gray_900 }]}>
-                    {odometerTamperingLabels[thf.odometer_tampering] || thf.odometer_tampering}
                   </Text>
                 </>
               ) : null}
@@ -1591,7 +2144,6 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
         </View>
       ) : null}
 
-      {/* Lien notes */}
       {thf.lien_notes ? (
         <View style={s.thfNotesBox} wrap={false}>
           <Text style={s.thfNotesLabel}>Lien Notes</Text>
@@ -1599,15 +2151,6 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
         </View>
       ) : null}
 
-      {/* Odometer notes */}
-      {thf.odometer_notes ? (
-        <View style={s.thfNotesBox} wrap={false}>
-          <Text style={s.thfNotesLabel}>Odometer Notes</Text>
-          <Text style={s.thfNotesText}>{thf.odometer_notes}</Text>
-        </View>
-      ) : null}
-
-      {/* Observable indicator groups */}
       <IndicatorGroup
         title="Flood / Water Intrusion Indicators"
         items={thf.flood_indicators || []}
@@ -1630,7 +2173,6 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
         labelMap={ACCIDENT_LABELS}
       />
 
-      {/* VIN verification photos */}
       {(thf.dashboard_vin_photo_url || thf.door_jamb_vin_photo_url) ? (
         <View style={s.thfVinPhotoRow} wrap={false}>
           {thf.dashboard_vin_photo_url ? (
@@ -1645,123 +2187,7 @@ function TitleHistoryFlagsSection({ thf }: { thf: NonNullable<ReportMeta["title_
   );
 }
 
-function RoadTestResultsSection({ rt }: { rt: RoadTestModule }) {
-  if (rt.status !== "completed") return null;
-
-  const overallItems = [
-    { id: "vehicle_drove_as_expected",   label: "Vehicle drove as expected for age and mileage" },
-    { id: "noticeable_concerns_observed",label: "Noticeable concerns observed during drive" },
-  ];
-
-  return (
-    <View style={s.content}>
-      <SectionTitle title="Road Test Results" />
-      <View style={s.rtGrid}>
-        {RT_PDF_SECTIONS.map(({ title, key, items }) => {
-          const checked = (rt[key] as string[] | undefined) ?? [];
-          return (
-            <View key={title} style={s.rtSubSection} wrap={false}>
-              <Text style={s.rtSubTitle}>{title}</Text>
-              {items.map(({ id, label }) => {
-                const isOn = checked.includes(id);
-                return (
-                  <View key={id} style={s.rtItem}>
-                    <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
-                    <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Other lights + Overall in a row */}
-      <View style={s.rtOtherRow} wrap={false}>
-        <View style={s.rtOtherBox}>
-          <Text style={s.rtOtherTitle}>Other Warning Lights</Text>
-          <Text style={rt.other_lights_noted ? [s.rtItemOn, { fontSize: 8 }] as any : [s.rtItemOff, { fontSize: 8 }] as any}>
-            {rt.other_lights_noted ? `Yes — ${rt.other_lights_description || "noted"}` : "None noted"}
-          </Text>
-        </View>
-        <View style={s.rtOtherBox}>
-          <Text style={s.rtOtherTitle}>Overall Drive Impression</Text>
-          {overallItems.map(({ id, label }) => {
-            const isOn = rt.overall?.includes(id);
-            return (
-              <View key={id} style={s.rtItem}>
-                <Text style={isOn ? s.rtCheckOn : s.rtCheckOff}>{isOn ? "✓" : "○"}</Text>
-                <Text style={isOn ? s.rtItemOn : s.rtItemOff}>{label}</Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Drive concerns */}
-      {rt.concerns_notes && (
-        <View style={s.rtConcernsBox} wrap={false}>
-          <Text style={s.rtConcernsLabel}>Drive Concerns Noted</Text>
-          <Text style={s.rtConcernsText}>{rt.concerns_notes}</Text>
-        </View>
-      )}
-
-      {/* Road test photos */}
-      {(rt.photo_1_url || rt.photo_2_url) && (
-        <View style={s.rtPhotosRow} wrap={false}>
-          {rt.photo_1_url && <PhotoBlock url={rt.photo_1_url} caption="Road test — Photo 1" />}
-          {rt.photo_2_url && <PhotoBlock url={rt.photo_2_url} caption="Road test — Photo 2" />}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function PhotoBlock({ url, caption }: { url?: string; caption: string }) {
-  return (
-    <View style={s.photoBlock}>
-      {url ? (
-        <Image style={s.photoImg} src={url} />
-      ) : (
-        <View style={s.photoPlaceholder}>
-          <Text style={s.photoPlaceholderText}>Photo</Text>
-        </View>
-      )}
-      <Text style={s.photoCaption}>■ {caption}</Text>
-    </View>
-  );
-}
-
-// ─── RISK INTELLIGENCE SECTION ───────────────────────────────────────────────
-
-function riskLevelColors(level: string): { bg: string; border: string; text: string } {
-  switch (level) {
-    case "HIGH":     return { bg: C.fail_bg,    border: "#FECACA", text: C.fail };
-    case "ELEVATED": return { bg: C.risk_bg,    border: "#FED7AA", text: C.risk };
-    case "MODERATE": return { bg: C.monitor_bg, border: "#FDE68A", text: C.monitor };
-    default:         return { bg: C.good_bg,    border: "#BBF7D0", text: C.good };
-  }
-}
-
-function riskLevelLabel(level: string): string {
-  switch (level) {
-    case "HIGH":     return "HIGH RISK";
-    case "ELEVATED": return "ELEVATED RISK";
-    case "MODERATE": return "MODERATE RISK";
-    default:         return "LOW RISK";
-  }
-}
-
-function RiskModuleBadge({ value, good }: { value: string; good: boolean }) {
-  const bg   = good ? C.good_bg    : C.monitor_bg;
-  const tc   = good ? C.good       : C.monitor;
-  const bord = good ? "#BBF7D0"    : "#FDE68A";
-  return (
-    <View style={[s.riskModuleBadge, { backgroundColor: bg, borderWidth: 1, borderColor: bord }]}>
-      <Text style={[s.riskModuleBadgeText, { color: tc }]}>{value}</Text>
-    </View>
-  );
-}
+// ─── TITLE & TRANSFER READINESS ───────────────────────────────────────────────
 
 function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSummary }) {
   const statusColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
@@ -1785,22 +2211,20 @@ function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSum
     UNABLE_TO_VERIFY_DOCUMENTS:     "One or more documents could not be fully verified",
   };
 
-  const checkItems: { label: string; value: string | boolean | null; }[] = [
-    { label: "Title Present",               value: ttr.title_present === true ? "Yes" : ttr.title_present === false ? "No" : "N/A" },
-    { label: "VIN Matches Title",           value: ttr.vin_matches_title ?? "—" },
-    { label: "Open Title",                  value: ttr.open_title ?? "—" },
-    { label: "Title Signed",                value: ttr.title_signed ?? "—" },
-    { label: "Odometer Disclosure",         value: ttr.odometer_disclosure_completed ?? "—" },
-    { label: "Lien Release",                value: ttr.lien_release_present ?? "—" },
-    { label: "Buyer Name Completed",        value: ttr.buyer_name_completed ?? "—" },
-    { label: "State of Title",              value: ttr.state_of_title ?? "—" },
+  const checkItems: { label: string; value: string | boolean | null }[] = [
+    { label: "Title Present",       value: ttr.title_present === true ? "Yes" : ttr.title_present === false ? "No" : "N/A" },
+    { label: "VIN Matches Title",   value: ttr.vin_matches_title ?? "—" },
+    { label: "Open Title",          value: ttr.open_title ?? "—" },
+    { label: "Title Signed",        value: ttr.title_signed ?? "—" },
+    { label: "Odometer Disclosure", value: ttr.odometer_disclosure_completed ?? "—" },
+    { label: "Lien Release",        value: ttr.lien_release_present ?? "—" },
+    { label: "Buyer Name Completed",value: ttr.buyer_name_completed ?? "—" },
+    { label: "State of Title",      value: ttr.state_of_title ?? "—" },
   ];
 
   return (
     <View style={s.content} wrap={false}>
       <SectionTitle title="Title & Transfer Readiness" />
-
-      {/* Status banner */}
       <View style={[s.thfIndicatorGroup, { backgroundColor: sc.bg, borderColor: sc.border, marginBottom: 8 }]}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <View style={{ flex: 1 }}>
@@ -1811,17 +2235,15 @@ function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSum
           </View>
         </View>
       </View>
-
-      {/* Checklist grid */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
         {checkItems.map((item) => {
           const val = String(item.value ?? "—");
-          const isBad = val === "no" || val === "No" || val === "unable_to_verify";
+          const isBad  = val === "no" || val === "No";
           const isGood = val === "yes" || val === "Yes";
           const dotColor = isGood ? C.good : isBad ? C.fail : C.gray_400;
           return (
             <View key={item.label} style={{ width: "48%", flexDirection: "row", alignItems: "flex-start", gap: 5 }}>
-              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: dotColor, marginTop: 1 }} />
+              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: dotColor, marginTop: 2 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 7, color: C.gray_600, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.3 }}>{item.label}</Text>
                 <Text style={{ fontSize: 8, color: C.gray_900 }}>{val}</Text>
@@ -1830,8 +2252,6 @@ function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSum
           );
         })}
       </View>
-
-      {/* Flags */}
       {ttr.risk_flags.length > 0 && (
         <View style={[s.thfIndicatorGroup, { borderColor: sc.border }]}>
           <Text style={s.thfIndicatorGroupTitle}>Flags Identified</Text>
@@ -1843,15 +2263,12 @@ function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSum
           ))}
         </View>
       )}
-
-      {/* Seller name */}
       {ttr.seller_name_on_title && (
         <View style={{ marginBottom: 6 }}>
           <Text style={s.thfNotesLabel}>Seller Name on Title</Text>
           <Text style={s.thfNotesText}>{ttr.seller_name_on_title}</Text>
         </View>
       )}
-
       <Text style={{ fontSize: 6.5, color: C.gray_400, marginTop: 2 }}>
         Reviewed at inspection on {ttr.checked_at ? new Date(ttr.checked_at).toLocaleDateString("en-US") : "—"}.
         This review is observational only and does not constitute legal title verification.
@@ -1860,43 +2277,243 @@ function TitleTransferReadinessSection({ ttr }: { ttr: TitleTransferReadinessSum
   );
 }
 
+// ─── FIELD PHOTO DOCUMENTATION (grouped) ─────────────────────────────────────
+
+function FieldPhotoDocumentation({
+  meta,
+  obd,
+  rt,
+}: {
+  meta: ReportMeta;
+  obd?: OBDModule;
+  rt?: RoadTestModule;
+}) {
+  // Group photos into categories — deduplicate by URL
+  const seen = new Set<string>();
+  function dedup(url?: string): string | undefined {
+    if (!url) return undefined;
+    if (seen.has(url)) return undefined;
+    seen.add(url);
+    return url;
+  }
+
+  const vinPhotos: Array<{ url?: string; caption: string }> = [
+    { url: dedup(meta.vin_photo_url), caption: "VIN Plate" },
+    ...(meta.title_history_module?.dashboard_vin_photo_url
+      ? [{ url: dedup(meta.title_history_module.dashboard_vin_photo_url), caption: "VIN — Dashboard" }]
+      : []),
+    ...(meta.title_history_module?.door_jamb_vin_photo_url
+      ? [{ url: dedup(meta.title_history_module.door_jamb_vin_photo_url), caption: "VIN — Door Jamb" }]
+      : []),
+  ].filter((p) => p.url);
+
+  const odometerPhotos: Array<{ url?: string; caption: string }> = [
+    { url: dedup(meta.odometer_photo_url), caption: "Odometer — Mileage Reading" },
+  ].filter((p) => p.url);
+
+  const enginePhotos: Array<{ url?: string; caption: string }> = [
+    { url: dedup(meta.under_hood_photo_url), caption: "Engine Bay — Under Hood" },
+  ].filter((p) => p.url);
+
+  const underbodyPhotos: Array<{ url?: string; caption: string }> = [
+    { url: dedup(meta.undercarriage_photo_url), caption: "Undercarriage — Frame & Underbody" },
+  ].filter((p) => p.url);
+
+  const obdPhotos: Array<{ url?: string; caption: string }> = obd
+    ? (obd.uploaded_files || [])
+        .filter((f) => f.fileType === "image")
+        .map((f, i) => ({ url: dedup(f.url), caption: `OBD Evidence — ${f.fileName}` }))
+        .filter((p) => p.url)
+    : [];
+
+  const rtPhotos: Array<{ url?: string; caption: string }> = rt
+    ? [
+        rt.photo_1_url ? { url: dedup(rt.photo_1_url), caption: "Road Test — Photo 1" } : null,
+        rt.photo_2_url ? { url: dedup(rt.photo_2_url), caption: "Road Test — Photo 2" } : null,
+      ].filter(Boolean) as Array<{ url?: string; caption: string }>
+    : [];
+
+  const extraPhotos: Array<{ url?: string; caption: string }> = (meta.extra_photos || []).map(
+    (url, i) => ({ url: dedup(url), caption: `Additional Photo ${i + 1}` })
+  ).filter((p) => p.url);
+
+  const allGroups: Array<{ title: string; photos: Array<{ url?: string; caption: string }> }> = [
+    { title: "VIN Verification Photos", photos: vinPhotos },
+    { title: "Odometer", photos: odometerPhotos },
+    { title: "Engine Bay", photos: enginePhotos },
+    { title: "Rust & Underbody", photos: underbodyPhotos },
+    { title: "OBD Field Scan Evidence", photos: obdPhotos },
+    { title: "Road Test Evidence", photos: rtPhotos },
+    { title: "Additional Field Photos", photos: extraPhotos },
+  ].filter((g) => g.photos.length > 0);
+
+  if (allGroups.length === 0) return null;
+
+  return (
+    <View style={s.content} break>
+      <SectionTitle title="Field Photo Documentation" />
+      {allGroups.map((group) => (
+        <View key={group.title}>
+          <Text style={s.photoGroupHeader}>{group.title}</Text>
+          <View style={s.photoGrid}>
+            {group.photos.map((photo, i) => (
+              <PhotoBlock key={i} url={photo.url} caption={photo.caption} />
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── REPAIR EXPOSURE SUMMARY ──────────────────────────────────────────────────
+
+function RepairExposureSummary({ report }: { report: GeneratedReport }) {
+  if (report.repair_estimates.length === 0) return null;
+  return (
+    <View style={s.content} break>
+      <SectionTitle title="Repair Exposure Summary" />
+      <Text style={{ fontSize: 7, color: C.muted, marginBottom: 6 }}>
+        All estimates reflect Chicago-area labor rates. Actual costs may vary. These are informed estimates, not binding quotes.
+      </Text>
+      <View style={s.table}>
+        <View style={s.tableHead}>
+          <Text style={[s.thText, s.rCol_item]}>Item</Text>
+          <Text style={[s.thText, s.rCol_priority]}>Priority</Text>
+          <Text style={[s.thText, { ...s.rCol_low, textAlign: "right" }]}>Est. Low</Text>
+          <Text style={[s.thText, { ...s.rCol_high, textAlign: "right" }]}>Est. High</Text>
+        </View>
+        {report.repair_estimates.map((est, i) => (
+          <View key={i} style={s.repairRow} wrap={false}>
+            <Text style={[s.tdText, s.rCol_item]}>{est.item}</Text>
+            <View style={s.rCol_priority}>
+              <PriorityBadge priority={est.priority} />
+            </View>
+            <Text style={[s.tdText, { width: 65, textAlign: "right" }]}>{fmt(est.cost_low)}</Text>
+            <Text style={[s.tdText, { width: 65, textAlign: "right" }]}>{fmt(est.cost_high)}</Text>
+          </View>
+        ))}
+        <View style={s.repairTotalRow} wrap={false}>
+          <Text style={[s.tdText, s.rCol_item, { fontFamily: "Helvetica-Bold" }]}>
+            Total Estimated Repair Exposure
+          </Text>
+          <View style={s.rCol_priority} />
+          <Text style={[s.tdText, { width: 65, textAlign: "right", fontFamily: "Helvetica-Bold" }]}>
+            {fmt(report.total_repair_low)}
+          </Text>
+          <Text style={[s.tdText, { width: 65, textAlign: "right", fontFamily: "Helvetica-Bold" }]}>
+            {fmt(report.total_repair_high)}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── BUYER CONSIDERATIONS ─────────────────────────────────────────────────────
+
+function BuyerConsiderations({ report }: { report: GeneratedReport }) {
+  const repairHigh = report.total_repair_high ?? 0;
+  const hasRepairs = repairHigh > 0;
+  const isHigh     = report.verdict === "HIGH_RISK";
+  const isMod      = report.verdict === "MODERATE_RISK";
+
+  const moreFor: string[] = [];
+  if (hasRepairs) {
+    moreFor.push("Buyers comfortable with near-term mechanical repairs");
+    moreFor.push("Buyers with access to a trusted mechanic or service center");
+  }
+  if (isHigh || isMod) moreFor.push("Secondary or occasional-use vehicle buyers");
+  if (hasRepairs) moreFor.push(`Buyers prepared for ${fmt(report.total_repair_low)}–${fmt(report.total_repair_high)} in near-term repair costs`);
+  if (!hasRepairs) {
+    moreFor.push("Buyers seeking a lower-maintenance pre-owned vehicle");
+    moreFor.push("Daily-use buyers comfortable with standard upkeep");
+  }
+
+  const lessFor: string[] = [];
+  if (isHigh || isMod) lessFor.push("Buyers requiring immediate, uninterrupted daily reliability");
+  if (repairHigh > 1000) lessFor.push("Buyers without a repair budget contingency");
+  if (isHigh) {
+    lessFor.push("Long-distance commuters without a repair plan");
+    lessFor.push("Buyers without access to independent mechanical assessment");
+  }
+
+  if (moreFor.length === 0 && lessFor.length === 0) return null;
+
+  return (
+    <View wrap={false}>
+      <SectionTitle title="Buyer Considerations" />
+      <View style={s.buyerConsiderationsRow}>
+        {moreFor.length > 0 && (
+          <View style={[s.buyerCol, { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+            <Text style={[s.buyerColHeader, { color: C.green_dark }]}>
+              May be more appropriate for
+            </Text>
+            {moreFor.map((item, i) => (
+              <View key={i} style={s.buyerItem}>
+                <Text style={s.buyerIcon}>✓</Text>
+                <Text style={s.buyerText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {lessFor.length > 0 && (
+          <View style={[s.buyerCol, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
+            <Text style={[s.buyerColHeader, { color: "#92400e" }]}>
+              May be less appropriate for
+            </Text>
+            {lessFor.map((item, i) => (
+              <View key={i} style={s.buyerItem}>
+                <Text style={s.buyerIcon}>!</Text>
+                <Text style={s.buyerText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── RISK INTELLIGENCE SUMMARY ────────────────────────────────────────────────
+
 function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_intelligence"]> }) {
   const colors    = riskLevelColors(ri.overall_level);
   const levelText = riskLevelLabel(ri.overall_level);
 
-  const vinOk     = ri.vin_valid === true;
-  const recallOk  = ri.recall_count === 0;
-  const floodOk   = ri.flood_level === "LOW";
-  const theftOk   = ri.theft_status === "CLEAR";
-  const marketOk  = ri.pricing_risk == null || ri.pricing_risk === "NONE" || ri.pricing_risk === "UNAVAILABLE";
+  const vinOk    = ri.vin_valid === true;
+  const recallOk = ri.recall_count === 0;
+  const floodOk  = ri.flood_level === "LOW";
+  const theftOk  = ri.theft_status === "CLEAR";
+  const marketOk = ri.pricing_risk == null || ri.pricing_risk === "NONE" || ri.pricing_risk === "UNAVAILABLE";
 
   const vinLabel    = ri.vin_valid === true ? "Verified"
     : ri.vin_valid === false ? "Invalid / Unverified" : "Not checked";
   const recallLabel = ri.recall_count === 0
     ? "No recalls found" : `${ri.recall_count} recall(s) — ${ri.recall_severity}`;
-  const floodLabel  = ri.flood_level === "LOW"      ? "LOW — No significant indicators"
+  const floodLabel  = ri.flood_level === "LOW"
+    ? "LOW — No significant indicators"
     : ri.flood_level === "MODERATE" ? `MODERATE — score ${ri.flood_score}`
     : `HIGH — score ${ri.flood_score} (${ri.flood_active_count} indicators)`;
-  const theftLabel  = ri.theft_status === "CLEAR"            ? "CLEAR"
-    : ri.theft_status === "FLAGGED"          ? "FLAGGED — manual review required"
+  const theftLabel  = ri.theft_status === "CLEAR" ? "CLEAR"
+    : ri.theft_status === "FLAGGED" ? "FLAGGED — manual review required"
     : "Unable to verify — manual NICB check recommended";
   const marketLabel = ri.market_variance_pct != null
     ? `${ri.pricing_risk?.replace(/_/g, " ") ?? "N/A"} (${ri.market_variance_pct}% below market)`
     : "Market data unavailable";
 
-  const modules: Array<{ name: string; value: string; good: boolean; isLast: boolean }> = [
-    { name: "VIN Verification",   value: vinLabel,    good: vinOk,    isLast: false },
-    { name: "Recall Status",       value: recallLabel, good: recallOk, isLast: false },
-    { name: "Flood Risk",          value: floodLabel,  good: floodOk,  isLast: false },
-    { name: "Theft / Salvage",     value: theftLabel,  good: theftOk,  isLast: false },
-    { name: "Price Analysis",      value: marketLabel, good: marketOk, isLast: true  },
+  const modules = [
+    { name: "VIN Verification", value: vinLabel,    good: vinOk,    isLast: false },
+    { name: "Recall Status",    value: recallLabel, good: recallOk, isLast: false },
+    { name: "Flood Risk",       value: floodLabel,  good: floodOk,  isLast: false },
+    { name: "Theft / Salvage",  value: theftLabel,  good: theftOk,  isLast: false },
+    { name: "Price Analysis",   value: marketLabel, good: marketOk, isLast: true  },
   ];
 
   return (
     <View style={s.content} break>
       <SectionTitle title="Risk Intelligence Summary" />
 
-      {/* Overall risk banner */}
       <View style={[s.riskBanner, { backgroundColor: colors.bg, borderColor: colors.border }]} wrap={false}>
         <View style={s.riskScoreBlock}>
           <Text style={[s.riskScoreNum, { color: colors.text }]}>{ri.overall_score}</Text>
@@ -1912,7 +2529,6 @@ function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_inte
         </View>
       </View>
 
-      {/* Hard stops (if any) */}
       {ri.hard_stops.length > 0 && (
         <View style={s.riskHardStopBanner} wrap={false}>
           <Text style={s.riskHardStopText}>
@@ -1921,7 +2537,6 @@ function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_inte
         </View>
       )}
 
-      {/* Per-module table */}
       <View style={[s.riskModulesTable, { borderColor: C.border }]}>
         {modules.map((mod, i) => (
           <View
@@ -1939,7 +2554,6 @@ function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_inte
         ))}
       </View>
 
-      {/* Contributing risk reasons */}
       {ri.reasons.length > 0 && (
         <View style={s.riskReasonsList}>
           <Text style={{ fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.gray_700, marginBottom: 4 }}>
@@ -1963,7 +2577,44 @@ function RiskIntelligenceSection({ ri }: { ri: NonNullable<ReportMeta["risk_inte
   );
 }
 
-// ─── MAIN DOCUMENT ───────────────────────────────────────────────────────────
+// ─── INTERPRETED OBD ENTRIES (Claude-generated, if present) ──────────────────
+
+function InterpretedOBDSection({ entries }: { entries: GeneratedReport["obd_entries"] }) {
+  if (entries.length === 0) return null;
+  return (
+    <View style={s.content} wrap={false}>
+      <SectionTitle title="OBD-II Field Scan — Interpreted Findings" />
+      <View style={s.table}>
+        <View style={s.tableHead}>
+          <Text style={[s.thText, s.col_sys]}>System</Text>
+          <Text style={[s.thText, s.col_stat]}>Status</Text>
+          <Text style={[s.thText, s.col_codes]}>Code(s)</Text>
+          <Text style={[s.thText, s.col_desc]}>Description</Text>
+        </View>
+        {entries.map((entry, i) => {
+          const isLast = i === entries.length - 1;
+          return (
+            <View key={i} style={isLast ? s.tableRowLast : s.tableRow}>
+              <Text style={[s.tdText, s.col_sys]}>{entry.system}</Text>
+              <View style={[s.col_stat, s.statusPill]}>
+                <View style={entry.is_active ? s.dot_on : s.dot_off} />
+                <Text style={entry.is_active
+                  ? [s.tdText, { color: C.fail }]
+                  : [s.tdText, { color: C.good }]}>
+                  {entry.status_label}
+                </Text>
+              </View>
+              <Text style={[s.tdMuted, s.col_codes]}>{entry.codes}</Text>
+              <Text style={[s.tdText, s.col_desc]}>{entry.description}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ─── MAIN DOCUMENT ────────────────────────────────────────────────────────────
 
 interface Props {
   report: GeneratedReport;
@@ -1971,83 +2622,43 @@ interface Props {
 }
 
 export function RideCheckReport({ report, meta }: Props) {
-  const verdictBg = verdictColor(report.verdict);
-
-  const allPhotos: Array<{ url?: string; caption: string }> = [
-    { url: meta.vin_photo_url,          caption: "VIN — Vehicle identification" },
-    { url: meta.odometer_photo_url,     caption: "Odometer — Mileage reading" },
-    { url: meta.under_hood_photo_url,   caption: "Engine bay — Under hood condition" },
-    { url: meta.undercarriage_photo_url,caption: "Undercarriage — Frame and underbody" },
-    ...(meta.extra_photos || []).map((url, i) => ({
-      url,
-      caption: `Additional photo ${i + 1}`,
-    })),
-  ];
+  const vc = verdictColor(report.verdict);
+  const vbg = verdictBg(report.verdict);
+  const vbord = verdictBorder(report.verdict);
 
   return (
     <Document
-      title={`RideCheck Report — ${meta.vehicle_year} ${meta.vehicle_make} ${meta.vehicle_model}`}
+      title={`RideCheck Vehicle Transparency Report — ${meta.vehicle_year} ${meta.vehicle_make} ${meta.vehicle_model}`}
       author="RideCheck"
+      subject="Vehicle Transparency Report"
+      creator="RideCheck Vehicle Transparency Platform"
     >
+      {/* ═══════════════════════ COVER PAGE ══════════════════════════ */}
+      <Page size="LETTER" style={s.coverPage}>
+        <CoverPage report={report} meta={meta} />
+        <PageFooter />
+      </Page>
+
+      {/* ═══════════════════════ CONTENT PAGES ═══════════════════════ */}
       <Page size="LETTER" style={s.page}>
-        <Header />
+        <PageHeader meta={meta} />
 
-        {/* ── Vehicle info ── */}
-        <View style={s.vehicleBlock}>
-          <Text style={s.vehicleTitle}>
-            {meta.vehicle_year} {meta.vehicle_make}
-          </Text>
-          <Text style={s.vehicleSubtitle}>
-            Vehicle Transparency Inspection — {meta.vehicle_model}
-            {meta.vehicle_trim ? ` ${meta.vehicle_trim}` : ""} —{" "}
-            {meta.package_tier}
-          </Text>
-          <View style={s.metaGrid}>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Mileage</Text>
-              <Text style={s.metaValue}>{meta.vehicle_mileage}</Text>
-            </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Inspection Date</Text>
-              <Text style={s.metaValue}>{meta.inspection_date}</Text>
-            </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Asking Price</Text>
-              <Text style={s.metaValue}>{meta.vehicle_price}</Text>
-            </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Report #</Text>
-              <Text style={s.metaValue}>{meta.report_number}</Text>
-            </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Location</Text>
-              <Text style={s.metaValue}>{meta.inspection_location}</Text>
-            </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Inspector</Text>
-              <Text style={s.metaValue}>RideCheck Specialist</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Verdict banner ── */}
-        <View style={[s.verdictBanner, { backgroundColor: verdictBg }]}>
+        {/* ── Risk Verdict Banner ── */}
+        <View style={[s.verdictBanner, { backgroundColor: vbg, borderColor: vbord }]}>
           <View style={s.verdictLeft}>
-            <View style={s.verdictSquare} />
-            <Text style={s.verdictLabel}>
-              {verdictLabel(report.verdict)}
-            </Text>
+            <Text style={[s.verdictDot, { color: vc }]}>{verdictDot(report.verdict)}</Text>
+            <Text style={[s.verdictLabel, { color: vc }]}>{verdictLabel(report.verdict)}</Text>
           </View>
           <Text style={s.verdictTagline}>{report.verdict_tagline}</Text>
         </View>
 
-        {/* ── Top Insights ── */}
+        {/* ── On-Site Key Findings ── */}
         <View style={s.content}>
-          <SectionTitle title="Top 3 Key Findings" />
+          <SectionTitle title="On-Site Key Findings" />
           {report.top_insights.slice(0, 3).map((insight, i) => (
             <View key={i} style={s.insightBlock}>
               <View style={s.insightBulletBox}>
-                <Text style={s.insightBulletText}>■</Text>
+                <Text style={s.insightBulletText}>{i + 1}</Text>
               </View>
               <View style={s.insightContent}>
                 <Text style={s.insightTitle}>{insight.title}</Text>
@@ -2057,49 +2668,33 @@ export function RideCheckReport({ report, meta }: Props) {
           ))}
         </View>
 
-        {/* ── Inspection Scope + Confidence + Missing ── */}
-        <InspectionScopeSections meta={meta} />
+        {/* ── Inspection Scope + Confidence ── */}
+        <InspectionConfidenceScope meta={meta} />
 
-        {/* ── System assessment ── */}
-        <View style={s.content} break>
-          <SectionTitle title="System-by-System Assessment" />
-          {report.systems.map((sys, i) => (
-            <View key={i} style={s.systemRow} wrap={false}>
-              <View style={s.systemNameCol}>
-                <Text style={s.systemName}>{sys.name}</Text>
-                <StatusBadge status={sys.status} />
-              </View>
-              <View style={s.systemDescCol}>
-                <Text style={[s.systemFieldLabel, { marginTop: 0 }]}>Observed</Text>
-                <Text style={s.systemFieldText}>{sys.observed}</Text>
-                <Text style={s.systemFieldLabel}>Consideration</Text>
-                <Text style={s.systemFieldText}>{sys.consideration}</Text>
-              </View>
-              <View style={s.systemCostCol}>
-                {sys.cost_low != null && sys.cost_high != null ? (
-                  <Text style={s.systemCost}>
-                    {fmt(sys.cost_low)} – {fmt(sys.cost_high)}
-                  </Text>
-                ) : null}
-                {sys.cost_note ? (
-                  <Text style={s.systemCostNote}>{sys.cost_note}</Text>
-                ) : null}
-                {sys.cost_low == null && sys.cost_high == null && !sys.cost_note ? (
-                  <Text style={s.systemCost}>No action needed</Text>
-                ) : null}
-              </View>
-            </View>
-          ))}
-        </View>
+        {/* ── Vehicle System Observations ── */}
+        <VehicleSystemObservations report={report} />
 
-        {/* ── Road Test Results (if completed) ── */}
+        {/* ── Road Test Results ── */}
         {meta.road_test_module?.status === "completed" && (
           <RoadTestResultsSection rt={meta.road_test_module} />
         )}
 
-        {/* ── OBD-II Diagnostics (structured module) ── */}
+        {/* ── OBD-II Field Scan ── */}
         {meta.obd_module && (
-          <OBDDiagnosticsSection obd={meta.obd_module} />
+          <OBDFieldScanSection obd={meta.obd_module} />
+        )}
+
+        {/* ── Interpreted OBD entries (if Claude parsed additional entries) ── */}
+        {report.obd_entries.length > 0 && (
+          <InterpretedOBDSection entries={report.obd_entries} />
+        )}
+
+        {/* ── Odometer & Mileage Verification ── */}
+        {meta.title_history_module && (
+          <OdometerSection
+            thf={meta.title_history_module}
+            vehicleMileage={meta.vehicle_mileage}
+          />
         )}
 
         {/* ── Title & History Flags ── */}
@@ -2117,110 +2712,50 @@ export function RideCheckReport({ report, meta }: Props) {
           <RiskIntelligenceSection ri={meta.risk_intelligence} />
         )}
 
-        {/* ── OBD Table (AI-interpreted entries) ── */}
-        {report.obd_entries.length > 0 && (
-          <View style={s.content} wrap={false}>
-            <SectionTitle title="OBD-II Diagnostic Data" />
-            <View style={s.table}>
-              <View style={s.tableHead}>
-                <Text style={[s.thText, s.col_sys]}>System</Text>
-                <Text style={[s.thText, s.col_stat]}>Status</Text>
-                <Text style={[s.thText, s.col_codes]}>Code(s)</Text>
-                <Text style={[s.thText, s.col_desc]}>Description</Text>
-              </View>
-              {report.obd_entries.map((entry, i) => {
-                const isLast = i === report.obd_entries.length - 1;
-                return (
-                  <View key={i} style={isLast ? s.tableRowLast : s.tableRow}>
-                    <Text style={[s.tdText, s.col_sys]}>{entry.system}</Text>
-                    <View style={[s.col_stat, s.statusPill]}>
-                      <View style={entry.is_active ? s.dot_on : s.dot_off} />
-                      <Text style={entry.is_active ? [s.tdText, { color: C.fail }] : [s.tdText, { color: C.good }]}>
-                        {entry.status_label}
-                      </Text>
-                    </View>
-                    <Text style={[s.tdMuted, s.col_codes]}>{entry.codes}</Text>
-                    <Text style={[s.tdText, s.col_desc]}>{entry.description}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        )}
+        {/* ── Field Photo Documentation (grouped) ── */}
+        <FieldPhotoDocumentation
+          meta={meta}
+          obd={meta.obd_module}
+          rt={meta.road_test_module}
+        />
 
-        {/* ── Photo Documentation ── */}
-        {allPhotos.length > 0 && (
-          <View style={s.content} break>
-            <SectionTitle title="Photo Documentation" />
-            <View style={s.photoGrid}>
-              {allPhotos.map((photo, i) => (
-                <PhotoBlock key={i} url={photo.url} caption={photo.caption} />
-              ))}
-            </View>
-          </View>
-        )}
+        {/* ── Repair Exposure Summary ── */}
+        <RepairExposureSummary report={report} />
 
-        {/* ── Repair Estimates ── */}
-        <View style={s.content} break>
-          <SectionTitle title="Repair Cost Estimate Summary" />
-          <Text style={{ fontSize: 7, color: C.muted, marginBottom: 6 }}>
-            All estimates reflect Chicago-area labor rates. Actual costs may vary. These are informed estimates, not binding quotes.
-          </Text>
-          <View style={s.table}>
-            <View style={s.tableHead}>
-              <Text style={[s.thText, s.rCol_item]}>Item</Text>
-              <Text style={[s.thText, s.rCol_priority]}>Priority</Text>
-              <Text style={[s.thText, { ...s.rCol_low, textAlign: "right" }]}>Est. Low</Text>
-              <Text style={[s.thText, { ...s.rCol_high, textAlign: "right" }]}>Est. High</Text>
-            </View>
-            {report.repair_estimates.map((est, i) => (
-              <View key={i} style={s.repairRow} wrap={false}>
-                <Text style={[s.tdText, s.rCol_item]}>{est.item}</Text>
-                <View style={s.rCol_priority}>
-                  <PriorityBadge priority={est.priority} />
-                </View>
-                <Text style={[s.tdText, { width: 65, textAlign: "right" }]}>{fmt(est.cost_low)}</Text>
-                <Text style={[s.tdText, { width: 65, textAlign: "right" }]}>{fmt(est.cost_high)}</Text>
+        {/* ── Buyer Considerations ── */}
+        <View style={s.content}>
+          <BuyerConsiderations report={report} />
+        </View>
+
+        {/* ── Price & Condition Context ── */}
+        {report.negotiation_options.length > 0 && (
+          <View style={s.content}>
+            <SectionTitle title="Price & Condition Context" />
+            {report.negotiation_options.map((opt, i) => (
+              <View key={i} style={s.negotiationOption} wrap={false}>
+                <Text style={s.negotiationLabel}>{opt.label}</Text>
+                <Text style={s.negotiationDesc}>{opt.description}</Text>
               </View>
             ))}
-            <View style={s.repairTotalRow} wrap={false}>
-              <Text style={[s.tdText, s.rCol_item, { fontFamily: "Helvetica-Bold" }]}>
-                Total Estimated Repairs
-              </Text>
-              <View style={s.rCol_priority} />
-              <Text style={[s.tdText, { width: 65, textAlign: "right", fontFamily: "Helvetica-Bold" }]}>
-                {fmt(report.total_repair_low)}
-              </Text>
-              <Text style={[s.tdText, { width: 65, textAlign: "right", fontFamily: "Helvetica-Bold" }]}>
-                {fmt(report.total_repair_high)}
-              </Text>
-            </View>
           </View>
+        )}
 
-          {/* ── Buyer Considerations ── */}
-          <BuyerConsiderations report={report} />
-
-          {/* ── Price & Condition Considerations ── */}
-          <SectionTitle title="Price & Condition Considerations" />
-          {report.negotiation_options.map((opt, i) => (
-            <View key={i} style={s.negotiationOption} wrap={false}>
-              <Text style={s.negotiationLabel}>{opt.label}</Text>
-              <Text style={s.negotiationDesc}>{opt.description}</Text>
-            </View>
-          ))}
-
-          {/* ── Disclaimer ── */}
+        {/* ── Disclaimer ── */}
+        <View style={s.content}>
           <View style={s.disclaimer} wrap={false}>
             <Text style={s.disclaimerText}>
-              This report reflects visual observations and OBD-II diagnostic data collected at the time of inspection. Risk levels represent estimated financial and maintenance exposure only and do not constitute purchase advice or a recommendation to buy or not buy. RideCheck
-              is not responsible for undisclosed issues or post-inspection changes. Repair cost estimates are approximations based on Chicago-area rates and may vary significantly by shop and
-              market conditions. A professional mechanical inspection is recommended before any transaction. Governed by Illinois law, Lake County venue.
-              ridecheckauto.com
+              RideCheck is a Vehicle Transparency Platform — not a purchase advisor, legal authority, or title agency.
+              This report reflects visual observations and field data collected at the time of inspection only.
+              Risk levels represent estimated financial and maintenance exposure and do not constitute a recommendation to buy or not buy.
+              RideCheck is not responsible for undisclosed issues or post-inspection changes.
+              Repair cost estimates are approximations based on Chicago-area rates and may vary significantly by shop and market conditions.
+              A professional mechanical inspection is recommended before completing any vehicle transaction.
+              Governed by Illinois law, Lake County venue.  ·  ridecheckauto.com  ·  support@ridecheckauto.com
             </Text>
           </View>
         </View>
 
-        <Footer meta={meta} />
+        <PageFooter />
       </Page>
     </Document>
   );

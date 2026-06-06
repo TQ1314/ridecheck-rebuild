@@ -20,7 +20,7 @@ function resolveOBDScope(submission: any): { level: string; status: ScopeRow["st
         const hasFiles   = (obd.uploaded_files?.length ?? 0) > 0;
         const hasEvidence = hasCodes || hasFiles;
         return {
-          level:  hasEvidence ? "Performed — Codes + Evidence Uploaded" : "Performed",
+          level:  hasEvidence ? "Full — Codes Retrieved" : "Limited — No Codes Retrieved",
           status: "assessed",
         };
       }

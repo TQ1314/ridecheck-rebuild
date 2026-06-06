@@ -3,848 +3,1791 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RideCheck Inspection Report</title>
+    <title>RideCheck Vehicle Transparency Report — Sample</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #1f2937;
-            background: #f9fafb;
-            padding: 20px;
-        }
-        
-        .report-container {
-            max-width: 850px;
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            color: white;
-            padding: 40px 40px 30px;
-        }
-
-        .header-top {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .logo-img {
-            height: 50px;
-            width: auto;
-        }
-
-        .header-company {
-        }
-
-        .vehicle-banner {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .vehicle-title {
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        .vehicle-meta {
             font-size: 14px;
-            opacity: .9;
-            margin-top: 3px;
+            line-height: 1.6;
+            color: #111827;
+            background: #e5e7eb;
         }
-        
-        .company-name {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
+
+        .report-container {
+            max-width: 860px;
+            margin: 24px auto;
+            background: white;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
         }
-        
-        .report-title {
-            font-size: 18px;
-            opacity: 0.95;
-            font-weight: 500;
-            margin-top: 5px;
+
+        /* ─── COVER PAGE ─── */
+        .cover-page {
+            background: white;
         }
-        
-        .report-meta {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .meta-item {
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        
-        .meta-label {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        
-        .content {
-            padding: 40px;
-        }
-        
-        .condition-banner {
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 35px;
+
+        .cover-top-band {
+            background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+            padding: 22px 40px;
             display: flex;
             align-items: center;
-            gap: 20px;
+            justify-content: space-between;
         }
-        
-        .condition-icon {
-            width: 70px;
-            height: 70px;
-            background: #10b981;
-            border-radius: 50%;
+        .cover-brand-name {
+            font-size: 28px;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 5px;
+        }
+        .cover-brand-sub {
+            font-size: 10px;
+            color: #86efac;
+            margin-top: 4px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+        .cover-report-num {
+            text-align: right;
+        }
+        .cover-report-num-label {
+            font-size: 9px;
+            color: #86efac;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cover-report-num-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            margin-top: 2px;
+        }
+
+        .cover-hero {
+            height: 220px;
+            background: linear-gradient(160deg, #1e3a2f 0%, #14532d 50%, #0f3d22 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 36px;
-            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
         }
-        
-        .condition-text h2 {
-            font-size: 24px;
-            color: #065f46;
-            margin-bottom: 5px;
-        }
-        
-        .condition-text p {
-            color: #047857;
-            font-size: 15px;
-        }
-        
-        .section {
-            margin-bottom: 40px;
-        }
-        
-        .section-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #111827;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #059669;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .section-icon {
-            font-size: 24px;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .info-item {
-            background: #f9fafb;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #059669;
-        }
-        
-        .info-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: #6b7280;
+        .cover-hero-badge {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #86efac;
+            font-size: 11px;
+            letter-spacing: 3px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
+            padding: 12px 28px;
+            border-radius: 4px;
         }
-        
-        .info-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #111827;
+
+        .cover-body {
+            padding: 28px 40px 32px;
         }
-        
-        .insights-box {
-            background: #fffbeb;
-            border: 2px solid #fbbf24;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 35px;
+        .cover-vehicle-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #14532d;
+            line-height: 1.1;
+            margin-bottom: 4px;
         }
-        
-        .insights-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .cover-vehicle-sub {
+            font-size: 14px;
+            color: #6b7280;
             margin-bottom: 20px;
         }
-        
-        .insights-icon {
-            font-size: 28px;
+
+        .cover-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border: 1px solid #e5e7eb;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 20px;
         }
-        
-        .insights-title {
-            font-size: 18px;
+        .cover-meta-cell {
+            padding: 10px 14px;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .cover-meta-cell:nth-child(3n) { border-right: none; }
+        .cover-meta-cell:nth-child(4),
+        .cover-meta-cell:nth-child(5),
+        .cover-meta-cell:nth-child(6) { border-bottom: none; }
+        .cover-meta-label {
+            font-size: 9px;
             font-weight: 700;
-            color: #78350f;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 3px;
         }
-        
-        .insight-item {
-            padding: 12px 0;
-            border-bottom: 1px solid #fde68a;
+        .cover-meta-value {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .cover-badge-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .risk-badge {
+            padding: 16px;
+            border-radius: 6px;
+            border: 2px solid #fecaca;
+            background: #fef2f2;
+            text-align: center;
+        }
+        .risk-badge.moderate {
+            border-color: #fde68a;
+            background: #fffbeb;
+        }
+        .risk-badge.low {
+            border-color: #bbf7d0;
+            background: #f0fdf4;
+        }
+        .risk-badge-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #dc2626;
+            margin-bottom: 6px;
+        }
+        .risk-badge.moderate .risk-badge-label { color: #d97706; }
+        .risk-badge.low .risk-badge-label { color: #16a34a; }
+        .risk-badge-value {
+            font-size: 17px;
+            font-weight: 900;
+            color: #dc2626;
+        }
+        .risk-badge.moderate .risk-badge-value { color: #d97706; }
+        .risk-badge.low .risk-badge-value { color: #16a34a; }
+
+        .conf-badge {
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid #86efac;
+            background: #f0fdf4;
+            text-align: center;
+        }
+        .conf-badge-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #16a34a;
+            margin-bottom: 6px;
+        }
+        .conf-badge-value {
+            font-size: 15px;
+            font-weight: 900;
+            color: #14532d;
+        }
+
+        .cover-findings-title {
+            font-size: 10px;
+            font-weight: 800;
+            color: #14532d;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 2.5px solid #14532d;
+        }
+        .cover-finding {
             display: flex;
             align-items: flex-start;
             gap: 12px;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-radius: 5px;
+            border-left: 3px solid #16a34a;
+            margin-bottom: 8px;
         }
-        
-        .insight-item:last-child {
-            border-bottom: none;
-        }
-        
-        .insight-bullet {
-            color: #f59e0b;
-            font-size: 20px;
-            margin-top: 2px;
-        }
-        
-        .insight-text {
-            flex: 1;
-            color: #92400e;
-            font-size: 15px;
-        }
-        
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .status-good {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .status-monitor {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
-        .status-risk {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        
-        .status-dot {
-            width: 10px;
-            height: 10px;
+        .cover-finding-num {
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-        }
-        
-        .dot-green { background: #10b981; }
-        .dot-yellow { background: #f59e0b; }
-        .dot-red { background: #ef4444; }
-        
-        .photo-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .photo-placeholder {
-            background: #f3f4f6;
-            border: 2px dashed #d1d5db;
-            border-radius: 8px;
-            aspect-ratio: 4/3;
+            background: #14532d;
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #9ca3af;
-            font-size: 14px;
-            gap: 8px;
+            flex-shrink: 0;
         }
-        
-        .photo-icon {
-            font-size: 32px;
-        }
-        
-        .observation-card {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-left: 4px solid #6b7280;
-        }
-        
-        .observation-title {
+        .cover-finding-title {
+            font-size: 12px;
             font-weight: 700;
-            font-size: 16px;
             color: #111827;
-            margin-bottom: 10px;
+            margin-bottom: 3px;
         }
-        
-        .observation-text {
-            color: #4b5563;
-            font-size: 15px;
-            line-height: 1.7;
+        .cover-finding-text {
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.5;
         }
-        
-        .negotiation-box {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            border: 2px solid #22c55e;
-            border-radius: 12px;
-            padding: 25px;
-            margin-top: 30px;
+
+        .cover-tagline {
+            margin-top: 20px;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-radius: 4px;
+            border-top: 3px solid #14532d;
+            text-align: center;
+            font-size: 11px;
+            color: #6b7280;
+            line-height: 1.6;
         }
-        
-        .negotiation-header {
+
+        /* ─── PAGE DIVIDER ─── */
+        .page-break {
+            height: 20px;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: #9ca3af;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* ─── CONTENT PAGES ─── */
+        .content-page {
+            background: white;
+        }
+
+        .page-header {
+            background: #14532d;
+            padding: 12px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .page-header-left {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 15px;
         }
-        
-        .negotiation-icon {
-            font-size: 28px;
-        }
-        
-        .negotiation-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #14532d;
-        }
-        
-        .negotiation-text {
-            color: #166534;
+        .page-header-brand {
             font-size: 15px;
-            line-height: 1.7;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 3px;
         }
-        
-        .cost-estimate {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 18px;
+        .page-header-divider {
+            width: 1px;
+            height: 16px;
+            background: #4ade80;
+        }
+        .page-header-sub {
+            font-size: 9px;
+            color: #86efac;
+            letter-spacing: 0.4px;
+        }
+        .page-header-right {
+            text-align: right;
+        }
+        .page-header-report {
+            font-size: 9px;
             font-weight: 700;
-            color: #047857;
+            color: #86efac;
         }
-        
-        .summary-box {
+        .page-header-date {
+            font-size: 8.5px;
+            color: #bbf7d0;
+            margin-top: 1px;
+        }
+
+        .page-footer {
+            border-top: 1px solid #e5e7eb;
+            padding: 8px 36px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             background: #f9fafb;
-            border-radius: 12px;
-            padding: 25px;
-            margin-top: 30px;
         }
-        
-        .summary-header {
-            font-size: 18px;
+        .page-footer-brand {
+            font-size: 9px;
             font-weight: 700;
-            color: #111827;
-            margin-bottom: 15px;
+            color: #6b7280;
+        }
+        .page-footer-contact {
+            font-size: 8.5px;
+            color: #9ca3af;
+            margin-top: 1px;
+        }
+        .page-footer-num {
+            font-size: 9px;
+            color: #6b7280;
+        }
+
+        /* ─── VERDICT BANNER ─── */
+        .verdict-banner {
+            margin: 12px 36px;
+            padding: 14px 18px;
+            border-radius: 5px;
+            border: 1.5px solid #fde68a;
+            background: #fffbeb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .verdict-left {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
-        .summary-text {
-            color: #4b5563;
-            font-size: 15px;
-            line-height: 1.8;
+        .verdict-dot {
+            font-size: 20px;
+            color: #d97706;
         }
-        
-        .disclaimer {
-            background: #f3f4f6;
-            border-left: 4px solid #6b7280;
-            padding: 20px;
-            margin-top: 40px;
-            font-size: 12px;
+        .verdict-label {
+            font-size: 15px;
+            font-weight: 900;
+            color: #d97706;
+        }
+        .verdict-tagline {
+            font-size: 10px;
             color: #6b7280;
+            text-align: right;
+            max-width: 220px;
+            line-height: 1.5;
+        }
+
+        /* ─── SECTION CONTENT ─── */
+        .content-section {
+            padding: 6px 36px 10px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            margin-top: 14px;
+        }
+        .section-bar {
+            width: 4px;
+            height: 16px;
+            background: #16a34a;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .section-title {
+            font-size: 10px;
+            font-weight: 800;
+            color: #14532d;
+            text-transform: uppercase;
+            letter-spacing: 1.1px;
+        }
+
+        /* ─── KEY FINDINGS ─── */
+        .finding-block {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            margin-bottom: 12px;
+        }
+        .finding-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #14532d;
+            color: white;
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .finding-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 3px;
+        }
+        .finding-body {
+            font-size: 10.5px;
+            color: #374151;
+            line-height: 1.5;
+        }
+
+        /* ─── INSPECTION SCOPE ─── */
+        .scope-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .scope-head {
+            display: grid;
+            grid-template-columns: 20px 160px 1fr;
+            background: #f3f4f6;
+            padding: 7px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 9px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .scope-row {
+            display: grid;
+            grid-template-columns: 20px 160px 1fr;
+            padding: 6px 10px;
+            border-bottom: 1px solid #f3f4f6;
+            align-items: center;
+            font-size: 11px;
+        }
+        .scope-row:last-child { border-bottom: none; }
+        .scope-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #16a34a;
+        }
+        .scope-dot.partial { background: #d97706; }
+        .scope-dot.none    { background: #d1d5db; }
+        .scope-system { color: #111827; font-weight: 500; }
+        .scope-level  { color: #6b7280; }
+
+        /* ─── CONFIDENCE ROW ─── */
+        .confidence-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .conf-box {
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #86efac;
+            background: #f0fdf4;
+        }
+        .conf-box-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .conf-box-value {
+            font-size: 13px;
+            font-weight: 900;
+            color: #16a34a;
+        }
+        .conf-box-note {
+            font-size: 9px;
+            color: #6b7280;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+        .missing-box {
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        .missing-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .missing-ok {
+            font-size: 11px;
+            font-weight: 700;
+            color: #16a34a;
+        }
+        .missing-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-size: 10.5px;
+            color: #374151;
+        }
+        .missing-dash { color: #d97706; font-weight: 700; }
+
+        /* ─── SYSTEM OBSERVATIONS ─── */
+        .system-row {
+            display: grid;
+            grid-template-columns: 130px 1fr 110px;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f3f4f6;
+            margin-bottom: 10px;
+        }
+        .system-row:last-child { border-bottom: none; }
+        .system-name {
+            font-size: 11px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 8.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-good    { background: #f0fdf4; color: #16a34a; }
+        .status-monitor { background: #fffbeb; color: #d97706; }
+        .status-risk    { background: #fff7ed; color: #ea580c; }
+        .status-fail    { background: #fef2f2; color: #dc2626; }
+        .field-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 2px;
+            margin-top: 6px;
+        }
+        .field-label:first-child { margin-top: 0; }
+        .field-text {
+            font-size: 10.5px;
+            color: #374151;
+            line-height: 1.45;
+        }
+        .system-cost {
+            font-size: 11px;
+            font-weight: 700;
+            color: #111827;
+            text-align: right;
+        }
+        .system-cost-note {
+            font-size: 9.5px;
+            color: #6b7280;
+            text-align: right;
+            line-height: 1.3;
+        }
+
+        /* ─── ROAD TEST ─── */
+        .rt-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .rt-box {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        .rt-box-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        }
+        .rt-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+            margin-bottom: 4px;
+            font-size: 10.5px;
+        }
+        .rt-check-on  { color: #16a34a; font-weight: 700; flex-shrink: 0; }
+        .rt-check-off { color: #d1d5db; flex-shrink: 0; }
+        .rt-item-on  { color: #111827; }
+        .rt-item-off { color: #9ca3af; }
+
+        /* ─── OBD SECTION ─── */
+        .obd-scan-banner {
+            padding: 10px 12px;
+            border-radius: 4px;
+            border: 1px solid #86efac;
+            background: #f0fdf4;
+            margin-bottom: 10px;
+        }
+        .obd-scan-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #16a34a;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 3px;
+        }
+        .obd-scan-value {
+            font-size: 12px;
+            font-weight: 800;
+            color: #14532d;
+        }
+        .obd-scan-sub {
+            font-size: 10px;
+            color: #16a34a;
+            margin-top: 2px;
+        }
+        .obd-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .obd-box {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        .obd-box-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 7px;
+        }
+        .obd-light-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 4px;
+            font-size: 10.5px;
+        }
+        .obd-light-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dot-green { background: #16a34a; }
+        .dot-red   { background: #dc2626; }
+        .dot-amber { background: #d97706; }
+        .dot-gray  { background: #9ca3af; }
+
+        .dtc-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .dtc-head {
+            display: grid;
+            grid-template-columns: 80px 70px 70px 1fr;
+            background: #f3f4f6;
+            padding: 7px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+        }
+        .dtc-row {
+            display: grid;
+            grid-template-columns: 80px 70px 70px 1fr;
+            padding: 7px 10px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 10.5px;
+            align-items: center;
+        }
+        .dtc-row:last-child { border-bottom: none; }
+        .dtc-code { font-weight: 700; color: #111827; }
+        .dtc-pill {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .dtc-active  { background: #fef2f220; color: #dc2626; }
+        .dtc-pending { background: #fffbeb20; color: #d97706; }
+
+        /* ─── ODOMETER SECTION ─── */
+        .odo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .odo-box {
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        .odo-box.flagged {
+            border-color: #d97706;
+            background: #fffbeb;
+        }
+        .odo-box-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 7px;
+        }
+        .odo-value {
+            font-size: 20px;
+            font-weight: 900;
+            color: #111827;
+        }
+        .odo-sub {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 3px;
+        }
+        .odo-flag-row {
+            display: flex;
+            gap: 8px;
+            padding: 10px 12px;
+            background: #fffbeb;
+            border-radius: 4px;
+            border-left: 4px solid #d97706;
+            margin-bottom: 8px;
+            font-size: 10.5px;
+            color: #92400e;
+            line-height: 1.5;
+        }
+        .odo-note {
+            font-size: 9.5px;
+            color: #6b7280;
+            font-style: italic;
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+
+        /* ─── TITLE & HISTORY ─── */
+        .thf-banner {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+            margin-bottom: 12px;
+        }
+        .thf-banner-col { }
+        .thf-banner-label {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+        .thf-banner-value {
+            font-size: 13px;
+            font-weight: 800;
+            color: #111827;
+        }
+        .thf-banner-sub { font-size: 10px; color: #6b7280; margin-top: 2px; }
+        .thf-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .thf-box {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+        }
+        .thf-box-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 7px;
+        }
+        .thf-box-sub  { font-size: 9.5px; color: #6b7280; }
+        .thf-box-value { font-size: 11px; font-weight: 700; color: #111827; margin-bottom: 5px; }
+        .indicator-group {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #f9fafb;
+            margin-bottom: 10px;
+        }
+        .indicator-group-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+            margin-bottom: 7px;
+        }
+        .indicator-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 5px;
+            font-size: 10.5px;
+        }
+        .indicator-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        /* ─── REPAIR TABLE ─── */
+        .repair-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .repair-head {
+            display: grid;
+            grid-template-columns: 1fr 90px 80px 80px;
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 9px;
+            font-weight: 700;
+            color: #4b5563;
+            text-transform: uppercase;
+        }
+        .repair-row {
+            display: grid;
+            grid-template-columns: 1fr 90px 80px 80px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 11px;
+            align-items: center;
+        }
+        .repair-total {
+            display: grid;
+            grid-template-columns: 1fr 90px 80px 80px;
+            padding: 10px 12px;
+            background: #f9fafb;
+            border-top: 2px solid #e5e7eb;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 3px;
+            font-size: 8.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .pri-immediate { background: #fef2f230; color: #dc2626; }
+        .pri-soon      { background: #fff7ed30; color: #ea580c; }
+        .pri-monitor   { background: #f3f4f6;   color: #4b5563; }
+        .repair-cost { text-align: right; }
+
+        /* ─── BUYER CONSIDERATIONS ─── */
+        .buyer-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .buyer-col {
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid;
+        }
+        .buyer-col-header {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .buyer-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            margin-bottom: 5px;
+            font-size: 10.5px;
+            color: #374151;
+            line-height: 1.45;
+        }
+        .buyer-icon { flex-shrink: 0; font-weight: 700; }
+
+        /* ─── NEGOTIATION ─── */
+        .negotiation-option {
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-radius: 4px;
+            border-left: 3px solid #16a34a;
+            margin-bottom: 10px;
+        }
+        .negotiation-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #14532d;
+            margin-bottom: 5px;
+        }
+        .negotiation-desc {
+            font-size: 10.5px;
+            color: #374151;
+            line-height: 1.5;
+        }
+
+        /* ─── RISK INTELLIGENCE ─── */
+        .risk-banner {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 16px;
+            align-items: center;
+            padding: 14px 18px;
+            border-radius: 5px;
+            border: 1px solid #fde68a;
+            background: #fffbeb;
+            margin-bottom: 10px;
+        }
+        .risk-score-num {
+            font-size: 36px;
+            font-weight: 900;
+            color: #d97706;
+            line-height: 1;
+        }
+        .risk-score-label {
+            font-size: 8.5px;
+            color: #d97706;
+            margin-top: 3px;
+        }
+        .risk-level-big {
+            font-size: 20px;
+            font-weight: 900;
+            color: #d97706;
+        }
+        .risk-scale {
+            text-align: right;
+            font-size: 9px;
+            color: #d97706;
             line-height: 1.6;
         }
-        
-        .disclaimer-title {
-            font-weight: 700;
-            color: #374151;
+        .risk-modules-table {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
             margin-bottom: 10px;
-            font-size: 13px;
         }
-        
-        .footer {
-            background: #111827;
-            color: #9ca3af;
-            padding: 25px 40px;
+        .risk-module-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 90px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 10.5px;
+            align-items: center;
+        }
+        .risk-module-row:last-child { border-bottom: none; }
+        .risk-module-row:nth-child(even) { background: #f9fafb; }
+        .risk-module-name { font-weight: 700; color: #374151; }
+        .risk-module-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 8.5px;
+            font-weight: 700;
+        }
+        .badge-pass   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
+        .badge-review { background: #fffbeb; border: 1px solid #fde68a; color: #d97706; }
+
+        /* ─── DISCLAIMER ─── */
+        .disclaimer {
+            margin: 14px 36px 6px;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+            font-size: 9.5px;
+            color: #6b7280;
             text-align: center;
-            font-size: 13px;
+            line-height: 1.6;
         }
-        
-        .footer-links {
-            margin-top: 10px;
+
+        /* ─── SAMPLE WATERMARK ─── */
+        .sample-notice {
+            background: #fffbeb;
+            border-top: 3px solid #d97706;
+            border-bottom: 1px solid #fde68a;
+            padding: 12px 40px;
+            text-align: center;
+            font-size: 11px;
+            color: #92400e;
         }
-        
-        .footer-link {
-            color: #10b981;
-            text-decoration: none;
-            margin: 0 10px;
-        }
-        
+        .sample-notice strong { font-weight: 800; }
+
         @media print {
-            body {
-                background: white;
-                padding: 0;
-            }
-            
-            .report-container {
-                box-shadow: none;
-            }
+            body { background: white; }
+            .report-container { box-shadow: none; margin: 0; max-width: 100%; }
+        }
+        @media (max-width: 640px) {
+            .cover-meta-grid { grid-template-columns: 1fr 1fr; }
+            .cover-badge-row { grid-template-columns: 1fr; }
+            .rt-grid { grid-template-columns: 1fr; }
+            .odo-grid { grid-template-columns: 1fr; }
+            .buyer-row { grid-template-columns: 1fr; }
+            .thf-grid { grid-template-columns: 1fr; }
+            .obd-two-col { grid-template-columns: 1fr; }
+            .cover-top-band { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .page-header { flex-direction: column; gap: 6px; align-items: flex-start; }
         }
     </style>
 </head>
 <body>
-    <div class="report-container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-top">
-                <img src="/images/ridecheck-logo.png" alt="RideCheck Logo" class="logo-img">
-                <div class="header-company">
-                    <div class="company-name">RideCheck</div>
-                    <div class="report-title">Independent Vehicle Inspection Report</div>
-                </div>
-            </div>
 
-            <div class="vehicle-banner">
-                <div class="vehicle-title">2019 Honda Accord Sport</div>
-                <div class="vehicle-meta">VIN: 1HGCV1F39KA123456 | Odometer: 47,235 miles</div>
-            </div>
+<div class="report-container">
 
-            <div class="report-meta">
-                <div class="meta-item">
-                    <div class="meta-label">Report ID</div>
-                    <div>RC-2026-03456</div>
-                </div>
-                <div class="meta-item">
-                    <div class="meta-label">Inspection Date</div>
-                    <div>March 5, 2026</div>
-                </div>
-                <div class="meta-item">
-                    <div class="meta-label">Inspector</div>
-                    <div>RideCheck Certified Inspector</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Content -->
-        <div class="content">
-            <!-- Overall Condition Banner -->
-            <div class="condition-banner">
-                <div class="condition-icon">&#x1F7E2;</div>
-                <div class="condition-text">
-                    <h2>RideCheck Condition Indicator: Good</h2>
-                    <p>This vehicle shows normal wear appropriate for its age and mileage. Minor items noted for buyer awareness.</p>
-                </div>
-            </div>
-            
-            <!-- Report Generation Info -->
-            <div style="background: #f0f9ff; border: 1px solid #0284c7; border-radius: 8px; padding: 20px; margin-bottom: 35px; font-size: 14px; color: #0c4a6e;">
-                <div style="font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                    <span>&#x2139;&#xFE0F;</span>
-                    Report Generation Process
-                </div>
-                <div style="line-height: 1.6;">
-                    This report was compiled from field inspection data submitted by a RideCheck-certified inspector. All findings were reviewed by RideCheck operations and formatted into this buyer-ready report. Buyers and inspectors do not communicate directly &mdash; RideCheck coordinates all aspects of the inspection process.
-                </div>
-            </div>
-            
-            <!-- Top 3 Buyer Insights -->
-            <div class="insights-box">
-                <div class="insights-header">
-                    <div class="insights-icon">&#x1F4A1;</div>
-                    <div class="insights-title">Top 3 Buyer Insights</div>
-                </div>
-                <div class="insight-item">
-                    <div class="insight-bullet">1.</div>
-                    <div class="insight-text">Minor oil seep detected at valve cover gasket &mdash; not urgent, but plan repair within 6&ndash;12 months ($350&ndash;$500)</div>
-                </div>
-                <div class="insight-item">
-                    <div class="insight-bullet">2.</div>
-                    <div class="insight-text">Front tires at 4/32&quot; tread depth &mdash; legal but recommend replacement within 8&ndash;12 months for safety ($600&ndash;$800)</div>
-                </div>
-                <div class="insight-item">
-                    <div class="insight-bullet">3.</div>
-                    <div class="insight-text">No structural damage, frame issues, or title concerns observed &mdash; vehicle appears well-maintained</div>
-                </div>
-            </div>
-            
-            <!-- Vehicle Information -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F697;</span>
-                    Vehicle Information
-                </h2>
-                
-                <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-label">Year, Make, Model</div>
-                        <div class="info-value">2019 Honda Accord Sport</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">VIN</div>
-                        <div class="info-value">1HGCV1F39KA123456</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Odometer Reading</div>
-                        <div class="info-value">47,235 miles</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Exterior Color</div>
-                        <div class="info-value">Modern Steel Metallic</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Engine</div>
-                        <div class="info-value">1.5L Turbo 4-Cylinder</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Transmission</div>
-                        <div class="info-value">CVT Automatic</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- VIN & Title Documentation -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F50D;</span>
-                    VIN &amp; Title Documentation
-                </h2>
-                
-                <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-label">VIN Verification</div>
-                        <div class="info-value">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Verified
-                            </span>
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">VIN Match (Dash/Door)</div>
-                        <div class="info-value">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Match Confirmed
-                            </span>
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Title Status (as presented)</div>
-                        <div class="info-value">Clean Title Indicated</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Ownership Documentation</div>
-                        <div class="info-value">Single Owner Listed</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Title Review</div>
-                        <div class="info-value">Documentation Reviewed</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Odometer Declaration</div>
-                        <div class="info-value">Consistent with Title</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; padding: 15px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 14px; color: #92400e;">
-                    <strong>Important:</strong> This section documents the title and ownership information as presented by the seller. Buyers should verify title status, lien holder information, and ownership records directly with their state DMV before completing purchase.
-                </div>
-            </div>
-            
-            <!-- OBD-II Diagnostic Scan -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F4BB;</span>
-                    OBD-II Diagnostic Scan
-                </h2>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Computer Diagnostics</div>
-                    <div class="observation-text">
-                        <strong>Stored Codes:</strong> None detected<br>
-                        <strong>Pending Codes:</strong> None detected<br>
-                        <strong>Readiness Monitors:</strong> All systems ready<br>
-                        <strong>Check Engine Light:</strong> Not illuminated<br>
-                        <strong>Battery Voltage:</strong> 12.6V (healthy)<br>
-                        <strong>Emissions Status:</strong> Pass &mdash; all readiness monitors complete
-                    </div>
-                </div>
-                
-                <div style="margin-top: 15px;">
-                    <span class="status-indicator status-good">
-                        <span class="status-dot dot-green"></span>
-                        No Issues Detected
-                    </span>
-                </div>
-            </div>
-            
-            <!-- Mechanical Observations -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F527;</span>
-                    Mechanical Observations
-                </h2>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Engine</div>
-                    <div class="observation-text">
-                        Engine starts smoothly and idles steady. Minor oil seep observed at valve cover gasket (common for this model). Oil level full, color acceptable. Coolant level good, no leaks detected. Belts and hoses in good condition. No abnormal noises during operation.
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-monitor">
-                                <span class="status-dot dot-yellow"></span>
-                                Monitor &mdash; Minor seep noted
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Transmission</div>
-                    <div class="observation-text">
-                        CVT transmission shifts smoothly with no hesitation or slipping. Fluid level appears adequate (CVT systems do not have dipstick on this model). No leaks detected at pan or seals. Test drive showed normal acceleration and deceleration.
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Good Condition
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Brakes</div>
-                    <div class="observation-text">
-                        Front brake pads: 6mm remaining (50% life)<br>
-                        Rear brake pads: 7mm remaining (60% life)<br>
-                        Rotors: Light surface rust (normal), no scoring or warping<br>
-                        Brake fluid: Clean, proper level<br>
-                        Parking brake: Holds properly<br>
-                        Brake pedal feel: Firm, responsive
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Good Condition
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Suspension &amp; Steering</div>
-                    <div class="observation-text">
-                        Suspension components visually inspected &mdash; no excessive play or worn bushings detected. Steering responsive with no unusual noises. Vehicle tracks straight on test drive. No visible leaks from shock absorbers. Ball joints and tie rods appear secure.
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Good Condition
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tires -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F6DE;</span>
-                    Tires &amp; Wheels
-                </h2>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Tire Condition</div>
-                    <div class="observation-text">
-                        <strong>Brand:</strong> Michelin Defender<br>
-                        <strong>Size:</strong> 235/40R18<br><br>
-                        
-                        <strong>Tread Depth:</strong><br>
-                        &bull; Front Left: 4/32&quot; &mdash; approaching replacement threshold<br>
-                        &bull; Front Right: 4/32&quot; &mdash; approaching replacement threshold<br>
-                        &bull; Rear Left: 6/32&quot; &mdash; acceptable<br>
-                        &bull; Rear Right: 6/32&quot; &mdash; acceptable<br><br>
-                        
-                        <strong>Tire Age:</strong> DOT date code indicates 4 years old (acceptable)<br>
-                        <strong>Wear Pattern:</strong> Even wear, proper inflation maintained<br>
-                        <strong>Wheels:</strong> No curb rash or damage observed
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-monitor">
-                                <span class="status-dot dot-yellow"></span>
-                                Monitor &mdash; Front tires need replacement soon
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Exterior & Interior -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x2728;</span>
-                    Exterior &amp; Interior Condition
-                </h2>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Exterior</div>
-                    <div class="observation-text">
-                        Paint in good overall condition with normal wear. Minor scratches on rear bumper (cosmetic only). No evidence of major collision repair or repainting. Panel gaps appear factory-consistent. Glass in good condition with no cracks. All lights functional. Windshield wipers in good condition.
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Good Condition
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="observation-card">
-                    <div class="observation-title">Interior</div>
-                    <div class="observation-text">
-                        Interior clean and well-maintained. Driver seat shows light wear consistent with mileage. All electronics tested and functional (radio, climate control, power windows, power locks). No warning lights on dashboard. Cabin air filter appears recently replaced. No unusual odors detected.
-                        <div style="margin-top: 10px;">
-                            <span class="status-indicator status-good">
-                                <span class="status-dot dot-green"></span>
-                                Good Condition
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Inspection Photos -->
-            <div class="section">
-                <h2 class="section-title">
-                    <span class="section-icon">&#x1F4F8;</span>
-                    Inspection Photos
-                </h2>
-                
-                <div class="photo-grid">
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>VIN Plate Photo</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Engine Bay Overview</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Valve Cover Oil Seep</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Front Tire Tread Depth</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Exterior Front View</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Exterior Rear View</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Interior Dashboard</div>
-                    </div>
-                    <div class="photo-placeholder">
-                        <div class="photo-icon">&#x1F4F7;</div>
-                        <div>Odometer Reading</div>
-                    </div>
-                </div>
-                
-                <p style="margin-top: 15px; color: #6b7280; font-size: 13px; font-style: italic;">
-                    Note: Actual inspection reports include 20-45 high-resolution photos documenting all findings.
-                </p>
-            </div>
-            
-            <!-- Negotiation Insight -->
-            <div class="negotiation-box">
-                <div class="negotiation-header">
-                    <div class="negotiation-icon">&#x1F4B0;</div>
-                    <div class="negotiation-title">Negotiation Insight</div>
-                </div>
-                <div class="negotiation-text">
-                    Based on the findings in this inspection, here are the estimated repair considerations for near-term maintenance:
-                    
-                    <div class="cost-estimate">
-                        Estimated Repair Considerations: $950 &ndash; $1,300
-                    </div>
-                    
-                    <div style="margin-top: 15px; line-height: 1.8;">
-                        <strong>Breakdown:</strong><br>
-                        &bull; Valve cover gasket replacement: $350 &ndash; $500<br>
-                        &bull; Front tire replacement (pair): $600 &ndash; $800<br><br>
-                        
-                        <strong>Negotiation Strategy:</strong> These are maintenance items, not urgent repairs. You could negotiate $800-$1,000 off the asking price to account for these items, or request the seller complete the repairs before purchase.
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Inspector Summary -->
-            <div class="summary-box">
-                <div class="summary-header">
-                    <span>&#x1F4DD;</span>
-                    Inspector Summary
-                </div>
-                <div class="summary-text">
-                    <strong>Overall Assessment:</strong> This 2019 Honda Accord Sport presents as a well-maintained vehicle with normal wear appropriate for its age and mileage. The minor oil seep at the valve cover gasket is a common issue for this model and year, and is not urgent but should be addressed within the next 6-12 months. Front tires are approaching the replacement threshold and should be budgeted for within the next 8-12 months for optimal safety and performance.<br><br>
-                    
-                    <strong>No major mechanical concerns, frame damage, or title issues were identified during this inspection.</strong> The vehicle's maintenance history appears consistent with proper care. The clean OBD-II scan and absence of warning lights support the overall positive condition assessment.<br><br>
-                    
-                    <strong>Recommendation:</strong> This vehicle is suitable for purchase. Budget for the identified maintenance items, or use these findings to negotiate a fair adjustment to the purchase price. A pre-purchase agreement should include verification that all representations made by the seller are accurate.
-                </div>
-            </div>
-            
-            <!-- Disclaimer -->
-            <div class="disclaimer">
-                <div class="disclaimer-title">IMPORTANT DISCLAIMER</div>
-                This inspection report represents the findings of a visual and diagnostic inspection performed at the time and location specified. This report is NOT a warranty or guarantee of the vehicle's future condition or fitness for use. RideCheck's liability is limited to the amount paid for this inspection service. Vehicle condition may change after the inspection date. This report is prepared for the named client only and may not be transferred or relied upon by third parties. Buyers are responsible for completing official title transfer at their state DMV. For complete terms and conditions, visit ridecheckauto.com/terms
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <div class="footer">
-            <div><strong>RideCheck</strong> &mdash; Pre-Purchase Due Diligence for Used Cars</div>
-            <div class="footer-links">
-                <a href="https://ridecheckauto.com" class="footer-link">ridecheckauto.com</a> | 
-                <a href="mailto:support@ridecheckauto.com" class="footer-link">support@ridecheckauto.com</a>
-            </div>
-            <div style="margin-top: 10px; font-size: 11px;">
-                Report generated on March 5, 2026 | RideCheck &copy; 2026
-            </div>
-        </div>
+    <!-- ═══════════════════ SAMPLE NOTICE ═══════════════════ -->
+    <div class="sample-notice">
+        <strong>SAMPLE REPORT</strong> — This is an example of a RideCheck Vehicle Transparency Report for illustrative purposes.
+        All vehicle data, VINs, inspection findings, and cost estimates shown are fictional.
+        <a href="/book" style="color:#92400e;font-weight:700;margin-left:8px;">Book your inspection →</a>
     </div>
+
+    <!-- ═══════════════════ COVER PAGE ═══════════════════════ -->
+    <div class="cover-page">
+
+        <!-- Top branding band -->
+        <div class="cover-top-band">
+            <div>
+                <div class="cover-brand-name">RIDECHECK</div>
+                <div class="cover-brand-sub">Vehicle Transparency Report  ·  Field Inspection Document</div>
+            </div>
+            <div class="cover-report-num">
+                <div class="cover-report-num-label">Report Number</div>
+                <div class="cover-report-num-value">RC-2026-00847</div>
+            </div>
+        </div>
+
+        <!-- Hero image area -->
+        <div class="cover-hero">
+            <div class="cover-hero-badge">Vehicle Inspection Documentation</div>
+        </div>
+
+        <!-- Cover body -->
+        <div class="cover-body">
+
+            <div class="cover-vehicle-title">2019 Toyota Camry XSE</div>
+            <div class="cover-vehicle-sub">Plus Package — Buyer-Arranged Inspection</div>
+
+            <!-- Meta grid -->
+            <div class="cover-meta-grid">
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Mileage</div>
+                    <div class="cover-meta-value">67,400 mi</div>
+                </div>
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Asking Price</div>
+                    <div class="cover-meta-value">$19,500</div>
+                </div>
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Inspection Date</div>
+                    <div class="cover-meta-value">June 5, 2026</div>
+                </div>
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Location</div>
+                    <div class="cover-meta-value">Waukegan, IL</div>
+                </div>
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Inspector</div>
+                    <div class="cover-meta-value">RideCheck Field Inspector</div>
+                </div>
+                <div class="cover-meta-cell">
+                    <div class="cover-meta-label">Inspection Tier</div>
+                    <div class="cover-meta-value">Plus</div>
+                </div>
+            </div>
+
+            <!-- Risk + Confidence badges -->
+            <div class="cover-badge-row">
+                <div class="risk-badge moderate">
+                    <div class="risk-badge-label">Field Risk Assessment</div>
+                    <div class="risk-badge-value">MODERATE RISK OBSERVED</div>
+                </div>
+                <div class="conf-badge">
+                    <div class="conf-badge-label">Inspection Confidence</div>
+                    <div class="conf-badge-value">HIGH CONFIDENCE</div>
+                </div>
+            </div>
+
+            <!-- Top 3 Field Findings -->
+            <div class="cover-findings-title">Top 3 Field Findings</div>
+
+            <div class="cover-finding">
+                <div class="cover-finding-num">1</div>
+                <div>
+                    <div class="cover-finding-title">Brake Pad Wear — Immediate Attention Recommended</div>
+                    <div class="cover-finding-text">Front brake pads observed at approximately 15–20% remaining. Brake wear indicators may activate under near-term normal use. Estimated replacement cost: $250–$400.</div>
+                </div>
+            </div>
+
+            <div class="cover-finding">
+                <div class="cover-finding-num">2</div>
+                <div>
+                    <div class="cover-finding-title">Minor Oil Seepage — Engine Bay Observed</div>
+                    <div class="cover-finding-text">Light oil seepage noted around valve cover gasket area. No active drips observed at inspection. Monitoring and professional assessment recommended at next service interval.</div>
+                </div>
+            </div>
+
+            <div class="cover-finding">
+                <div class="cover-finding-num">3</div>
+                <div>
+                    <div class="cover-finding-title">Rear Tire Tread — Approaching Service Threshold</div>
+                    <div class="cover-finding-text">Rear tires measured at approximately 3/32" tread depth on driver side. Replacement may be needed within the near term depending on driving conditions. Estimated: $160–$220 per tire.</div>
+                </div>
+            </div>
+
+            <div class="cover-tagline">
+                RideCheck is a Vehicle Transparency Platform — not a purchase advisor or legal authority.<br>
+                This report reflects field observations at the time of inspection.<br>
+                ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois
+            </div>
+        </div>
+    </div><!-- /cover-page -->
+
+    <div class="page-break">— Page 2 —</div>
+
+    <!-- ═══════════════════ CONTENT PAGES ══════════════════════ -->
+    <div class="content-page">
+
+        <!-- Page header -->
+        <div class="page-header">
+            <div class="page-header-left">
+                <div class="page-header-brand">RIDECHECK</div>
+                <div class="page-header-divider"></div>
+                <div class="page-header-sub">Vehicle Transparency Report  ·  Field Inspection Document</div>
+            </div>
+            <div class="page-header-right">
+                <div class="page-header-report">Report #RC-2026-00847</div>
+                <div class="page-header-date">June 5, 2026</div>
+            </div>
+        </div>
+
+        <!-- Verdict banner -->
+        <div class="verdict-banner">
+            <div class="verdict-left">
+                <span class="verdict-dot">●</span>
+                <span class="verdict-label">MODERATE RISK OBSERVED</span>
+            </div>
+            <div class="verdict-tagline">Some near-term maintenance items identified. Vehicle was operational and drove normally during inspection.</div>
+        </div>
+
+        <!-- ── ON-SITE KEY FINDINGS ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">On-Site Key Findings</div>
+            </div>
+
+            <div class="finding-block">
+                <div class="finding-num">1</div>
+                <div>
+                    <div class="finding-title">Brake Pad Wear — Immediate Attention Recommended</div>
+                    <div class="finding-body">Front brake pads observed at approximately 15–20% remaining. Replacement recommended within the near term. Inspector noted no pulsation or brake pull during road test. Estimated replacement cost: $250–$400.</div>
+                </div>
+            </div>
+
+            <div class="finding-block">
+                <div class="finding-num">2</div>
+                <div>
+                    <div class="finding-title">Minor Oil Seepage — Engine Bay Observed</div>
+                    <div class="finding-body">Light oil seepage noted around valve cover gasket area. No active drips observed at inspection. Volume appears minimal. Monitoring recommended at next service interval. Professional assessment recommended if seepage increases.</div>
+                </div>
+            </div>
+
+            <div class="finding-block">
+                <div class="finding-num">3</div>
+                <div>
+                    <div class="finding-title">Rear Tire Tread — Approaching Service Threshold</div>
+                    <div class="finding-body">Rear tires measured at approximately 3/32" tread depth on driver-rear tire. Tires are approaching the minimum recommended tread depth. Replacement within 3,000–5,000 miles may be appropriate depending on usage and conditions.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── INSPECTION SCOPE ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Inspection Scope</div>
+            </div>
+
+            <div class="scope-table">
+                <div class="scope-head">
+                    <div></div>
+                    <div>System / Area</div>
+                    <div>Inspection Level</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Engine</div>
+                    <div class="scope-level">Full visual and operation check</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Transmission</div>
+                    <div class="scope-level">Road test included</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Brakes</div>
+                    <div class="scope-level">Visual + road test</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Electrical / HVAC</div>
+                    <div class="scope-level">Operational check performed</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">OBD-II Field Scan</div>
+                    <div class="scope-level">Full — Codes Retrieved</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Title / History</div>
+                    <div class="scope-level">Physical title reviewed</div>
+                </div>
+                <div class="scope-row">
+                    <div class="scope-dot"></div>
+                    <div class="scope-system">Road Test</div>
+                    <div class="scope-level">Completed — approximately 10 minutes</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── INSPECTION CONFIDENCE ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Inspection Confidence</div>
+            </div>
+
+            <div class="confidence-row">
+                <div class="conf-box">
+                    <div class="conf-box-label">Confidence Level</div>
+                    <div class="conf-box-value">HIGH CONFIDENCE</div>
+                    <div class="conf-box-note">Reflects inspection completeness only — not vehicle quality.</div>
+                </div>
+                <div class="missing-box">
+                    <div class="missing-title">Missing or Limited Information</div>
+                    <div class="missing-ok">✓ All standard inspection items completed.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── VEHICLE SYSTEM OBSERVATIONS ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Vehicle System Observations</div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">Engine</div>
+                    <span class="status-badge status-good">■ GOOD</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">Engine started promptly with no unusual sounds. No significant smoke from exhaust. Light oil seepage around valve cover gasket noted — volume appeared minimal at time of inspection.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Minor seepage is common on higher-mileage four-cylinders. Monitoring recommended. Independent assessment recommended if seepage increases.</div>
+                </div>
+                <div>
+                    <div class="system-cost">$80–$150</div>
+                    <div class="system-cost-note">Valve cover gasket if addressed</div>
+                </div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">Brakes</div>
+                    <span class="status-badge status-risk">■ RISK</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">Front brake pads observed at approximately 15–20% remaining life. Rear pads appeared adequate at approximately 40–50%. Rotors showed no significant grooves or heat discoloration observed.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Front brake replacement is recommended within the near term. Delaying may result in rotor damage, increasing overall repair cost. Estimated front brake service: $250–$400.</div>
+                </div>
+                <div>
+                    <div class="system-cost">$250–$400</div>
+                    <div class="system-cost-note">Front brake service</div>
+                </div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">Tires</div>
+                    <span class="status-badge status-monitor">■ MONITOR</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">Driver-rear tire measured at approximately 3/32" tread depth. Remaining tires appeared adequate. No visible sidewall damage or bubbling observed. Tires matched — all four same brand.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Rear tire replacement approaching within near term. Safe operation may be possible in the short term depending on conditions; monitoring recommended.</div>
+                </div>
+                <div>
+                    <div class="system-cost">$160–$220</div>
+                    <div class="system-cost-note">Per rear tire (×2 recommended)</div>
+                </div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">Transmission</div>
+                    <span class="status-badge status-good">■ GOOD</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">Automatic transmission shifted smoothly through all gears. No slipping, hesitation, or delayed engagement observed during road test. No unusual sounds during gear changes.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Transmission appeared to be functioning normally at time of inspection. No immediate concerns identified.</div>
+                </div>
+                <div>
+                    <div class="system-cost-note">No action needed</div>
+                </div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">Suspension</div>
+                    <span class="status-badge status-good">■ GOOD</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">No excessive bouncing, clunking, or unusual sounds observed over road imperfections during road test. Steering felt centered and responsive.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Suspension components appeared adequate for vehicle age and mileage. No immediate concerns identified.</div>
+                </div>
+                <div>
+                    <div class="system-cost-note">No action needed</div>
+                </div>
+            </div>
+
+            <div class="system-row">
+                <div>
+                    <div class="system-name">HVAC / Climate</div>
+                    <span class="status-badge status-good">■ GOOD</span>
+                </div>
+                <div>
+                    <div class="field-label">Observed</div>
+                    <div class="field-text">AC produced cold air within normal timeframe. Heat operated normally. Fan/blower operated at all speeds. No unusual odors from HVAC system.</div>
+                    <div class="field-label">Consideration</div>
+                    <div class="field-text">Climate system appeared functional at time of inspection. No immediate concerns identified.</div>
+                </div>
+                <div>
+                    <div class="system-cost-note">No action needed</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── ROAD TEST RESULTS ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Road Test Results</div>
+            </div>
+            <div class="rt-grid">
+                <div class="rt-box">
+                    <div class="rt-box-title">Engine Behavior</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Engine started promptly</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No unusual noises at startup</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No smoke from exhaust</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Engine ran smoothly during drive</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No hesitation or rough idling</span></div>
+                </div>
+                <div class="rt-box">
+                    <div class="rt-box-title">Transmission / Shifting</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Transmission shifted smoothly</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No slipping or delayed engagement</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No unusual sounds during gear changes</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Vehicle accelerated normally</span></div>
+                </div>
+                <div class="rt-box">
+                    <div class="rt-box-title">Brakes</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Brakes engaged responsively</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No pulling to one side</span></div>
+                    <div class="rt-item"><span class="rt-check-off">○</span><span class="rt-item-off">No grinding or squealing</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Brake pedal felt firm</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Vehicle stopped straight</span></div>
+                </div>
+                <div class="rt-box">
+                    <div class="rt-box-title">Steering & Handling</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Steering responsive and centered</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No pulling left or right</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No steering wheel vibration</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No unusual noises during turning</span></div>
+                </div>
+                <div class="rt-box">
+                    <div class="rt-box-title">Suspension</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No excessive bouncing or rattling</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No clunking over bumps</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Ride consistent with vehicle age/type</span></div>
+                </div>
+                <div class="rt-box">
+                    <div class="rt-box-title">Warning Lights During Drive</div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">No new warning lights appeared</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">Check engine light status unchanged</span></div>
+                    <div class="rt-item"><span class="rt-check-on">✓</span><span class="rt-item-on">ABS light status unchanged</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── OBD-II FIELD SCAN ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">OBD-II Field Scan Results</div>
+            </div>
+
+            <div class="obd-scan-banner">
+                <div class="obd-scan-label">Scan Status</div>
+                <div class="obd-scan-value">OBD-II Field Scan Performed</div>
+                <div class="obd-scan-sub">2 diagnostic trouble codes retrieved</div>
+            </div>
+
+            <div class="obd-two-col">
+                <div class="obd-box">
+                    <div class="obd-box-title">Warning Lights Observed</div>
+                    <div class="obd-light-item">
+                        <div class="obd-light-dot dot-red"></div>
+                        Check Engine
+                    </div>
+                    <div class="obd-light-item">
+                        <div class="obd-light-dot dot-gray"></div>
+                        TPMS
+                    </div>
+                </div>
+                <div class="obd-box">
+                    <div class="obd-box-title">Emissions Readiness</div>
+                    <div class="obd-light-item">
+                        <div class="obd-light-dot dot-amber"></div>
+                        Not Ready — Potential Registration Issue
+                    </div>
+                </div>
+            </div>
+
+            <div class="dtc-table">
+                <div class="dtc-head">
+                    <div>System</div>
+                    <div>Code</div>
+                    <div>Status</div>
+                    <div>Description</div>
+                </div>
+                <div class="dtc-row">
+                    <div style="color:#6b7280">Engine</div>
+                    <div class="dtc-code">P0420</div>
+                    <div><span class="dtc-pill dtc-pending">Pending</span></div>
+                    <div>Catalyst system efficiency below threshold — Bank 1. May indicate catalytic converter wear.</div>
+                </div>
+                <div class="dtc-row">
+                    <div style="color:#6b7280">Tire Pressure</div>
+                    <div class="dtc-code">C0750</div>
+                    <div><span class="dtc-pill dtc-active" style="background:#fef2f2">Active</span></div>
+                    <div>TPMS sensor fault — right rear. Sensor may require replacement.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── ODOMETER & MILEAGE VERIFICATION ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Odometer &amp; Mileage Verification</div>
+            </div>
+
+            <div class="odo-grid">
+                <div class="odo-box">
+                    <div class="odo-box-title">Observed at Inspection</div>
+                    <div class="odo-value">67,400 mi</div>
+                    <div class="odo-sub">Listed mileage: 67,400 mi</div>
+                </div>
+                <div class="odo-box">
+                    <div class="odo-box-title">Disclosure Consistency</div>
+                    <div class="odo-value" style="font-size:16px;color:#16a34a">Consistent with disclosure</div>
+                </div>
+                <div class="odo-box">
+                    <div class="odo-box-title">Cluster Tampering Indicators</div>
+                    <div class="odo-value" style="font-size:16px">None observed</div>
+                </div>
+            </div>
+
+            <div class="odo-note">
+                Mileage observations are based on physical odometer reading and title documentation review at time of inspection only.
+                RideCheck does not access third-party vehicle history databases. Independent verification recommended.
+            </div>
+        </div>
+
+        <!-- ── TITLE & HISTORY FLAGS ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Title &amp; History Flags</div>
+            </div>
+
+            <div class="thf-banner">
+                <div class="thf-banner-col">
+                    <div class="thf-banner-label">Title Review</div>
+                    <div class="thf-banner-value">Physical Title Reviewed</div>
+                    <div class="thf-banner-sub">Title Type Observed: Clean</div>
+                </div>
+                <div class="thf-banner-col">
+                    <div class="thf-banner-label">VIN vs. Title</div>
+                    <div class="thf-banner-value">Confirmed Match</div>
+                </div>
+                <div class="thf-banner-col">
+                    <div class="thf-banner-label">Lien Status</div>
+                    <div class="thf-banner-value">No Lien Observed</div>
+                </div>
+            </div>
+
+            <div class="thf-grid">
+                <div class="thf-box">
+                    <div class="thf-box-title">VIN Verification</div>
+                    <div class="thf-box-sub">Dashboard VIN</div>
+                    <div class="thf-box-value">Verified</div>
+                    <div class="thf-box-sub">Door Jamb VIN</div>
+                    <div class="thf-box-value">Verified</div>
+                    <div class="thf-box-sub">Physical VINs</div>
+                    <div class="thf-box-value">Matched</div>
+                </div>
+                <div class="thf-box">
+                    <div class="thf-box-title">Seller / Title</div>
+                    <div class="thf-box-sub">Seller Name Match</div>
+                    <div class="thf-box-value">Matched</div>
+                    <div class="thf-box-sub">Title Signed</div>
+                    <div class="thf-box-value">Appropriately signed</div>
+                </div>
+                <div class="thf-box">
+                    <div class="thf-box-title">Odometer</div>
+                    <div class="thf-box-sub">Reading at Inspection</div>
+                    <div class="thf-box-value">67,400 mi</div>
+                    <div class="thf-box-sub">Disclosure Consistency</div>
+                    <div class="thf-box-value">Consistent with disclosure</div>
+                </div>
+            </div>
+
+            <div class="indicator-group">
+                <div class="indicator-group-title">Flood / Water Intrusion Indicators</div>
+                <div class="indicator-row">
+                    <div class="indicator-dot" style="background:#16a34a"></div>
+                    <span style="color:#16a34a;font-weight:700">No indicators observed</span>
+                </div>
+            </div>
+            <div class="indicator-group">
+                <div class="indicator-group-title">Theft / Tampering Indicators</div>
+                <div class="indicator-row">
+                    <div class="indicator-dot" style="background:#16a34a"></div>
+                    <span style="color:#16a34a;font-weight:700">No indicators observed</span>
+                </div>
+            </div>
+            <div class="indicator-group">
+                <div class="indicator-group-title">Prior Accident / Repair Indicators</div>
+                <div class="indicator-row">
+                    <div class="indicator-dot" style="background:#d97706"></div>
+                    <span>Inconsistent panel gaps observed — front passenger door</span>
+                </div>
+                <div class="indicator-row">
+                    <div class="indicator-dot" style="background:#d97706"></div>
+                    <span>Minor overspray on front passenger door seal</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── REPAIR EXPOSURE SUMMARY ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Repair Exposure Summary</div>
+            </div>
+            <div style="font-size:9.5px;color:#6b7280;margin-bottom:10px">
+                All estimates reflect Chicago-area labor rates. Actual costs may vary. These are informed estimates, not binding quotes.
+            </div>
+            <div class="repair-table">
+                <div class="repair-head">
+                    <div>Item</div>
+                    <div>Priority</div>
+                    <div class="repair-cost">Est. Low</div>
+                    <div class="repair-cost">Est. High</div>
+                </div>
+                <div class="repair-row">
+                    <div>Front brake service (pads + rotor inspection)</div>
+                    <div><span class="priority-badge pri-immediate">■ Immediate</span></div>
+                    <div class="repair-cost">$250</div>
+                    <div class="repair-cost">$400</div>
+                </div>
+                <div class="repair-row">
+                    <div>Rear tire replacement (×2)</div>
+                    <div><span class="priority-badge pri-soon">■ Soon</span></div>
+                    <div class="repair-cost">$320</div>
+                    <div class="repair-cost">$440</div>
+                </div>
+                <div class="repair-row">
+                    <div>Valve cover gasket replacement</div>
+                    <div><span class="priority-badge pri-monitor">■ Monitor</span></div>
+                    <div class="repair-cost">$80</div>
+                    <div class="repair-cost">$150</div>
+                </div>
+                <div class="repair-row">
+                    <div>TPMS sensor replacement — rear right</div>
+                    <div><span class="priority-badge pri-soon">■ Soon</span></div>
+                    <div class="repair-cost">$60</div>
+                    <div class="repair-cost">$120</div>
+                </div>
+                <div class="repair-total">
+                    <div>Total Estimated Repair Exposure</div>
+                    <div></div>
+                    <div class="repair-cost">$710</div>
+                    <div class="repair-cost">$1,110</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── BUYER CONSIDERATIONS ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Buyer Considerations</div>
+            </div>
+            <div class="buyer-row">
+                <div class="buyer-col" style="background:#f0fdf4;border-color:#bbf7d0">
+                    <div class="buyer-col-header" style="color:#14532d">May be more appropriate for</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#16a34a">✓</span> Buyers comfortable with near-term mechanical repairs</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#16a34a">✓</span> Buyers with access to a trusted mechanic or service center</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#16a34a">✓</span> Secondary or occasional-use vehicle buyers</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#16a34a">✓</span> Buyers prepared for $710–$1,110 in near-term repair costs</div>
+                </div>
+                <div class="buyer-col" style="background:#fffbeb;border-color:#fde68a">
+                    <div class="buyer-col-header" style="color:#92400e">May be less appropriate for</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#d97706">!</span> Buyers requiring immediate, uninterrupted daily reliability</div>
+                    <div class="buyer-item"><span class="buyer-icon" style="color:#d97706">!</span> Buyers without a repair budget contingency</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── PRICE & CONDITION CONTEXT ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Price &amp; Condition Context</div>
+            </div>
+            <div class="negotiation-option">
+                <div class="negotiation-label">Price Reduction Request</div>
+                <div class="negotiation-desc">With $710–$1,110 in identified near-term repair exposure, buyers may consider requesting a price reduction in the range of the estimated repair costs to offset near-term maintenance needs. This is a buyer decision — not a RideCheck recommendation.</div>
+            </div>
+            <div class="negotiation-option">
+                <div class="negotiation-label">Seller-Paid Pre-Delivery Service</div>
+                <div class="negotiation-desc">Buyers may request that the seller address immediate items (brake service) prior to vehicle transfer. This is a negotiation option only — outcomes depend on seller willingness and transaction terms.</div>
+            </div>
+            <div class="negotiation-option">
+                <div class="negotiation-label">Accept As-Is with Full Awareness</div>
+                <div class="negotiation-desc">Buyers who have budgeted for near-term maintenance may choose to accept the vehicle at the listed price with full awareness of identified maintenance items. RideCheck provides transparency — the purchasing decision remains with the buyer.</div>
+            </div>
+        </div>
+
+        <!-- ── RISK INTELLIGENCE SUMMARY ── -->
+        <div class="content-section">
+            <div class="section-header">
+                <div class="section-bar"></div>
+                <div class="section-title">Risk Intelligence Summary</div>
+            </div>
+            <div class="risk-banner">
+                <div>
+                    <div class="risk-score-num" style="color:#d97706">22</div>
+                    <div class="risk-score-label" style="color:#d97706">COMPOSITE RISK SCORE</div>
+                </div>
+                <div class="risk-level-big" style="color:#d97706">MODERATE RISK</div>
+                <div class="risk-scale" style="color:#d97706">
+                    0–14 LOW · 15–29 MODERATE<br>
+                    30–49 ELEVATED · 50+ HIGH<br>
+                    Checked June 5, 2026
+                </div>
+            </div>
+            <div class="risk-modules-table">
+                <div class="risk-module-row">
+                    <div class="risk-module-name">VIN Verification</div>
+                    <div>Verified</div>
+                    <div><span class="risk-module-badge badge-pass">PASS</span></div>
+                </div>
+                <div class="risk-module-row">
+                    <div class="risk-module-name">Recall Status</div>
+                    <div>2 open recall(s) — LOW severity</div>
+                    <div><span class="risk-module-badge badge-review">REVIEW</span></div>
+                </div>
+                <div class="risk-module-row">
+                    <div class="risk-module-name">Flood Risk</div>
+                    <div>LOW — No significant indicators</div>
+                    <div><span class="risk-module-badge badge-pass">PASS</span></div>
+                </div>
+                <div class="risk-module-row">
+                    <div class="risk-module-name">Theft / Salvage</div>
+                    <div>CLEAR</div>
+                    <div><span class="risk-module-badge badge-pass">PASS</span></div>
+                </div>
+                <div class="risk-module-row">
+                    <div class="risk-module-name">Price Analysis</div>
+                    <div>Priced near market average</div>
+                    <div><span class="risk-module-badge badge-pass">PASS</span></div>
+                </div>
+            </div>
+            <div style="font-size:9.5px;color:#6b7280;margin-top:8px;line-height:1.5">
+                Risk scores are computed from NHTSA recall data, physical flood indicators, VIN verification,
+                and listing price analysis. Theft/salvage status requires manual NICB or NMVTIS verification
+                when no provider is configured. This section supplements — and does not replace — physical inspection findings.
+            </div>
+        </div>
+
+        <!-- ── DISCLAIMER ── -->
+        <div class="disclaimer">
+            RideCheck is a Vehicle Transparency Platform — not a purchase advisor, legal authority, or title agency.<br>
+            This report reflects visual observations and field data collected at the time of inspection only.
+            Risk levels represent estimated financial and maintenance exposure and do not constitute a recommendation to buy or not buy.<br>
+            RideCheck is not responsible for undisclosed issues or post-inspection changes.
+            Repair cost estimates are approximations based on Chicago-area rates and may vary significantly by shop and market conditions.<br>
+            A professional mechanical inspection is recommended before completing any vehicle transaction.
+            Governed by Illinois law, Lake County venue.  ·  ridecheckauto.com  ·  support@ridecheckauto.com
+        </div>
+
+        <!-- Page footer -->
+        <div class="page-footer">
+            <div>
+                <div class="page-footer-brand">RideCheck Vehicle Transparency Platform</div>
+                <div class="page-footer-contact">ridecheckauto.com  ·  support@ridecheckauto.com  ·  Lake County, Illinois</div>
+            </div>
+            <div class="page-footer-num">Page 2</div>
+        </div>
+
+    </div><!-- /content-page -->
+
+</div><!-- /report-container -->
+
 </body>
 </html>

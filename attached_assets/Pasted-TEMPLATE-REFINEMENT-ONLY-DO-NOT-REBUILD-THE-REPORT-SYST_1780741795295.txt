@@ -1,0 +1,456 @@
+TEMPLATE REFINEMENT ONLY — DO NOT REBUILD THE REPORT SYSTEM
+
+IMPORTANT:
+Do NOT add Python.
+Do NOT add reportlab.
+Do NOT create a parallel PDF system.
+Do NOT change generate-report/route.ts except for minor bug fixes if required.
+Do NOT modify:
+
+* auth
+* middleware.ts
+* checkout
+* payments
+* roles
+* Supabase schema
+* Claude report prompt
+* inspection flow
+* RideChecker workflow
+
+The app already uses:
+
+@react-pdf/renderer v4.5.1
+
+The only target file for redesign is:
+
+lib/report/pdf-template.tsx
+
+GOAL:
+Upgrade the existing RideCheck report into a premium branded Vehicle Transparency Report.
+
+This is a visual and usability refinement only.
+
+Preserve all existing report data, logic, risk calculations, confidence calculations, title/history logic, OBD logic, and photo validation.
+
+══════════════════════════════════════════
+PART 1 — FIX EXISTING BUGS
+══════════════════════════════════════════
+
+1. Fix page numbering.
+
+Current issue:
+Pages display:
+
+* Page 10 of 9
+* Page 11 of 9
+* Page 13 of 9
+
+Requirements:
+
+* Accurate page count
+  OR
+* Display Page X only
+
+No incorrect totals.
+
+──────────────────────────────────────────
+
+2. Fix OBD scope contradiction.
+
+Current issue:
+
+Inspection Scope table sometimes says:
+
+"Limited — No Codes Retrieved"
+
+while OBD codes are displayed later in the report.
+
+Requirements:
+
+If OBD codes exist:
+
+* Full — Codes Retrieved
+
+If scan performed but no codes captured:
+
+* Limited — No Codes Retrieved
+
+If no scan:
+
+* Not Performed
+
+Must always match actual report data.
+
+══════════════════════════════════════════
+PART 2 — STRENGTHEN RIDECHECK BRANDING
+══════════════════════════════════════════
+
+Use stronger RideCheck visual identity.
+
+Every page header should include:
+
+* RideCheck logo (if asset exists)
+* RideCheck wordmark
+* Vehicle Transparency Report
+* Field Inspection Document
+* Report number
+* Inspection date
+
+Every page footer should include:
+
+RideCheck Vehicle Transparency Platform
+ridecheckauto.com
+[support@ridecheckauto.com](mailto:support@ridecheckauto.com)
+Lake County, Illinois
+
+Keep existing footer functionality and page numbering.
+
+Use consistent RideCheck colors:
+
+* dark green
+* black
+* white
+* light gray
+
+Do not introduce unrelated color schemes.
+
+══════════════════════════════════════════
+PART 3 — IMPROVE COVER PAGE
+══════════════════════════════════════════
+
+Cover page should feel premium and professional.
+
+Display:
+
+* Vehicle hero photo (if available)
+* Year / Make / Model / Trim
+* Mileage
+* Asking Price
+* VIN
+* Inspection Date
+* Report Number
+* Inspector Name
+* Inspection Tier
+
+Risk Badge:
+
+* 🔴 HIGH
+* 🟡 MODERATE
+* 🟢 LOW
+
+Inspection Confidence Badge:
+
+* HIGH
+* MODERATE
+* LIMITED
+
+Display:
+
+TOP 3 FIELD FINDINGS
+
+Each finding:
+
+* icon
+* title
+* severity
+* short observation
+
+Make this the visual focal point of the cover page.
+
+══════════════════════════════════════════
+PART 4 — SECTION NAMING
+══════════════════════════════════════════
+
+Use RideCheck field-oriented language.
+
+Preferred section titles:
+
+* ON-SITE KEY FINDINGS
+* INSPECTION CONFIDENCE
+* INSPECTION SCOPE
+* VEHICLE SYSTEM OBSERVATIONS
+* ROAD TEST RESULTS
+* OBD-II FIELD SCAN RESULTS
+* TITLE & HISTORY FLAGS
+* FIELD PHOTO DOCUMENTATION
+* REPAIR EXPOSURE SUMMARY
+* BUYER CONSIDERATIONS
+* PRICE & CONDITION CONTEXT
+* MISSING OR LIMITED INFORMATION
+
+Avoid generic AI-style wording.
+
+The report should feel:
+
+* field-generated
+* evidence-based
+* inspector-driven
+
+Not:
+
+* AI essay
+* chatbot report
+
+══════════════════════════════════════════
+PART 5 — PROTECT ALL EXISTING MODULES
+══════════════════════════════════════════
+
+DO NOT REMOVE OR BREAK:
+
+MECHANICAL / FUNCTIONAL
+
+* Engine observations
+* Transmission observations
+* Brake observations
+* Tire observations
+* Suspension observations
+* Electrical observations
+
+HVAC / CLIMATE
+
+* AC operation
+* Heat operation
+* Fan/blower operation
+* HVAC noises
+* HVAC observations
+
+ROAD TEST
+
+* Engine behavior
+* Transmission behavior
+* Brake behavior
+* Steering behavior
+* Suspension behavior
+* Warning lights during drive
+* Overall drive impression
+
+OBD-II
+
+* DTC codes
+* Warning lights
+* Emissions readiness
+* Uploaded OBD images
+* Uploaded OBD PDFs
+* OBD notes
+
+TITLE & HISTORY FLAGS
+
+* Title review status
+* Title type
+* VIN match
+* Seller name match
+* Title signing status
+* Lien status
+* Lien notes
+
+VIN VERIFICATION
+
+* Dashboard VIN
+* Door jamb VIN
+* VIN match verification
+* VIN photos
+
+FLOOD INDICATORS
+
+* Water intrusion indicators
+* Flood notes
+
+THEFT / TAMPERING
+
+* Ignition tampering
+* VIN plate concerns
+* Lock cylinder concerns
+* Wiring concerns
+
+ACCIDENT / REPAIR INDICATORS
+
+* Paint mismatch
+* Overspray
+* Panel gaps
+* Body filler indicators
+* Structural repair indicators
+
+══════════════════════════════════════════
+PART 6 — ADD DEDICATED ODOMETER SECTION
+══════════════════════════════════════════
+
+Add a standalone section:
+
+ODOMETER & MILEAGE VERIFICATION
+
+This section should appear whenever mileage data exists.
+
+Display:
+
+OBSERVED:
+
+* Odometer reading
+* Title mileage if available
+* Disclosure consistency
+* Odometer discrepancy indicators
+* Cluster tampering observations
+
+CONSIDERATION:
+Neutral language only.
+
+Example:
+
+Mileage discrepancies may affect vehicle value,
+maintenance expectations, resale value, and title documentation.
+
+Independent verification recommended.
+
+If mileage rollback indicators exist:
+
+Show elevated visibility.
+
+Do NOT say:
+
+* rollback confirmed
+* fraud confirmed
+
+Use:
+
+* discrepancy observed
+* inconsistency observed
+* verification recommended
+
+══════════════════════════════════════════
+PART 7 — PHOTO DOCUMENTATION REFINEMENT
+══════════════════════════════════════════
+
+Improve photo presentation.
+
+Group photos into categories:
+
+* VIN Verification
+* Odometer
+* Dashboard / Warning Lights
+* OBD Evidence
+* Engine Bay
+* Exterior
+* Interior
+* Rust & Underbody
+* Title / History Evidence
+* Road Test Evidence
+
+Avoid duplicate photos.
+
+Avoid repetitive pages of ungrouped images.
+
+Create a cleaner evidence portfolio experience.
+
+══════════════════════════════════════════
+PART 8 — REPORT PHILOSOPHY
+══════════════════════════════════════════
+
+RideCheck is a Vehicle Transparency Platform.
+
+RideCheck is NOT:
+
+* a purchase advisor
+* a legal authority
+* a title agency
+* a Carfax replacement
+
+Do NOT add:
+
+* do not buy
+* walk away
+* avoid this vehicle
+* seller is hiding something
+* vehicle was stolen
+* flood car confirmed
+
+Use:
+
+* observed
+* identified
+* noted
+* indicators observed
+* discrepancy observed
+* may
+* typically
+* professional assessment recommended
+* independent verification recommended
+
+══════════════════════════════════════════
+PART 9 — PRESERVE EXISTING SECTIONS
+══════════════════════════════════════════
+
+Keep:
+
+* Inspection Confidence
+* Inspection Scope
+* Missing Information
+* Road Test
+* OBD
+* Title & History
+* VIN Verification
+* Flood Indicators
+* Theft/Tampering
+* Accident Indicators
+* Repair Estimates
+* Buyer Considerations
+* Price & Condition Context
+* Disclaimer
+
+Do not remove existing content.
+
+Only improve presentation.
+
+══════════════════════════════════════════
+PART 10 — KEEP LEGAL LANGUAGE
+══════════════════════════════════════════
+
+Do not weaken:
+
+* liability language
+* disclaimer language
+* transparency language
+
+Keep:
+
+"RideCheck is a Vehicle Transparency Platform, not a purchase advisor."
+
+══════════════════════════════════════════
+PART 11 — TESTING
+══════════════════════════════════════════
+
+Generate a test report using a completed inspection.
+
+Confirm:
+
+[ ] PDF builds successfully
+[ ] Page numbering fixed
+[ ] RideCheck branding stronger
+[ ] Vehicle hero section displays properly
+[ ] Risk badge displays correctly
+[ ] Confidence badge displays correctly
+[ ] OBD scope matches OBD data
+[ ] Title & History section still renders
+[ ] VIN verification still renders
+[ ] Flood indicators still render
+[ ] Theft/Tampering still render
+[ ] Accident indicators still render
+[ ] Odometer & Mileage Verification section renders
+[ ] HVAC findings still render
+[ ] Road Test findings still render
+[ ] Photo categories render correctly
+[ ] No purchase recommendation language appears
+[ ] Existing Generate AI Report button still works
+[ ] No auth changes
+[ ] No payment changes
+[ ] No middleware changes
+[ ] No schema changes
+
+After testing:
+Provide a summary of:
+
+* what changed
+* screenshots or render confirmation
+* any remaining issues
+* any recommended future improvements
+
+```
+```
