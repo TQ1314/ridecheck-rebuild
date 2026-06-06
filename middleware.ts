@@ -28,6 +28,9 @@ const PUBLIC_ROUTES = [
   "/what-we-check",
   "/seller",
   "/blog",
+  "/founding-supporters",
+  "/founding-supporters/success",
+  "/founding-partners",
 ];
 
 const INVITE_PREFIX = "/invite/";

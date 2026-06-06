@@ -2,8 +2,100 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
 import { sendEmail } from "@/lib/email/resend";
+import { generateCreditCode } from "@/lib/founding/credit-code";
+import { buildSupporterConfirmationEmail, buildGiftRecipientEmail } from "@/lib/email/founding-supporter";
 
 export const dynamic = "force-dynamic";
+
+async function handleFoundingSupporter(session: any) {
+  const meta = session.metadata ?? {};
+  const tier = meta.tier as string;
+
+  if (!tier || !meta.supporter_email) {
+    console.error("[Stripe Webhook] founding_supporter missing metadata", { sessionId: session.id });
+    return;
+  }
+
+  // Idempotency: skip if already processed
+  const { data: existing } = await supabaseAdmin
+    .from("ridecheck_credits")
+    .select("id")
+    .eq("stripe_session_id", session.id)
+    .maybeSingle();
+  if (existing) {
+    console.log("[Stripe Webhook] founding_supporter already processed", { sessionId: session.id });
+    return;
+  }
+
+  const tierCredits: Record<string, number> = {
+    backer: 1, believer: 1, founding_partner: 2,
+  };
+  const tierAmounts: Record<string, number> = {
+    backer: 10_000, believer: 20_000, founding_partner: 30_000,
+  };
+
+  const creditsCount  = tierCredits[tier]  ?? 1;
+  const amountCents   = tierAmounts[tier]  ?? 10_000;
+  const creditCode    = generateCreditCode(tier);
+  const now           = new Date();
+  const expiresAt     = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()).toISOString();
+
+  const { error: insertError } = await supabaseAdmin
+    .from("ridecheck_credits")
+    .insert({
+      session_type:          "founding_supporter",
+      tier,
+      amount_cents:          amountCents,
+      credits_count:         creditsCount,
+      credit_code:           creditCode,
+      supporter_name:        meta.supporter_name  ?? "",
+      supporter_email:       meta.supporter_email,
+      supporter_phone:       meta.supporter_phone || null,
+      gift_recipient_name:   meta.gift_recipient_name  || null,
+      gift_recipient_email:  meta.gift_recipient_email || null,
+      gift_message:          meta.gift_message         || null,
+      list_on_partners_page: meta.list_on_partners_page === "true",
+      stripe_session_id:     session.id,
+      status:                "active",
+      expires_at:            expiresAt,
+      updated_at:            now.toISOString(),
+    });
+
+  if (insertError) {
+    console.error("[Stripe Webhook] founding_supporter insert failed", insertError);
+    return;
+  }
+
+  console.log("[Stripe Webhook] founding_supporter credit created", { creditCode, tier, sessionId: session.id });
+
+  // Supporter confirmation email
+  const { subject: confSubject, html: confHtml } = buildSupporterConfirmationEmail({
+    name:         meta.supporter_name ?? "Supporter",
+    tier,
+    creditCode,
+    creditsCount,
+    expiresAt,
+  });
+  await sendEmail({ to: meta.supporter_email, subject: confSubject, html: confHtml }).catch((e) =>
+    console.error("[Stripe Webhook] supporter email failed", e)
+  );
+
+  // Gift email
+  if (meta.gift_recipient_email && meta.gift_recipient_name) {
+    const { subject: giftSubject, html: giftHtml } = buildGiftRecipientEmail({
+      senderName:    meta.supporter_name ?? "Someone",
+      recipientName: meta.gift_recipient_name,
+      giftMessage:   meta.gift_message || null,
+      creditCode,
+      tier,
+      creditsCount,
+      expiresAt,
+    });
+    await sendEmail({ to: meta.gift_recipient_email, subject: giftSubject, html: giftHtml }).catch((e) =>
+      console.error("[Stripe Webhook] gift email failed", e)
+    );
+  }
+}
 
 async function markOrderPaid(orderId: string, paymentIntentId: string | null, customerEmail?: string | null) {
   const { data: existingOrder, error: fetchError } = await supabaseAdmin
@@ -139,6 +231,16 @@ export async function POST(req: NextRequest) {
   // checkout.session.completed — primary payment confirmation
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as any;
+    const sessionType = session.metadata?.session_type;
+
+    // ── Founding Supporter branch ────────────────────────────────────────────
+    if (sessionType === "founding_supporter") {
+      console.log("[Stripe Webhook] checkout.session.completed — founding_supporter", { sessionId: session.id });
+      await handleFoundingSupporter(session);
+      return NextResponse.json({ received: true });
+    }
+
+    // ── Standard order branch ────────────────────────────────────────────────
     const orderId = session.metadata?.order_id;
     const customerEmail = session.customer_details?.email || session.metadata?.customer_email;
 

@@ -1,0 +1,316 @@
+BUILD A FOUNDING SUPPORTER CAMPAIGN FOR RIDECHECK
+
+IMPORTANT
+
+Before writing any code:
+
+1. Inspect the existing RideCheck architecture.
+2. Inspect existing Stripe implementation.
+3. Show me the implementation plan.
+4. Do NOT write code until the plan is approved.
+
+DO NOT MODIFY:
+
+* Existing booking flow
+* Existing inspection payment flow
+* Existing Stripe inspection checkout
+* Existing order workflow
+* Existing auth
+* Existing middleware
+* Existing inspection database schema
+
+This must be a completely separate feature.
+
+═══════════════════════════════════════════════
+OBJECTIVE
+═══════════════════════════════════════════════
+
+Build a Founding Supporter Campaign that allows supporters to contribute to RideCheck and receive future RideCheck Credits.
+
+This is NOT crowdfunding.
+
+This is NOT equity.
+
+This is a supporter program with future service credits.
+
+═══════════════════════════════════════════════
+NEW PAGES
+═══════════════════════════════════════════════
+
+Create:
+
+/founding-supporters
+
+/founding-supporters/success
+
+/founding-partners
+
+═══════════════════════════════════════════════
+CAMPAIGN STRUCTURE
+═══════════════════════════════════════════════
+
+Display campaign progress:
+
+Community Support Raised
+
+Example:
+
+$2,700 raised of $10,000 goal
+
+Display:
+
+Number of Founding Supporters
+
+Example:
+
+23 Founding Supporters
+
+Do NOT use a 50-person limit.
+
+═══════════════════════════════════════════════
+SUPPORTER TIERS
+═══════════════════════════════════════════════
+
+THE BACKER — $100
+
+Includes:
+
+• 1 Standard RideCheck Credit
+• 47-Point Vehicle Evaluation
+• OBD-II Diagnostic Scan
+• 30+ Vehicle Photos
+• Professional RideCheck Report
+• Valid 24 Months
+• Transferable
+
+THE BELIEVER — $200
+
+MOST POPULAR
+
+Includes:
+
+• 1 Standard RideCheck Credit
+• Priority Scheduling
+• Founder Updates
+• Founding Supporter Recognition
+• Valid 24 Months
+• Transferable
+
+FOUNDING PARTNER — $300
+
+Includes:
+
+• 2 Standard RideCheck Credits
+• Priority Scheduling
+• Founder Updates
+• Name on Founding Partners Page
+• Valid 24 Months
+• Transferable
+
+═══════════════════════════════════════════════
+HERO SECTION
+═══════════════════════════════════════════════
+
+Headline:
+
+Become a Founding Supporter
+
+Subheadline:
+
+Lock in future RideCheck Credits.
+Gift them. Use them. Support RideCheck.
+
+Mission Statement:
+
+Help us build a safer used-car marketplace and expand RideCheck across Illinois.
+
+CTA:
+
+Become a Supporter
+
+═══════════════════════════════════════════════
+FOUNDER STORY
+═══════════════════════════════════════════════
+
+Headline:
+
+MY STORY. YOUR PROTECTION.
+
+Body:
+
+I bought a vehicle that looked clean.
+
+Two weeks later I discovered the odometer had been rolled back twice and the warranty was canceled.
+
+RideCheck exists so that doesn't happen to you.
+
+— Harry, Founder of RideCheck
+
+═══════════════════════════════════════════════
+PURCHASE FLOW
+═══════════════════════════════════════════════
+
+Required:
+
+* Full Name
+* Email
+
+Optional:
+
+* Phone
+* Gift Recipient Name
+* Gift Recipient Email
+* Gift Message
+
+For Founding Partner:
+
+Checkbox:
+
+List my name on the Founding Partners page
+
+Default:
+
+Checked
+
+Required Terms Checkbox:
+
+I understand RideCheck Credits:
+
+• expire after 24 months
+• are transferable
+• are not redeemable for cash
+
+═══════════════════════════════════════════════
+STRIPE
+═══════════════════════════════════════════════
+
+Use existing Stripe implementation if available.
+
+If Stripe is not configured:
+
+Show what environment variables are required.
+
+Create separate Stripe checkout sessions for:
+
+$100
+$200
+$300
+
+Do not modify existing inspection payments.
+
+═══════════════════════════════════════════════
+DATABASE
+═══════════════════════════════════════════════
+
+Create new table:
+
+ridecheck_credits
+
+Track:
+
+* supporter
+* tier
+* amount paid
+* credit code
+* gift details
+* expiration date
+* status
+
+Create separate table:
+
+supporter_waitlist
+
+Track:
+
+* name
+* email
+* created_at
+
+═══════════════════════════════════════════════
+EMAILS
+═══════════════════════════════════════════════
+
+Buyer Email
+
+Subject:
+
+Your RideCheck Founding Supporter Credit
+
+Include:
+
+* Thank you from Harry
+* Credit code
+* Tier
+* Expiration date
+* Instructions
+
+Gift Email
+
+Subject:
+
+[Buyer Name] sent you a RideCheck Credit
+
+Include:
+
+* Gift note
+* Credit code
+* Expiration date
+
+Do not mention AI anywhere.
+
+═══════════════════════════════════════════════
+FOUNDING PARTNERS PAGE
+═══════════════════════════════════════════════
+
+Public page:
+
+/founding-partners
+
+Display:
+
+RideCheck Founding Partners
+
+The people who believed first.
+
+Show:
+
+First Name + Last Initial
+
+Example:
+
+Harry F.
+
+January 2026
+
+═══════════════════════════════════════════════
+ADMIN
+═══════════════════════════════════════════════
+
+Add Founding Supporters section.
+
+Display:
+
+* Total supporters
+* Total funds raised
+* Active credits
+* Expiring credits
+
+Include CSV export.
+
+═══════════════════════════════════════════════
+PHASE 1 ONLY
+═══════════════════════════════════════════════
+
+Do NOT integrate RideCheck Credit redemption into the booking flow yet.
+
+Phase 1 is:
+
+* Campaign page
+* Stripe checkout
+* Credit generation
+* Emails
+* Success page
+* Founding Partners page
+* Admin reporting
+
+After inspecting the existing codebase, provide the implementation plan before writing code.
