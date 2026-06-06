@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = {
   title: "Buyer Intelligence Hub | RideCheck",
   description:
-    "Real inspection findings, fraud alerts, and field intelligence from Lake County's pre-purchase vehicle assessment team.",
+    "Real inspection findings, fraud alerts, and field intelligence from RideCheck's pre-purchase vehicle assessment team serving Lake County and McHenry County, IL.",
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -56,7 +56,7 @@ export default function BlogPage({
             <p className="mt-3 text-base text-gray-600 leading-relaxed">
               Real findings from real inspections. Fraud alerts from the field. Playbooks for
               smarter buying decisions. Everything here comes from what our RideCheckers
-              see on the ground in Lake County.
+              see on the ground in Lake County and McHenry County, IL.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
