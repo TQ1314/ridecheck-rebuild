@@ -1007,3 +1007,16 @@ ALTER TABLE ridechecker_raw_submissions
 
 COMMENT ON COLUMN ridechecker_raw_submissions.obd_module IS
   'Structured OBD-II diagnostic module: { scan_performed: yes|no|not_available|not_permitted, uploaded_files: [{url, fileName, fileType, reviewStatus}], dtc_codes: [{system, code, description, status}], notes: str, emissions_readiness: ready|not_ready|unknown, warning_lights: [], warning_other_desc: str }';
+
+-- ── 045: ridechecker_raw_submissions — audit timestamp columns ────────────────
+-- The base table was created in an earlier migration without these two audit
+-- columns. Add them idempotently so the schema matches migration 045.
+ALTER TABLE public.ridechecker_raw_submissions
+  ADD COLUMN IF NOT EXISTS created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- Re-apply updated_at auto-update trigger (idempotent)
+DROP TRIGGER IF EXISTS trg_rrs_updated_at ON public.ridechecker_raw_submissions;
+CREATE TRIGGER trg_rrs_updated_at
+  BEFORE UPDATE ON public.ridechecker_raw_submissions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
