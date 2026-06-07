@@ -908,36 +908,6 @@ ALTER TABLE public.profiles
 
 
 -- ============================================================
--- MIGRATION 036-B: ridechecker_job_assignments — data backfill
--- Creates missing assignment rows for orders that already have
--- assigned_ridechecker_id set. Safe to run multiple times.
--- ============================================================
-DO $$
-DECLARE
-  v_count INT := 0;
-BEGIN
-  INSERT INTO public.ridechecker_job_assignments
-    (order_id, ridechecker_id, status, created_at)
-  SELECT
-    o.id,
-    o.assigned_ridechecker_id,
-    COALESCE(NULLIF(o.assignment_status, 'unassigned'), 'awaiting_acceptance'),
-    COALESCE(o.assigned_at, o.updated_at, NOW())
-  FROM public.orders o
-  WHERE o.assigned_ridechecker_id IS NOT NULL
-    AND COALESCE(o.assignment_status, '') NOT IN ('unassigned', '')
-    AND NOT EXISTS (
-      SELECT 1 FROM public.ridechecker_job_assignments rja
-      WHERE rja.order_id       = o.id
-        AND rja.ridechecker_id = o.assigned_ridechecker_id
-        AND rja.status NOT IN ('cancelled', 'declined', 'expired', 'rejected')
-    );
-  GET DIAGNOSTICS v_count = ROW_COUNT;
-  RAISE NOTICE 'ridechecker_job_assignments backfill: % row(s) inserted', v_count;
-END $$;
-
-
--- ============================================================
 -- MIGRATION 036-C: Fix orders.assignment_status constraint
 -- ============================================================
 ALTER TABLE public.orders
@@ -947,7 +917,7 @@ ALTER TABLE public.orders
     assignment_status IN (
       'unassigned','assigned','awaiting_acceptance','accepted',
       'declined','expired','en_route','arrived',
-      'inspection_started','inspecting','report_processing',
+      'inspection_started','inspecting','in_progress','report_processing',
       'fraud_hold','unsafe_hold','completed','cancelled'
     )
   );
@@ -986,7 +956,8 @@ ALTER TABLE public.orders
 
 
 -- ============================================================
--- MIGRATION 036-F: ridechecker_job_assignments — lifecycle
+-- MIGRATION 036-F: ridechecker_job_assignments — expand lifecycle
+-- constraint FIRST so the backfill below can insert any status.
 -- ============================================================
 ALTER TABLE public.ridechecker_job_assignments
   DROP CONSTRAINT IF EXISTS chk_assignment_status;
@@ -1006,6 +977,36 @@ ALTER TABLE public.ridechecker_job_assignments
   ADD COLUMN IF NOT EXISTS flag_type  TEXT,
   ADD COLUMN IF NOT EXISTS flag_notes TEXT,
   ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMPTZ;
+
+
+-- ============================================================
+-- MIGRATION 036-B: ridechecker_job_assignments — data backfill
+-- Runs AFTER constraint expansion so any existing assignment_status
+-- value (e.g. 'in_progress') is accepted. Safe to run multiple times.
+-- ============================================================
+DO $$
+DECLARE
+  v_count INT := 0;
+BEGIN
+  INSERT INTO public.ridechecker_job_assignments
+    (order_id, ridechecker_id, status, created_at)
+  SELECT
+    o.id,
+    o.assigned_ridechecker_id,
+    COALESCE(NULLIF(o.assignment_status, 'unassigned'), 'awaiting_acceptance'),
+    COALESCE(o.assigned_at, o.updated_at, NOW())
+  FROM public.orders o
+  WHERE o.assigned_ridechecker_id IS NOT NULL
+    AND COALESCE(o.assignment_status, '') NOT IN ('unassigned', '')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.ridechecker_job_assignments rja
+      WHERE rja.order_id       = o.id
+        AND rja.ridechecker_id = o.assigned_ridechecker_id
+        AND rja.status NOT IN ('cancelled', 'declined', 'expired', 'rejected')
+    );
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE 'ridechecker_job_assignments backfill: % row(s) inserted', v_count;
+END $$;
 
 
 -- ============================================================
