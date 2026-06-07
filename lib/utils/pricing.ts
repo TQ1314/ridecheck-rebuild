@@ -100,7 +100,7 @@ export const PACKAGE_INFO: Record<
     name: "Basic",
     tagline: "Essential vehicle screening for informed decisions",
     features: [
-      "150+ point inspection",
+      "Comprehensive multi-module inspection",
       "Engine & transmission check",
       "Brake system evaluation",
       "Tire condition assessment",
