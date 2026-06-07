@@ -893,16 +893,25 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- ── Migration 036: RideChecker simple availability toggle ─────────────────────
+-- ============================================================
+-- MIGRATIONS 036–045 (catch-up from 035)
+-- All operations are idempotent — safe to run multiple times.
+-- ============================================================
+
+
+-- ============================================================
+-- MIGRATION 036-A: profiles — RideChecker availability toggle
+-- ============================================================
 ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS is_available boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS availability_updated_at timestamptz;
+  ADD COLUMN IF NOT EXISTS is_available            BOOLEAN    DEFAULT false,
+  ADD COLUMN IF NOT EXISTS availability_updated_at TIMESTAMPTZ;
 
--- ── Migration 037: Repair & Backfill ridechecker_job_assignments ──────────────
--- Finds every order that has assigned_ridechecker_id set but no matching
--- non-cancelled ridechecker_job_assignments row and creates the missing row.
--- Safe to run multiple times (ON CONFLICT DO NOTHING + WHERE NOT EXISTS guard).
 
+-- ============================================================
+-- MIGRATION 036-B: ridechecker_job_assignments — data backfill
+-- Creates missing assignment rows for orders that already have
+-- assigned_ridechecker_id set. Safe to run multiple times.
+-- ============================================================
 DO $$
 DECLARE
   v_count INT := 0;
@@ -912,41 +921,25 @@ BEGIN
   SELECT
     o.id,
     o.assigned_ridechecker_id,
-    COALESCE(
-      NULLIF(o.assignment_status, 'unassigned'),
-      'awaiting_acceptance'
-    ),
+    COALESCE(NULLIF(o.assignment_status, 'unassigned'), 'awaiting_acceptance'),
     COALESCE(o.assigned_at, o.updated_at, NOW())
   FROM public.orders o
   WHERE o.assigned_ridechecker_id IS NOT NULL
     AND COALESCE(o.assignment_status, '') NOT IN ('unassigned', '')
     AND NOT EXISTS (
       SELECT 1 FROM public.ridechecker_job_assignments rja
-      WHERE rja.order_id          = o.id
-        AND rja.ridechecker_id    = o.assigned_ridechecker_id
+      WHERE rja.order_id       = o.id
+        AND rja.ridechecker_id = o.assigned_ridechecker_id
         AND rja.status NOT IN ('cancelled', 'declined', 'expired', 'rejected')
     );
-
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'ridechecker_job_assignments backfill: % row(s) inserted', v_count;
 END $$;
 
--- ── Migration 038: Dispatch workflow stabilization ────────────────────────────
--- Additive only. IF NOT EXISTS / DROP+RECREATE constraints safely.
 
--- ── 038-A: Profiles — availability_status, suspended_until, max_active_jobs ──
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS availability_status   TEXT NOT NULL DEFAULT 'available',
-  ADD COLUMN IF NOT EXISTS suspended_until       TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS max_active_jobs       INT NOT NULL DEFAULT 5;
-
-ALTER TABLE public.profiles
-  DROP CONSTRAINT IF EXISTS chk_profiles_availability_status;
-ALTER TABLE public.profiles
-  ADD CONSTRAINT chk_profiles_availability_status
-  CHECK (availability_status IN ('available','unavailable','busy','suspended'));
-
--- ── 038-B: orders.assignment_status — expand constraint ───────────────────────
+-- ============================================================
+-- MIGRATION 036-C: Fix orders.assignment_status constraint
+-- ============================================================
 ALTER TABLE public.orders
   DROP CONSTRAINT IF EXISTS chk_orders_assignment_status;
 ALTER TABLE public.orders
@@ -959,7 +952,25 @@ ALTER TABLE public.orders
     )
   );
 
--- ── 038-C: orders.seller_status — expand to full operational enum ─────────────
+
+-- ============================================================
+-- MIGRATION 036-D: profiles — availability_status + capacity
+-- ============================================================
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS availability_status TEXT NOT NULL DEFAULT 'available',
+  ADD COLUMN IF NOT EXISTS suspended_until     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS max_active_jobs     INT  NOT NULL DEFAULT 5;
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS chk_profiles_availability_status;
+ALTER TABLE public.profiles
+  ADD CONSTRAINT chk_profiles_availability_status
+  CHECK (availability_status IN ('available','unavailable','busy','suspended'));
+
+
+-- ============================================================
+-- MIGRATION 036-E: orders.seller_status — full enum
+-- ============================================================
 ALTER TABLE public.orders
   DROP CONSTRAINT IF EXISTS chk_orders_seller_status;
 ALTER TABLE public.orders
@@ -973,7 +984,10 @@ ALTER TABLE public.orders
     )
   );
 
--- ── 038-D: ridechecker_job_assignments.status — add new lifecycle statuses ────
+
+-- ============================================================
+-- MIGRATION 036-F: ridechecker_job_assignments — lifecycle
+-- ============================================================
 ALTER TABLE public.ridechecker_job_assignments
   DROP CONSTRAINT IF EXISTS chk_assignment_status;
 ALTER TABLE public.ridechecker_job_assignments
@@ -988,34 +1002,242 @@ ALTER TABLE public.ridechecker_job_assignments
     )
   );
 
--- ── 038-E: ridechecker_job_assignments — issue_flag columns ──────────────────
 ALTER TABLE public.ridechecker_job_assignments
-  ADD COLUMN IF NOT EXISTS flag_type    TEXT,
-  ADD COLUMN IF NOT EXISTS flag_notes   TEXT,
-  ADD COLUMN IF NOT EXISTS flagged_at   TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS flag_type  TEXT,
+  ADD COLUMN IF NOT EXISTS flag_notes TEXT,
+  ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMPTZ;
 
--- ── 037: Road Test Module ─────────────────────────────────────────────────────
-ALTER TABLE ridechecker_raw_submissions
+
+-- ============================================================
+-- MIGRATION 037: ridechecker_raw_submissions — road test module
+-- ============================================================
+ALTER TABLE public.ridechecker_raw_submissions
   ADD COLUMN IF NOT EXISTS road_test_module JSONB NULL;
 
-COMMENT ON COLUMN ridechecker_raw_submissions.road_test_module IS
-  'Structured road test module data: { status: completed|not_permitted|not_possible, engine_behavior: [], transmission: [], brakes: [], steering: [], suspension: [], warning_lights: [], other_lights_noted: bool, other_lights_description: str, overall: [], concerns_notes: str, photo_1_url: str, photo_2_url: str }';
+COMMENT ON COLUMN public.ridechecker_raw_submissions.road_test_module IS
+  'Structured road test module: { status, engine_behavior[], transmission[], brakes[], steering[], suspension[], warning_lights[], other_lights_noted, other_lights_description, overall[], concerns_notes, photo_1_url, photo_2_url }';
 
--- ── 038: OBD-II Diagnostic Module ─────────────────────────────────────────────
-ALTER TABLE ridechecker_raw_submissions
+
+-- ============================================================
+-- MIGRATION 038: ridechecker_raw_submissions — OBD-II module
+-- ============================================================
+ALTER TABLE public.ridechecker_raw_submissions
   ADD COLUMN IF NOT EXISTS obd_module JSONB NULL;
 
-COMMENT ON COLUMN ridechecker_raw_submissions.obd_module IS
-  'Structured OBD-II diagnostic module: { scan_performed: yes|no|not_available|not_permitted, uploaded_files: [{url, fileName, fileType, reviewStatus}], dtc_codes: [{system, code, description, status}], notes: str, emissions_readiness: ready|not_ready|unknown, warning_lights: [], warning_other_desc: str }';
+COMMENT ON COLUMN public.ridechecker_raw_submissions.obd_module IS
+  'Structured OBD-II module: { scan_performed, uploaded_files[], dtc_codes[], notes, emissions_readiness, warning_lights[], warning_other_desc }';
 
--- ── 045: ridechecker_raw_submissions — audit timestamp columns ────────────────
--- The base table was created in an earlier migration without these two audit
--- columns. Add them idempotently so the schema matches migration 045.
+
+-- ============================================================
+-- MIGRATION 039: ridechecker_raw_submissions — title history module
+-- ============================================================
 ALTER TABLE public.ridechecker_raw_submissions
-  ADD COLUMN IF NOT EXISTS created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ NOT NULL DEFAULT now();
+  ADD COLUMN IF NOT EXISTS title_history_module JSONB NULL;
 
--- Re-apply updated_at auto-update trigger (idempotent)
+COMMENT ON COLUMN public.ridechecker_raw_submissions.title_history_module IS
+  'Observable title/VIN/flood/tampering/accident indicators: { title_review_status, title_type, vin_match_title, seller_name_match, title_signed, dashboard_vin_verified, door_jamb_vin_verified, vins_matched, dashboard_vin_photo_url, door_jamb_vin_photo_url, lien_status, lien_notes, odometer_reading, odometer_consistency, odometer_tampering, odometer_notes, flood_indicators[], flood_notes, tampering_indicators[], tampering_notes, accident_indicators[], accident_notes, ops_review_status }';
+
+
+-- ============================================================
+-- MIGRATION 040: orders — payment override tracking
+-- ============================================================
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='orders' AND column_name='payment_required') THEN
+    ALTER TABLE orders ADD COLUMN payment_required BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='orders' AND column_name='payment_override_approved') THEN
+    ALTER TABLE orders ADD COLUMN payment_override_approved BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='orders' AND column_name='payment_override_reason') THEN
+    ALTER TABLE orders ADD COLUMN payment_override_reason TEXT;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='orders' AND column_name='payment_override_by') THEN
+    ALTER TABLE orders ADD COLUMN payment_override_by UUID;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='orders' AND column_name='payment_override_at') THEN
+    ALTER TABLE orders ADD COLUMN payment_override_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
+
+-- ============================================================
+-- MIGRATION 041: Risk Intelligence tables
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.vehicle_risk_checks (
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id           UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  vin                TEXT,
+  overall_risk_score INTEGER,
+  overall_risk_level TEXT,
+  score_reasons      JSONB,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_risk_checks_order_id ON public.vehicle_risk_checks(order_id);
+CREATE INDEX        IF NOT EXISTS idx_vehicle_risk_checks_order_id ON public.vehicle_risk_checks(order_id);
+
+CREATE TABLE IF NOT EXISTS public.vehicle_vin_checks (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id       UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  vin            TEXT,
+  decoded_year   TEXT,
+  decoded_make   TEXT,
+  decoded_model  TEXT,
+  vin_valid      BOOLEAN,
+  source         TEXT,
+  raw_response   JSONB,
+  checked_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_vin_checks_order_id ON public.vehicle_vin_checks(order_id);
+
+CREATE TABLE IF NOT EXISTS public.vehicle_recall_checks (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id         UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  vin              TEXT,
+  recall_count     INTEGER,
+  highest_severity TEXT,
+  recall_data      JSONB,
+  source           TEXT,
+  checked_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_recall_checks_order_id ON public.vehicle_recall_checks(order_id);
+
+CREATE TABLE IF NOT EXISTS public.vehicle_flood_checks (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id         UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  flood_risk_score INTEGER,
+  flood_risk_level TEXT,
+  findings         JSONB,
+  checked_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_flood_checks_order_id ON public.vehicle_flood_checks(order_id);
+
+CREATE TABLE IF NOT EXISTS public.vehicle_theft_checks (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id     UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  theft_status TEXT,
+  theft_source TEXT,
+  theft_data   JSONB,
+  checked_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_theft_checks_order_id ON public.vehicle_theft_checks(order_id);
+
+CREATE TABLE IF NOT EXISTS public.vehicle_market_value_checks (
+  id                     UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id               UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  listing_price          NUMERIC,
+  estimated_market_value NUMERIC,
+  variance_percent       NUMERIC,
+  pricing_risk_level     TEXT,
+  source                 TEXT,
+  checked_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_vehicle_market_value_checks_order_id ON public.vehicle_market_value_checks(order_id);
+
+
+-- ============================================================
+-- MIGRATION 042: orders — seller_type
+-- ============================================================
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS seller_type TEXT DEFAULT 'private_party';
+
+UPDATE public.orders SET seller_type = 'private_party' WHERE seller_type IS NULL;
+
+ALTER TABLE public.orders
+  ALTER COLUMN seller_type SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_seller_type ON public.orders(seller_type);
+
+
+-- ============================================================
+-- MIGRATION 043: vehicle_title_transfer_checks
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.vehicle_title_transfer_checks (
+  id                            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id                      UUID        NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  vin                           TEXT,
+  title_present                 BOOLEAN,
+  seller_name_on_title          TEXT,
+  buyer_name_completed          TEXT,
+  odometer_disclosure_completed TEXT,
+  lien_release_present          TEXT,
+  title_signed                  TEXT,
+  open_title                    TEXT,
+  vin_matches_title             TEXT,
+  state_of_title                TEXT,
+  title_photo_url               TEXT,
+  lien_release_photo_url        TEXT,
+  odometer_disclosure_photo_url TEXT,
+  transfer_readiness_status     TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (transfer_readiness_status IN ('ready','caution','concern','unknown')),
+  risk_flags                    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  notes                         TEXT,
+  checked_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_vttc_order_id ON public.vehicle_title_transfer_checks(order_id);
+CREATE INDEX IF NOT EXISTS idx_vttc_vin      ON public.vehicle_title_transfer_checks(vin);
+CREATE INDEX IF NOT EXISTS idx_vttc_status   ON public.vehicle_title_transfer_checks(transfer_readiness_status);
+
+
+-- ============================================================
+-- MIGRATION 044: ridecheck_credits (Founding Supporter campaign)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.ridecheck_credits (
+  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_type          TEXT        NOT NULL DEFAULT 'founding_supporter',
+  tier                  TEXT        NOT NULL CHECK (tier IN ('backer','believer','founding_partner')),
+  amount_cents          INTEGER     NOT NULL,
+  credits_count         INTEGER     NOT NULL DEFAULT 1,
+  credit_code           TEXT        NOT NULL UNIQUE,
+  supporter_name        TEXT        NOT NULL,
+  supporter_email       TEXT        NOT NULL,
+  supporter_phone       TEXT,
+  gift_recipient_name   TEXT,
+  gift_recipient_email  TEXT,
+  gift_message          TEXT,
+  list_on_partners_page BOOLEAN     NOT NULL DEFAULT FALSE,
+  stripe_session_id     TEXT,
+  status                TEXT        NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active','redeemed','expired')),
+  expires_at            TIMESTAMPTZ NOT NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ridecheck_credits_email    ON public.ridecheck_credits(supporter_email);
+CREATE INDEX IF NOT EXISTS idx_ridecheck_credits_status   ON public.ridecheck_credits(status);
+CREATE INDEX IF NOT EXISTS idx_ridecheck_credits_stripe   ON public.ridecheck_credits(stripe_session_id);
+CREATE INDEX IF NOT EXISTS idx_ridecheck_credits_partners ON public.ridecheck_credits(list_on_partners_page, status, created_at);
+
+COMMENT ON TABLE public.ridecheck_credits IS
+  'Founding Supporter campaign credits. One row per purchase. credits_count=2 for founding_partner tier.';
+
+
+-- ============================================================
+-- MIGRATION 045: ridechecker_raw_submissions — audit timestamps
+-- ============================================================
+ALTER TABLE public.ridechecker_raw_submissions
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 DROP TRIGGER IF EXISTS trg_rrs_updated_at ON public.ridechecker_raw_submissions;
 CREATE TRIGGER trg_rrs_updated_at
   BEFORE UPDATE ON public.ridechecker_raw_submissions
