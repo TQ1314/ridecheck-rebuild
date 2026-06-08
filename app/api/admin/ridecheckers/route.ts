@@ -54,7 +54,7 @@ const PROFILE_FIELDS = `
   references_status, assessment_score, reviewer_notes,
   invite_sent_at, invite_accepted_at, suspended_at,
   ridechecker_rating, ridechecker_jobs_completed, ridechecker_quality_score,
-  training_sip4_completed
+  training_sip4_completed, verification_status
 `.replace(/\n\s+/g, " ").trim();
 
 // ─────────────────────────────────────────────
@@ -121,12 +121,19 @@ export async function GET(req: NextRequest) {
     guide_completed_at: guideMap.get(r.id)?.completed_at ?? null,
   }));
 
+  const perStage: Record<string, number> = {};
+  for (const r of rows as any[]) {
+    const s = r.workflow_stage ?? "unknown";
+    perStage[s] = (perStage[s] || 0) + 1;
+  }
+
   const stats = {
-    total: rows.length,
+    total:    rows.length,
     pipeline: rows.filter((r: any) => PIPELINE_STAGES.includes(r.workflow_stage)).length,
     ready:    rows.filter((r: any) => r.workflow_stage === "ready_for_approval").length,
     active:   rows.filter((r: any) => ["approved", "active"].includes(r.workflow_stage)).length,
     closed:   rows.filter((r: any) => ["rejected", "suspended"].includes(r.workflow_stage)).length,
+    perStage,
   };
 
   return NextResponse.json({ ridecheckers: enrichedRows, stats });

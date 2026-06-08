@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -18,17 +14,25 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CheckCircle2, XCircle, Clock, Users, MapPin, ShieldOff,
-  AlertTriangle, UserCheck, Activity, Ban, ChevronRight,
-  FileText, Star, Shield, BookOpen, History,
+  CheckCircle2, XCircle, Clock, Users, ShieldOff,
+  AlertTriangle, Ban, ChevronRight,
+  FileText, Shield, BookOpen, History, Search,
+  MapPin, Truck, Star, Activity,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-// ─── Constants ─────────────────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────
 
 const APPROVAL_ROLES = ["owner", "operations_lead"];
+
+const STAGE_ORDER = [
+  "applied", "under_review", "docs_requested", "docs_received",
+  "background_pending", "background_clear", "reference_pending",
+  "assessment_pending", "ready_for_approval", "approved", "active",
+  "rejected", "suspended",
+];
 
 const STAGE_LABELS: Record<string, string> = {
   applied:             "Applied",
@@ -37,7 +41,7 @@ const STAGE_LABELS: Record<string, string> = {
   docs_received:       "Docs Received",
   background_pending:  "Background Pending",
   background_clear:    "Background Clear",
-  reference_pending:   "References Pending",
+  reference_pending:   "Refs Pending",
   assessment_pending:  "Assessment Pending",
   ready_for_approval:  "Ready for Approval",
   approved:            "Approved",
@@ -46,7 +50,7 @@ const STAGE_LABELS: Record<string, string> = {
   suspended:           "Suspended",
 };
 
-const STAGE_COLORS: Record<string, string> = {
+const STAGE_TALLY_COLORS: Record<string, string> = {
   applied:             "bg-gray-100 text-gray-700 border-gray-200",
   under_review:        "bg-blue-100 text-blue-700 border-blue-200",
   docs_requested:      "bg-amber-100 text-amber-700 border-amber-200",
@@ -62,7 +66,6 @@ const STAGE_COLORS: Record<string, string> = {
   suspended:           "bg-rose-100 text-rose-700 border-rose-200",
 };
 
-// Stages available in the stage-advance dropdown (terminal stages excluded)
 const ADVANCEABLE_STAGES = [
   "applied", "under_review", "docs_requested", "docs_received",
   "background_pending", "background_clear", "reference_pending",
@@ -70,6 +73,7 @@ const ADVANCEABLE_STAGES = [
 ];
 
 type StageGroup = "all" | "pipeline" | "ready" | "active" | "closed";
+type CheckpointStatus = "complete" | "pending" | "blocked" | "not_started";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +108,7 @@ interface RideChecker {
   training_sip4_completed: boolean | null;
   guide_completed: boolean | null;
   guide_completed_at: string | null;
+  verification_status: string | null;
 }
 
 interface StageHistoryEntry {
@@ -122,49 +127,323 @@ interface Stats {
   ready: number;
   active: number;
   closed: number;
+  perStage: Record<string, number>;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Pipeline logic ──────────────────────────────────────────────────────────
+
+interface Checkpoint {
+  key: string;
+  label: string;
+  status: CheckpointStatus;
+  detail: string;
+}
+
+function getPipelineInfo(rc: RideChecker): {
+  checkpoints: Checkpoint[];
+  percent: number;
+  nextAction: string;
+  dispatchEligible: boolean;
+} {
+  const stage = rc.workflow_stage ?? "";
+  const isTerminal = stage === "rejected" || stage === "suspended";
+
+  const idStatus: CheckpointStatus =
+    rc.verification_status === "active"   ? "complete"    :
+    rc.verification_status === "submitted"? "pending"     :
+    rc.verification_status === "rejected" ? "blocked"     : "not_started";
+
+  const bgStatus: CheckpointStatus =
+    rc.background_check_status === "clear"  ? "complete"  :
+    rc.background_check_status === "pending"? "pending"   :
+    rc.background_check_status === "failed" ? "blocked"   : "not_started";
+
+  const trainingStatus: CheckpointStatus =
+    (rc.guide_completed && rc.training_sip4_completed) ? "complete"  :
+    (rc.guide_completed || rc.training_sip4_completed) ? "pending"   : "not_started";
+
+  const testRCStatus: CheckpointStatus =
+    (rc.ridechecker_jobs_completed ?? 0) > 0 ? "complete" :
+    ["approved", "active"].includes(stage)    ? "pending"  : "not_started";
+
+  const approvalStatus: CheckpointStatus =
+    ["approved", "active"].includes(stage) ? "complete"  :
+    stage === "ready_for_approval"         ? "pending"   :
+    isTerminal                             ? "blocked"   : "not_started";
+
+  const checkpoints: Checkpoint[] = [
+    {
+      key: "application",
+      label: "Application",
+      status: "complete",
+      detail: `Submitted ${new Date(rc.created_at).toLocaleDateString()}`,
+    },
+    {
+      key: "id_verification",
+      label: "ID Verification",
+      status: idStatus,
+      detail: rc.verification_status === "active"    ? "Verified"
+            : rc.verification_status === "submitted" ? "Awaiting review"
+            : rc.verification_status === "rejected"  ? "Rejected"
+            : "Not submitted",
+    },
+    {
+      key: "background",
+      label: "Background Check",
+      status: bgStatus,
+      detail: rc.background_check_status === "clear"   ? "Clear"
+            : rc.background_check_status === "pending" ? "In progress"
+            : rc.background_check_status === "failed"  ? "Failed"
+            : "Not started",
+    },
+    {
+      key: "training",
+      label: "Training",
+      status: trainingStatus,
+      detail: (rc.guide_completed && rc.training_sip4_completed) ? "Guide + SIP-4 complete"
+            : rc.guide_completed   ? "Guide ✓ — SIP-4 pending"
+            : rc.training_sip4_completed ? "SIP-4 ✓ — Guide pending"
+            : "Not started",
+    },
+    {
+      key: "test_rc",
+      label: "Test RideCheck",
+      status: testRCStatus,
+      detail: (rc.ridechecker_jobs_completed ?? 0) > 0
+              ? `${rc.ridechecker_jobs_completed} job(s) completed`
+              : ["approved", "active"].includes(stage)
+              ? "Awaiting first job"
+              : "Pending approval",
+    },
+    {
+      key: "approval",
+      label: "Final Approval",
+      status: approvalStatus,
+      detail: ["approved", "active"].includes(stage) ? "Approved & active"
+            : stage === "ready_for_approval"         ? "Ready — awaiting ops decision"
+            : isTerminal                             ? stage === "rejected" ? "Rejected" : "Suspended"
+            : "In pipeline",
+    },
+  ];
+
+  const completed = checkpoints.filter((c) => c.status === "complete").length;
+  const percent = Math.round((completed / checkpoints.length) * 100);
+
+  const dispatchEligible = rc.is_active === true && ["approved", "active"].includes(stage);
+
+  let nextAction = "No action required";
+  if (stage === "rejected")            nextAction = "Review rejection or reinstate";
+  else if (stage === "suspended")      nextAction = "Review suspension";
+  else if (idStatus !== "complete")    nextAction = idStatus === "pending" ? "Review ID verification" : "Request ID verification";
+  else if (bgStatus !== "complete")    nextAction = bgStatus === "pending" ? "Confirm background check result" : "Order background check";
+  else if (trainingStatus !== "complete") nextAction = "Assign missing training module(s)";
+  else if (stage === "ready_for_approval") nextAction = "Approve RideChecker";
+  else if (!["approved", "active"].includes(stage)) nextAction = "Advance to Ready for Approval";
+
+  return { checkpoints, percent, nextAction, dispatchEligible };
+}
+
+function canBeApproved(rc: RideChecker): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if (rc.workflow_stage !== "ready_for_approval") reasons.push("Stage must be Ready for Approval");
+  if (!rc.documents_complete)  reasons.push("Documents not marked complete");
+  if (rc.assessment_score == null) reasons.push("Assessment score missing");
+  return { ok: reasons.length === 0, reasons };
+}
+
+// ─── Small UI helpers ────────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: string | null }) {
   if (!stage) return <span className="text-muted-foreground text-xs">—</span>;
   return (
     <span className={cn(
       "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-      STAGE_COLORS[stage] ?? "bg-gray-100 text-gray-700 border-gray-200",
+      STAGE_TALLY_COLORS[stage] ?? "bg-gray-100 text-gray-700 border-gray-200",
     )}>
       {STAGE_LABELS[stage] ?? stage}
     </span>
   );
 }
 
-function StatusDot({ value, label }: { value: string | null | boolean; label: string }) {
-  const isOk = value === true || value === "clear" || value === "verified";
-  const isPending = value === "pending";
+function CheckpointDot({ status, label, detail }: { status: CheckpointStatus; label: string; detail: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs">
-      <span className={cn(
-        "h-2 w-2 rounded-full flex-shrink-0",
-        isOk ? "bg-green-500" : isPending ? "bg-amber-400" : "bg-gray-300",
-      )} />
-      <span className={isOk ? "text-green-700" : isPending ? "text-amber-700" : "text-muted-foreground"}>
-        {label}
-      </span>
+    <div className="flex items-start gap-1.5" title={detail}>
+      {status === "complete"   && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
+      {status === "pending"    && <Clock className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" />}
+      {status === "blocked"    && <XCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0 mt-0.5" />}
+      {status === "not_started"&& <span className="h-3.5 w-3.5 rounded-full border-2 border-gray-300 flex-shrink-0 mt-0.5 inline-block" />}
+      <div>
+        <p className={cn(
+          "text-xs font-medium leading-none",
+          status === "complete"    ? "text-emerald-700" :
+          status === "pending"     ? "text-amber-700"   :
+          status === "blocked"     ? "text-red-700"     : "text-muted-foreground",
+        )}>{label}</p>
+        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{detail}</p>
+      </div>
     </div>
   );
 }
 
-function canBeApproved(rc: RideChecker): { ok: boolean; reasons: string[] } {
-  const reasons: string[] = [];
-  if (rc.workflow_stage !== "ready_for_approval") {
-    reasons.push("Stage must be Ready for Approval");
-  }
-  if (!rc.documents_complete) reasons.push("Documents not marked complete");
-  if (rc.assessment_score == null) reasons.push("Assessment score missing");
-  return { ok: reasons.length === 0, reasons };
+// ─── Progress bar ────────────────────────────────────────────────────────────
+
+function ProgressBar({ percent, stage }: { percent: number; stage: string | null }) {
+  const color =
+    stage === "rejected" || stage === "suspended" ? "bg-red-400" :
+    percent === 100 ? "bg-emerald-500" :
+    percent >= 60   ? "bg-amber-400"   : "bg-blue-400";
+  return (
+    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+      <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${percent}%` }} />
+    </div>
+  );
 }
 
-// ─── Main Page ──────────────────────────────────────────────────────────────
+// ─── Pipeline Card ───────────────────────────────────────────────────────────
+
+interface PipelineCardProps {
+  rc: RideChecker;
+  canApprove: boolean;
+  actionLoading: string | null;
+  onDetail: (rc: RideChecker) => void;
+  onApprove: (rc: RideChecker) => void;
+  onReject: (rc: RideChecker) => void;
+  onSuspend: (rc: RideChecker) => void;
+  onStageUpdate: (rc: RideChecker) => void;
+}
+
+function PipelineCard({
+  rc, canApprove, actionLoading,
+  onDetail, onApprove, onReject, onSuspend, onStageUpdate,
+}: PipelineCardProps) {
+  const { checkpoints, percent, nextAction, dispatchEligible } = getPipelineInfo(rc);
+  const stage = rc.workflow_stage ?? "";
+  const isActive = ["approved", "active"].includes(stage);
+  const isTerminal = stage === "rejected" || stage === "suspended";
+  const isBusy = actionLoading === rc.id;
+
+  const nextActionColor =
+    stage === "rejected" || stage === "suspended" ? "bg-red-50 text-red-700 border-red-200" :
+    stage === "ready_for_approval"                ? "bg-green-50 text-green-700 border-green-200" :
+    nextAction === "No action required"           ? "bg-gray-50 text-gray-500 border-gray-200" :
+                                                   "bg-amber-50 text-amber-700 border-amber-200";
+
+  return (
+    <Card
+      data-testid={`card-ridechecker-${rc.id}`}
+      className="flex flex-col hover:shadow-md transition-shadow"
+    >
+      <CardContent className="p-4 flex flex-col gap-3 h-full">
+
+        {/* ── Header row ── */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <button
+              onClick={() => onDetail(rc)}
+              className="font-semibold text-sm hover:underline text-left leading-tight"
+              data-testid={`button-detail-${rc.id}`}
+            >
+              {rc.full_name}
+            </button>
+            <p className="text-xs text-muted-foreground truncate">{rc.email}</p>
+            {rc.service_area && (
+              <p className="text-xs text-muted-foreground flex items-center gap-0.5 mt-0.5">
+                <MapPin className="h-3 w-3 flex-shrink-0" />{rc.service_area}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <StageBadge stage={rc.workflow_stage} />
+            <span className="text-xs font-semibold text-muted-foreground">{percent}%</span>
+          </div>
+        </div>
+
+        {/* ── Progress bar ── */}
+        <ProgressBar percent={percent} stage={rc.workflow_stage} />
+
+        {/* ── Checkpoints: 2 columns ── */}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          {checkpoints.map((cp) => (
+            <CheckpointDot key={cp.key} status={cp.status} label={cp.label} detail={cp.detail} />
+          ))}
+        </div>
+
+        {/* ── Dispatch / jobs row ── */}
+        <div className="flex items-center gap-4 pt-1 border-t text-xs">
+          <div className="flex items-center gap-1">
+            <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className={dispatchEligible ? "text-emerald-700 font-medium" : "text-muted-foreground"}>
+              Dispatch: {dispatchEligible ? "Eligible" : "Not eligible"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Star className="h-3.5 w-3.5" />
+            <span>{rc.ridechecker_jobs_completed ?? 0} RideCheck{(rc.ridechecker_jobs_completed ?? 0) !== 1 ? "s" : ""}</span>
+          </div>
+        </div>
+
+        {/* ── Next action ── */}
+        <div className={cn("rounded border px-2.5 py-1.5 text-xs font-medium", nextActionColor)}>
+          {nextAction === "No action required"
+            ? "✓ No action required"
+            : `⤳ ${nextAction}`}
+        </div>
+
+        {/* ── Action buttons (ops_lead / owner only) ── */}
+        {canApprove && (
+          <div className="flex flex-wrap gap-1.5 pt-1 border-t">
+            {!isActive && !isTerminal && (
+              <Button
+                size="sm"
+                className="text-xs h-7 px-2"
+                disabled={!canBeApproved(rc).ok || isBusy}
+                onClick={() => onApprove(rc)}
+                data-testid={`button-approve-${rc.id}`}
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />Approve
+              </Button>
+            )}
+            {!isTerminal && (
+              <Button
+                size="sm" variant="outline"
+                className="text-xs h-7 px-2"
+                disabled={isBusy}
+                onClick={() => onStageUpdate(rc)}
+                data-testid={`button-stage-${rc.id}`}
+              >
+                <ChevronRight className="h-3 w-3 mr-1" />Stage
+              </Button>
+            )}
+            {!isActive && stage !== "rejected" && (
+              <Button
+                size="sm" variant="ghost"
+                className="text-xs h-7 px-2 text-destructive hover:text-destructive"
+                disabled={isBusy}
+                onClick={() => onReject(rc)}
+                data-testid={`button-reject-${rc.id}`}
+              >
+                <XCircle className="h-3 w-3 mr-1" />Reject
+              </Button>
+            )}
+            {isActive && (
+              <Button
+                size="sm" variant="ghost"
+                className="text-xs h-7 px-2 text-orange-600 hover:text-orange-700"
+                disabled={isBusy}
+                onClick={() => onSuspend(rc)}
+                data-testid={`button-suspend-${rc.id}`}
+              >
+                <Ban className="h-3 w-3 mr-1" />Suspend
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function RideCheckersAdminPage() {
   const { toast } = useToast();
@@ -172,9 +451,13 @@ export default function RideCheckersAdminPage() {
 
   const [userRole, setUserRole] = useState<string | null>(null);
   const [ridecheckers, setRidecheckers] = useState<RideChecker[]>([]);
-  const [stats, setStats] = useState<Stats>({ total: 0, pipeline: 0, ready: 0, active: 0, closed: 0 });
+  const [stats, setStats] = useState<Stats>({
+    total: 0, pipeline: 0, ready: 0, active: 0, closed: 0, perStage: {},
+  });
   const [loading, setLoading] = useState(true);
   const [stageGroup, setStageGroup] = useState<StageGroup>("all");
+  const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Detail modal
@@ -205,10 +488,7 @@ export default function RideCheckersAdminPage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
+        .from("profiles").select("role").eq("id", user.id).maybeSingle();
       setUserRole(profile?.role ?? null);
     });
   }, []);
@@ -220,7 +500,7 @@ export default function RideCheckersAdminPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setRidecheckers(data.ridecheckers || []);
-      setStats(data.stats || { total: 0, pipeline: 0, ready: 0, active: 0, closed: 0 });
+      setStats(data.stats || { total: 0, pipeline: 0, ready: 0, active: 0, closed: 0, perStage: {} });
     } catch {
       toast({ title: "Failed to load RideCheckers", variant: "destructive" });
     }
@@ -261,7 +541,6 @@ export default function RideCheckersAdminPage() {
       }
       toast({ title: successMsg });
       await loadData();
-      // Refresh detail if open
       if (detailOpen && detailRc?.id === userId) {
         openDetail({ ...detailRc!, ...payload } as any);
       }
@@ -271,12 +550,9 @@ export default function RideCheckersAdminPage() {
     setActionLoading(null);
   }
 
-  // Approve
-  const handleApprove = async (rc: RideChecker) => {
-    await patchRc({ userId: rc.id, action: "approve" }, `${rc.full_name} approved`);
-  };
+  const handleApprove = (rc: RideChecker) =>
+    patchRc({ userId: rc.id, action: "approve" }, `${rc.full_name} approved`);
 
-  // Stage update
   const openStageDialog = (rc: RideChecker) => {
     setStageTarget(rc);
     setNewStage(rc.workflow_stage || "applied");
@@ -287,47 +563,55 @@ export default function RideCheckersAdminPage() {
     if (!stageTarget) return;
     await patchRc(
       { userId: stageTarget.id, action: "update_stage", toStage: newStage, notes: stageNotes },
-      "Stage updated"
+      "Stage updated",
     );
     setStageDialogOpen(false);
   };
 
-  // Reject
   const openRejectDialog = (rc: RideChecker) => {
-    setRejectTarget(rc);
-    setRejectReason("");
-    setRejectDialogOpen(true);
+    setRejectTarget(rc); setRejectReason(""); setRejectDialogOpen(true);
   };
   const handleReject = async () => {
     if (!rejectTarget) return;
     await patchRc(
       { userId: rejectTarget.id, action: "reject", reason: rejectReason },
-      `${rejectTarget.full_name} rejected`
+      `${rejectTarget.full_name} rejected`,
     );
     setRejectDialogOpen(false);
   };
 
-  // Suspend
   const openSuspendDialog = (rc: RideChecker) => {
-    setSuspendTarget(rc);
-    setSuspendReason("");
-    setSuspendDialogOpen(true);
+    setSuspendTarget(rc); setSuspendReason(""); setSuspendDialogOpen(true);
   };
   const handleSuspend = async () => {
     if (!suspendTarget) return;
     await patchRc(
       { userId: suspendTarget.id, action: "suspend", reason: suspendReason },
-      `${suspendTarget.full_name} suspended`
+      `${suspendTarget.full_name} suspended`,
     );
     setSuspendDialogOpen(false);
   };
 
-  const FILTER_TABS: { key: StageGroup; label: string; count?: number }[] = [
-    { key: "all",      label: "All",              count: stats.total },
-    { key: "pipeline", label: "In Pipeline",       count: stats.pipeline },
-    { key: "ready",    label: "Ready for Approval",count: stats.ready },
-    { key: "active",   label: "Active",            count: stats.active },
-    { key: "closed",   label: "Rejected / Suspended", count: stats.closed },
+  // Filtered list
+  const filtered = ridecheckers.filter((rc) => {
+    if (stageFilter && rc.workflow_stage !== stageFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        rc.full_name.toLowerCase().includes(q) ||
+        rc.email.toLowerCase().includes(q) ||
+        (rc.service_area ?? "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const GROUP_TABS: { key: StageGroup; label: string; count: number }[] = [
+    { key: "all",      label: "All",               count: stats.total    },
+    { key: "pipeline", label: "In Pipeline",        count: stats.pipeline },
+    { key: "ready",    label: "Ready for Approval", count: stats.ready    },
+    { key: "active",   label: "Active",             count: stats.active   },
+    { key: "closed",   label: "Rejected / Susp.",   count: stats.closed   },
   ];
 
   return (
@@ -336,10 +620,10 @@ export default function RideCheckersAdminPage() {
       {/* ── Header ── */}
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-page-title">
-          RideChecker Hiring Pipeline
+          RideChecker Pipeline
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage applicants through the full onboarding workflow
+          Every applicant and RideChecker — all pipeline stages, nothing hidden.
         </p>
         {!canApprove && userRole === "operations" && (
           <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 w-fit">
@@ -349,254 +633,106 @@ export default function RideCheckersAdminPage() {
         )}
       </div>
 
-      {/* ── Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[
-          { label: "Total",             value: stats.total,    icon: <Users className="h-4 w-4 text-muted-foreground" /> },
-          { label: "In Pipeline",       value: stats.pipeline, icon: <Clock className="h-4 w-4 text-blue-500" /> },
-          { label: "Ready for Approval",value: stats.ready,    icon: <UserCheck className="h-4 w-4 text-lime-600" /> },
-          { label: "Active",            value: stats.active,   icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" /> },
-          { label: "Rejected / Susp.",  value: stats.closed,   icon: <Ban className="h-4 w-4 text-rose-500" /> },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-1 pt-3 px-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground leading-tight">{s.label}</CardTitle>
-              {s.icon}
-            </CardHeader>
-            <CardContent className="px-4 pb-3">
-              <div className="text-2xl font-bold">{s.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* ── Per-stage tally strip ── */}
+      <div className="overflow-x-auto pb-1">
+        <div className="flex gap-2 min-w-max">
+          {STAGE_ORDER.map((stage) => {
+            const count = stats.perStage?.[stage] ?? 0;
+            if (count === 0) return null;
+            const isSelected = stageFilter === stage;
+            return (
+              <button
+                key={stage}
+                onClick={() => setStageFilter(isSelected ? null : stage)}
+                data-testid={`tally-${stage}`}
+                className={cn(
+                  "flex flex-col items-center px-3 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                  isSelected
+                    ? "ring-2 ring-primary ring-offset-1 " + STAGE_TALLY_COLORS[stage]
+                    : STAGE_TALLY_COLORS[stage] + " opacity-80 hover:opacity-100",
+                )}
+              >
+                <span className="text-lg font-bold leading-none">{count}</span>
+                <span className="mt-0.5 whitespace-nowrap">{STAGE_LABELS[stage]}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* ── Filter Tabs ── */}
+      {/* ── Group filter tabs ── */}
       <div className="flex gap-2 flex-wrap">
-        {FILTER_TABS.map(({ key, label, count }) => (
+        {GROUP_TABS.map(({ key, label, count }) => (
           <Button
             key={key}
             variant={stageGroup === key ? "default" : "outline"}
             size="sm"
-            onClick={() => setStageGroup(key)}
+            onClick={() => { setStageGroup(key); setStageFilter(null); }}
             data-testid={`button-filter-${key}`}
           >
             {label}
-            {count !== undefined && (
-              <span className={cn(
-                "ml-1.5 text-xs rounded-full px-1.5 py-0.5 font-medium",
-                stageGroup === key ? "bg-white/20 text-white" : "bg-muted text-muted-foreground",
-              )}>
-                {count}
-              </span>
-            )}
+            <span className={cn(
+              "ml-1.5 text-xs rounded-full px-1.5 py-0.5 font-medium",
+              stageGroup === key ? "bg-white/20 text-white" : "bg-muted text-muted-foreground",
+            )}>
+              {count}
+            </span>
           </Button>
         ))}
+        {stageFilter && (
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => setStageFilter(null)}
+          >
+            <XCircle className="h-3.5 w-3.5 mr-1" />
+            Clear stage filter
+          </Button>
+        )}
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Search ── */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search name, email, city…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+          data-testid="input-search-ridecheckers"
+        />
+      </div>
+
+      {/* ── Card grid ── */}
       {loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
-      ) : ridecheckers.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-1">No RideCheckers Found</h3>
-            <p className="text-sm text-muted-foreground">No candidates match this filter.</p>
+            <p className="text-sm text-muted-foreground">
+              {search || stageFilter ? "No matches for your filters." : "No candidates in this group."}
+            </p>
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Candidate</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead>Checklist</TableHead>
-                  <TableHead>Assessment</TableHead>
-                  <TableHead>SIP-4 Cert</TableHead>
-                  <TableHead>Guide</TableHead>
-                  <TableHead>Applied</TableHead>
-                  {canApprove && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ridecheckers.map((rc) => {
-                  const approval = canBeApproved(rc);
-                  const isActive = rc.workflow_stage === "active" || rc.workflow_stage === "approved";
-                  return (
-                    <TableRow
-                      key={rc.id}
-                      data-testid={`row-ridechecker-${rc.id}`}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => openDetail(rc)}
-                    >
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{rc.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{rc.email}</p>
-                          {rc.phone && (
-                            <p className="text-xs text-muted-foreground">{rc.phone}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {rc.service_area ? (
-                          <span className="flex items-center gap-1 text-xs">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            {rc.service_area}
-                          </span>
-                        ) : <span className="text-muted-foreground text-xs">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <StageBadge stage={rc.workflow_stage} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <StatusDot value={rc.documents_complete} label="Docs" />
-                          <StatusDot value={rc.background_check_status} label="Background" />
-                          <StatusDot value={rc.references_status} label="References" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {rc.assessment_score != null ? (
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3 w-3 text-amber-500" />
-                            <span className="text-sm font-medium">{rc.assessment_score}</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {rc.training_sip4_completed ? (
-                          <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-                            "bg-emerald-100 text-emerald-700 border-emerald-200",
-                          )}>
-                            Passed
-                          </span>
-                        ) : (
-                          <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-                            "bg-gray-100 text-gray-500 border-gray-200",
-                          )}>
-                            Not Started
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {rc.guide_completed ? (
-                          <div>
-                            <span className={cn(
-                              "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-                              "bg-emerald-100 text-emerald-700 border-emerald-200",
-                            )}>
-                              Completed
-                            </span>
-                            {rc.guide_completed_at && (
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {new Date(rc.guide_completed_at).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-                            "bg-gray-100 text-gray-500 border-gray-200",
-                          )}>
-                            Not Read
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(rc.created_at).toLocaleDateString()}
-                      </TableCell>
-
-                      {canApprove && (
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex flex-col gap-1.5 min-w-[120px]">
-                            {/* Approve — gated by prerequisites */}
-                            {!isActive && rc.workflow_stage !== "rejected" && rc.workflow_stage !== "suspended" && (
-                              <div className="relative group">
-                                <Button
-                                  size="sm"
-                                  className="w-full text-xs"
-                                  disabled={!approval.ok || actionLoading === rc.id}
-                                  onClick={() => handleApprove(rc)}
-                                  data-testid={`button-approve-${rc.id}`}
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Approve
-                                </Button>
-                                {!approval.ok && (
-                                  <div className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-popover border rounded-md shadow-md p-2 text-xs w-52">
-                                    <p className="font-medium mb-1 text-destructive">Prerequisites not met:</p>
-                                    <ul className="space-y-0.5 list-disc list-inside text-muted-foreground">
-                                      {approval.reasons.map((r) => <li key={r}>{r}</li>)}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Advance Stage */}
-                            {rc.workflow_stage !== "rejected" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full text-xs"
-                                disabled={actionLoading === rc.id}
-                                onClick={() => openStageDialog(rc)}
-                                data-testid={`button-stage-${rc.id}`}
-                              >
-                                <ChevronRight className="h-3 w-3 mr-1" />
-                                {rc.workflow_stage === "active" || rc.workflow_stage === "approved" ? "Manage" : "Advance"}
-                              </Button>
-                            )}
-
-                            {/* Reject */}
-                            {!isActive && rc.workflow_stage !== "rejected" && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="w-full text-xs text-destructive hover:text-destructive"
-                                disabled={actionLoading === rc.id}
-                                onClick={() => openRejectDialog(rc)}
-                                data-testid={`button-reject-${rc.id}`}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Reject
-                              </Button>
-                            )}
-
-                            {/* Suspend */}
-                            {isActive && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="w-full text-xs text-orange-600 hover:text-orange-700"
-                                disabled={actionLoading === rc.id}
-                                onClick={() => openSuspendDialog(rc)}
-                                data-testid={`button-suspend-${rc.id}`}
-                              >
-                                <Ban className="h-3 w-3 mr-1" />
-                                Suspend
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((rc) => (
+            <PipelineCard
+              key={rc.id}
+              rc={rc}
+              canApprove={canApprove}
+              actionLoading={actionLoading}
+              onDetail={openDetail}
+              onApprove={handleApprove}
+              onReject={openRejectDialog}
+              onSuspend={openSuspendDialog}
+              onStageUpdate={openStageDialog}
+            />
+          ))}
+        </div>
       )}
 
       {/* ── Candidate Detail Dialog ── */}
@@ -627,9 +763,7 @@ export default function RideCheckersAdminPage() {
             <div>
               <Label className="mb-2 block">New Stage</Label>
               <Select value={newStage} onValueChange={setNewStage}>
-                <SelectTrigger data-testid="select-new-stage">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-new-stage"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ADVANCEABLE_STAGES.map((s) => (
                     <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
@@ -642,7 +776,7 @@ export default function RideCheckersAdminPage() {
               <Textarea
                 value={stageNotes}
                 onChange={(e) => setStageNotes(e.target.value)}
-                placeholder="e.g. Please upload your driver's license and vehicle inspection training certificate"
+                placeholder="e.g. Please upload your driver's license"
                 rows={3}
                 className="resize-none"
                 data-testid="input-stage-notes"
@@ -692,7 +826,7 @@ export default function RideCheckersAdminPage() {
               disabled={actionLoading === rejectTarget?.id}
               data-testid="button-confirm-reject"
             >
-              {actionLoading === rejectTarget?.id ? "Rejecting..." : "Reject Application"}
+              {actionLoading === rejectTarget?.id ? "Rejecting…" : "Reject Application"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -729,7 +863,7 @@ export default function RideCheckersAdminPage() {
               disabled={actionLoading === suspendTarget?.id}
               data-testid="button-confirm-suspend"
             >
-              {actionLoading === suspendTarget?.id ? "Suspending..." : "Suspend"}
+              {actionLoading === suspendTarget?.id ? "Suspending…" : "Suspend"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -738,7 +872,7 @@ export default function RideCheckersAdminPage() {
   );
 }
 
-// ─── Candidate Detail Dialog ────────────────────────────────────────────────
+// ─── Candidate Detail Dialog ─────────────────────────────────────────────────
 
 interface DetailDialogProps {
   open: boolean;
@@ -763,12 +897,7 @@ function CandidateDetailDialog({
   const [savingNotes, setSavingNotes] = useState(false);
   const [localNotes, setLocalNotes] = useState("");
   const [savingFields, setSavingFields] = useState(false);
-  const [fields, setFields] = useState<{
-    documents_complete: boolean;
-    background_check_status: string;
-    references_status: string;
-    assessment_score: string;
-  }>({
+  const [fields, setFields] = useState({
     documents_complete: false,
     background_check_status: "not_started",
     references_status: "not_started",
@@ -779,10 +908,10 @@ function CandidateDetailDialog({
     if (rc) {
       setLocalNotes(rc.reviewer_notes || "");
       setFields({
-        documents_complete: rc.documents_complete ?? false,
+        documents_complete:      rc.documents_complete ?? false,
         background_check_status: rc.background_check_status ?? "not_started",
-        references_status: rc.references_status ?? "not_started",
-        assessment_score: rc.assessment_score != null ? String(rc.assessment_score) : "",
+        references_status:       rc.references_status ?? "not_started",
+        assessment_score:        rc.assessment_score != null ? String(rc.assessment_score) : "",
       });
     }
   }, [rc]);
@@ -790,7 +919,7 @@ function CandidateDetailDialog({
   if (!rc) return null;
 
   const approval = canBeApproved(rc);
-  const isActive = rc.workflow_stage === "active" || rc.workflow_stage === "approved";
+  const isActive = ["approved", "active"].includes(rc.workflow_stage ?? "");
 
   async function saveNotes() {
     setSavingNotes(true);
@@ -836,13 +965,13 @@ function CandidateDetailDialog({
               <TabsTrigger value="history"><History className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
             </TabsList>
 
-            {/* ── Overview Tab ── */}
+            {/* ── Overview ── */}
             <TabsContent value="overview" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <InfoRow label="Email" value={rc.email} />
-                <InfoRow label="Phone" value={rc.phone || "—"} />
+                <InfoRow label="Email"        value={rc.email} />
+                <InfoRow label="Phone"        value={rc.phone || "—"} />
                 <InfoRow label="Service Area" value={rc.service_area || "—"} />
-                <InfoRow label="Applied" value={new Date(rc.created_at).toLocaleDateString()} />
+                <InfoRow label="Applied"      value={new Date(rc.created_at).toLocaleDateString()} />
                 {rc.approved_at && (
                   <InfoRow label="Approved" value={new Date(rc.approved_at).toLocaleDateString()} />
                 )}
@@ -852,9 +981,7 @@ function CandidateDetailDialog({
                 {rc.invite_accepted_at && (
                   <InfoRow label="Invite Accepted" value={new Date(rc.invite_accepted_at).toLocaleDateString()} />
                 )}
-                {rc.ridechecker_jobs_completed != null && (
-                  <InfoRow label="Jobs Completed" value={String(rc.ridechecker_jobs_completed)} />
-                )}
+                <InfoRow label="Jobs Completed" value={String(rc.ridechecker_jobs_completed ?? 0)} />
                 {rc.ridechecker_quality_score != null && (
                   <InfoRow label="Quality Score" value={`${rc.ridechecker_quality_score}%`} />
                 )}
@@ -874,11 +1001,10 @@ function CandidateDetailDialog({
                 </div>
               )}
 
-              {/* Approval readiness summary */}
               {!isActive && rc.workflow_stage !== "rejected" && (
                 <div className={cn(
                   "rounded-md border px-3 py-3 text-sm",
-                  approval.ok ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+                  approval.ok ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200",
                 )}>
                   <p className={cn("font-medium mb-1.5", approval.ok ? "text-green-800" : "text-amber-800")}>
                     {approval.ok ? "✓ Ready for approval" : "Approval prerequisites"}
@@ -900,50 +1026,39 @@ function CandidateDetailDialog({
                       onClick={() => onApprove(rc)}
                       data-testid={`button-detail-approve-${rc.id}`}
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      Approve
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Approve
                     </Button>
                   )}
                   {rc.workflow_stage !== "rejected" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={actionLoading === rc.id}
-                      onClick={() => onStageUpdate(rc)}
-                    >
-                      <ChevronRight className="h-3.5 w-3.5 mr-1" />
-                      Update Stage
+                    <Button size="sm" variant="outline" disabled={actionLoading === rc.id} onClick={() => onStageUpdate(rc)}>
+                      <ChevronRight className="h-3.5 w-3.5 mr-1" />Update Stage
                     </Button>
                   )}
                   {!isActive && rc.workflow_stage !== "rejected" && (
                     <Button
-                      size="sm"
-                      variant="ghost"
+                      size="sm" variant="ghost"
                       className="text-destructive hover:text-destructive"
                       disabled={actionLoading === rc.id}
                       onClick={() => onReject(rc)}
                     >
-                      <XCircle className="h-3.5 w-3.5 mr-1" />
-                      Reject
+                      <XCircle className="h-3.5 w-3.5 mr-1" />Reject
                     </Button>
                   )}
                   {isActive && (
                     <Button
-                      size="sm"
-                      variant="ghost"
+                      size="sm" variant="ghost"
                       className="text-orange-600 hover:text-orange-700"
                       disabled={actionLoading === rc.id}
                       onClick={() => onSuspend(rc)}
                     >
-                      <Ban className="h-3.5 w-3.5 mr-1" />
-                      Suspend
+                      <Ban className="h-3.5 w-3.5 mr-1" />Suspend
                     </Button>
                   )}
                 </div>
               )}
             </TabsContent>
 
-            {/* ── Checklist Tab ── */}
+            {/* ── Checklist ── */}
             <TabsContent value="checklist" className="space-y-5 mt-4">
               <div className="space-y-4">
                 <ChecklistItem
@@ -953,7 +1068,6 @@ function CandidateDetailDialog({
                   onChange={(v) => setFields((f) => ({ ...f, documents_complete: v }))}
                   disabled={!canApprove}
                 />
-
                 <div>
                   <Label className="mb-1.5 block text-sm">Background Check Status</Label>
                   <Select
@@ -961,9 +1075,7 @@ function CandidateDetailDialog({
                     onValueChange={(v) => setFields((f) => ({ ...f, background_check_status: v }))}
                     disabled={!canApprove}
                   >
-                    <SelectTrigger data-testid="select-bg-status">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger data-testid="select-bg-status"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="not_started">Not Started</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
@@ -972,7 +1084,6 @@ function CandidateDetailDialog({
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label className="mb-1.5 block text-sm">References Status</Label>
                   <Select
@@ -980,9 +1091,7 @@ function CandidateDetailDialog({
                     onValueChange={(v) => setFields((f) => ({ ...f, references_status: v }))}
                     disabled={!canApprove}
                   >
-                    <SelectTrigger data-testid="select-ref-status">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger data-testid="select-ref-status"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="not_started">Not Started</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
@@ -991,15 +1100,11 @@ function CandidateDetailDialog({
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label className="mb-1.5 block text-sm">Assessment Score (0–100)</Label>
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.5}
+                      type="number" min={0} max={100} step={0.5}
                       value={fields.assessment_score}
                       onChange={(e) => setFields((f) => ({ ...f, assessment_score: e.target.value }))}
                       placeholder="e.g. 87.5"
@@ -1016,26 +1121,18 @@ function CandidateDetailDialog({
                   </div>
                 </div>
               </div>
-
               {canApprove && (
-                <Button
-                  size="sm"
-                  onClick={saveChecklist}
-                  disabled={savingFields}
-                  data-testid="button-save-checklist"
-                >
+                <Button size="sm" onClick={saveChecklist} disabled={savingFields} data-testid="button-save-checklist">
                   {savingFields ? "Saving…" : "Save Checklist"}
                 </Button>
               )}
             </TabsContent>
 
-            {/* ── Notes Tab ── */}
+            {/* ── Notes ── */}
             <TabsContent value="notes" className="space-y-4 mt-4">
               <div>
                 <Label className="mb-2 block text-sm">Internal Reviewer Notes</Label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Internal only — not visible to the candidate.
-                </p>
+                <p className="text-xs text-muted-foreground mb-2">Internal only — not visible to the candidate.</p>
                 <Textarea
                   value={localNotes}
                   onChange={(e) => setLocalNotes(e.target.value)}
@@ -1053,7 +1150,7 @@ function CandidateDetailDialog({
               )}
             </TabsContent>
 
-            {/* ── History Tab ── */}
+            {/* ── History ── */}
             <TabsContent value="history" className="mt-4">
               {stageHistory.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">No stage history yet.</p>
@@ -1111,11 +1208,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ChecklistItem({
   label, description, checked, onChange, disabled,
 }: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
+  label: string; description: string; checked: boolean;
+  onChange: (v: boolean) => void; disabled?: boolean;
 }) {
   return (
     <div
