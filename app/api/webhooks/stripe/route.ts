@@ -16,7 +16,6 @@ async function handleFoundingSupporter(session: any) {
     return;
   }
 
-  // Idempotency: skip if already processed
   const { data: existing } = await supabaseAdmin
     .from("ridecheck_credits")
     .select("id")
@@ -68,7 +67,6 @@ async function handleFoundingSupporter(session: any) {
 
   console.log("[Stripe Webhook] founding_supporter credit created", { creditCode, tier, sessionId: session.id });
 
-  // Supporter confirmation email
   const { subject: confSubject, html: confHtml } = buildSupporterConfirmationEmail({
     name:         meta.supporter_name ?? "Supporter",
     tier,
@@ -80,7 +78,6 @@ async function handleFoundingSupporter(session: any) {
     console.error("[Stripe Webhook] supporter email failed", e)
   );
 
-  // Gift email
   if (meta.gift_recipient_email && meta.gift_recipient_name) {
     const { subject: giftSubject, html: giftHtml } = buildGiftRecipientEmail({
       senderName:    meta.supporter_name ?? "Someone",
@@ -97,32 +94,92 @@ async function handleFoundingSupporter(session: any) {
   }
 }
 
-async function markOrderPaid(orderId: string, paymentIntentId: string | null, customerEmail?: string | null) {
-  const { data: existingOrder, error: fetchError } = await supabaseAdmin
+// ─── markOrderPaid ────────────────────────────────────────────────────────────
+// Called by both checkout.session.completed and payment_intent.succeeded events.
+// checkoutSessionId: the cs_... ID (only available from checkout events)
+// paymentIntentId:   the pi_... ID
+async function markOrderPaid(
+  orderId: string,
+  paymentIntentId: string | null,
+  customerEmail?: string | null,
+  checkoutSessionId?: string | null,
+) {
+  console.log("[Stripe Webhook] markOrderPaid — looking up order", {
+    orderId,
+    paymentIntentId: paymentIntentId ? `${paymentIntentId.slice(0, 8)}…` : null,
+    checkoutSessionId: checkoutSessionId ? `${checkoutSessionId.slice(0, 8)}…` : null,
+  });
+
+  const { data: existingOrder, error: fetchError } = await (supabaseAdmin
     .from("orders")
-    .select("id, payment_status, customer_id, buyer_email, order_id, vehicle_year, vehicle_make, vehicle_model, package, final_price")
+    .select(
+      "id, payment_status, customer_id, buyer_email, order_id, order_number, " +
+      "vehicle_year, vehicle_make, vehicle_model, package, final_price, booking_type"
+    )
     .eq("id", orderId)
-    .single();
+    .single() as unknown as Promise<{
+      data: {
+        id: string;
+        payment_status: string | null;
+        customer_id: string | null;
+        buyer_email: string | null;
+        order_id: string | null;
+        order_number: string | null;
+        vehicle_year: string | null;
+        vehicle_make: string | null;
+        vehicle_model: string | null;
+        package: string | null;
+        final_price: number | null;
+        booking_type: string | null;
+      } | null;
+      error: any;
+    }>);
 
   if (fetchError || !existingOrder) {
-    console.error("[Stripe Webhook] Order not found for markOrderPaid", { orderId, fetchError });
+    console.error("[Stripe Webhook] markOrderPaid — order not found", {
+      orderId,
+      errorCode: fetchError?.code,
+      errorMessage: fetchError?.message,
+    });
     return { skipped: false, error: "Order not found" };
   }
 
+  console.log("[Stripe Webhook] markOrderPaid — order found", {
+    orderId,
+    orderNumber: existingOrder.order_number || existingOrder.order_id,
+    currentPaymentStatus: existingOrder.payment_status,
+    bookingType: existingOrder.booking_type,
+  });
+
   // Idempotency: skip if already paid
   if (existingOrder.payment_status === "paid") {
-    console.log("[Stripe Webhook] Order already paid, skipping duplicate update", { orderId });
+    console.log("[Stripe Webhook] markOrderPaid — already paid, skipping", { orderId });
     return { skipped: true };
   }
 
+  const now = new Date().toISOString();
+
+  // For concierge orders, next ops step is contact_seller (need to reach out to seller).
+  // For self_arrange, ops just waits for buyer to confirm the inspection time.
+  const nextOpsStatus = existingOrder.booking_type === "concierge"
+    ? "contact_seller"
+    : "payment_received";
+
   const updatePayload: Record<string, any> = {
-    payment_status: "paid",
-    payment_intent_id: paymentIntentId,
-    paid_at: new Date().toISOString(),
-    status: "payment_received",
-    ops_status: "payment_received",
-    updated_at: new Date().toISOString(),
+    payment_status:             "paid",
+    payment_intent_id:          paymentIntentId,     // legacy column (keep for compat)
+    stripe_payment_intent_id:   paymentIntentId,     // canonical column (migration 046)
+    paid_at:                    now,
+    status:                     "payment_received",
+    ops_status:                 nextOpsStatus,
+    updated_at:                 now,
   };
+
+  // Save the checkout session ID if we have it
+  if (checkoutSessionId) {
+    updatePayload.stripe_session_id          = checkoutSessionId; // legacy column
+    updatePayload.stripe_checkout_session_id = checkoutSessionId; // canonical column
+  }
 
   // Backfill customer_id if missing
   const emailToLookup = customerEmail || existingOrder.buyer_email;
@@ -135,7 +192,10 @@ async function markOrderPaid(orderId: string, paymentIntentId: string | null, cu
 
     if (profile) {
       updatePayload.customer_id = profile.id;
-      console.log("[Stripe Webhook] Backfilling customer_id", { orderId, customerId: profile.id });
+      console.log("[Stripe Webhook] markOrderPaid — backfilling customer_id", {
+        orderId,
+        customerId: profile.id,
+      });
     }
   }
 
@@ -145,18 +205,31 @@ async function markOrderPaid(orderId: string, paymentIntentId: string | null, cu
     .eq("id", orderId);
 
   if (updateError) {
-    console.error("[Stripe Webhook] Order update failed", { orderId, error: updateError });
+    console.error("[Stripe Webhook] markOrderPaid — DB update failed", {
+      orderId,
+      errorCode: updateError.code,
+      errorMessage: updateError.message,
+    });
     return { skipped: false, error: updateError.message };
   }
 
-  console.log("[Stripe Webhook] Order marked paid successfully", { orderId, paymentIntentId });
+  console.log("[Stripe Webhook] markOrderPaid — order updated successfully", {
+    orderId,
+    orderNumber: existingOrder.order_number || existingOrder.order_id,
+    paymentIntentId,
+    checkoutSessionId,
+    nextOpsStatus,
+  });
 
   await supabaseAdmin.from("activity_log").insert({
     order_id: orderId,
     action: "payment_received",
     details: {
-      payment_intent: paymentIntentId,
-      customer_id_backfilled: !existingOrder.customer_id && !!updatePayload.customer_id,
+      payment_intent:            paymentIntentId,
+      checkout_session:          checkoutSessionId ?? null,
+      ops_status_set:            nextOpsStatus,
+      booking_type:              existingOrder.booking_type,
+      customer_id_backfilled:    !existingOrder.customer_id && !!updatePayload.customer_id,
     },
   });
 
@@ -195,12 +268,14 @@ async function markOrderPaid(orderId: string, paymentIntentId: string | null, cu
         `,
       });
     } catch (emailErr) {
-      console.error("[Stripe Webhook] Confirmation email failed", { orderId, emailErr });
+      console.error("[Stripe Webhook] markOrderPaid — confirmation email failed", { orderId, emailErr });
     }
   }
 
   return { skipped: false };
 }
+
+// ─── Webhook POST handler ────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
@@ -214,7 +289,10 @@ export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!sig || !webhookSecret) {
-    console.error("[Stripe Webhook] Missing signature or secret", { hasSig: !!sig, hasSecret: !!webhookSecret });
+    console.error("[Stripe Webhook] Missing signature or secret", {
+      hasSig: !!sig,
+      hasSecret: !!webhookSecret,
+    });
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
@@ -222,68 +300,83 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err: any) {
-    console.error("[Stripe Webhook] Signature verification failed", err.message);
+    console.error("[Stripe Webhook] Signature verification failed — check STRIPE_WEBHOOK_SECRET matches the Stripe dashboard endpoint secret", err.message);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  console.log("[Stripe Webhook] Received event", { type: event.type, id: event.id });
+  console.log("[Stripe Webhook] Event received", { type: event.type, id: event.id });
 
-  // checkout.session.completed — primary payment confirmation
+  // ── checkout.session.completed ───────────────────────────────────────────
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as any;
     const sessionType = session.metadata?.session_type;
 
-    // ── Founding Supporter branch ────────────────────────────────────────────
     if (sessionType === "founding_supporter") {
-      console.log("[Stripe Webhook] checkout.session.completed — founding_supporter", { sessionId: session.id });
+      console.log("[Stripe Webhook] checkout.session.completed — founding_supporter branch", {
+        sessionId: session.id,
+      });
       await handleFoundingSupporter(session);
       return NextResponse.json({ received: true });
     }
 
-    // ── Standard order branch ────────────────────────────────────────────────
-    const orderId = session.metadata?.order_id;
+    const orderId      = session.metadata?.order_id;
     const customerEmail = session.customer_details?.email || session.metadata?.customer_email;
+    const paymentIntentId = typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : (session.payment_intent as any)?.id ?? null;
 
-    console.log("[Stripe Webhook] checkout.session.completed", {
+    console.log("[Stripe Webhook] checkout.session.completed — standard order branch", {
+      sessionId: session.id,
       orderId,
-      paymentIntent: session.payment_intent,
+      paymentIntentId,
       customerEmail,
       paymentStatus: session.payment_status,
     });
 
     if (!orderId) {
-      console.warn("[Stripe Webhook] checkout.session.completed — missing order_id in metadata", { sessionId: session.id });
+      console.warn("[Stripe Webhook] checkout.session.completed — no order_id in session metadata; cannot update order", {
+        sessionId: session.id,
+        metadata: session.metadata,
+      });
       return NextResponse.json({ received: true });
     }
 
-    await markOrderPaid(orderId, session.payment_intent, customerEmail);
+    await markOrderPaid(orderId, paymentIntentId, customerEmail, session.id);
   }
 
-  // payment_intent.succeeded — secondary confirmation (covers non-checkout flows)
+  // ── payment_intent.succeeded ─────────────────────────────────────────────
   if (event.type === "payment_intent.succeeded") {
     const intent = event.data.object as any;
-    const orderId = intent.metadata?.order_id;
+    const orderId       = intent.metadata?.order_id;
     const customerEmail = intent.receipt_email || intent.metadata?.customer_email;
 
     console.log("[Stripe Webhook] payment_intent.succeeded", {
+      intentId: intent.id,
       orderId,
-      paymentIntentId: intent.id,
       customerEmail,
     });
 
     if (orderId) {
-      await markOrderPaid(orderId, intent.id, customerEmail);
+      // No checkoutSessionId available from PI events — pass null
+      await markOrderPaid(orderId, intent.id, customerEmail, null);
     } else {
-      console.warn("[Stripe Webhook] payment_intent.succeeded — no order_id in metadata", { intentId: intent.id });
+      console.warn("[Stripe Webhook] payment_intent.succeeded — no order_id in intent metadata; cannot update order", {
+        intentId: intent.id,
+        metadata: intent.metadata,
+      });
     }
   }
 
-  // payment_intent.payment_failed
+  // ── payment_intent.payment_failed ────────────────────────────────────────
   if (event.type === "payment_intent.payment_failed") {
     const intent = event.data.object as any;
     const orderId = intent.metadata?.order_id;
 
-    console.log("[Stripe Webhook] payment_intent.payment_failed", { orderId, intentId: intent.id });
+    console.log("[Stripe Webhook] payment_intent.payment_failed", {
+      intentId: intent.id,
+      orderId,
+      failureMessage: intent.last_payment_error?.message,
+    });
 
     if (orderId) {
       const { data: order } = await supabaseAdmin
@@ -292,7 +385,6 @@ export async function POST(req: NextRequest) {
         .eq("id", orderId)
         .single();
 
-      // Don't overwrite a successful payment with failed
       if (order && order.payment_status !== "paid") {
         await supabaseAdmin
           .from("orders")
@@ -302,7 +394,9 @@ export async function POST(req: NextRequest) {
           })
           .eq("id", orderId);
 
-        console.log("[Stripe Webhook] Order marked failed", { orderId });
+        console.log("[Stripe Webhook] payment_intent.payment_failed — order marked failed", { orderId });
+      } else if (order?.payment_status === "paid") {
+        console.log("[Stripe Webhook] payment_intent.payment_failed — ignoring, order already paid", { orderId });
       }
     }
   }

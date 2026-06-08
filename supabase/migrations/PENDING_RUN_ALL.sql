@@ -1243,3 +1243,36 @@ DROP TRIGGER IF EXISTS trg_rrs_updated_at ON public.ridechecker_raw_submissions;
 CREATE TRIGGER trg_rrs_updated_at
   BEFORE UPDATE ON public.ridechecker_raw_submissions
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+-- ============================================================
+-- MIGRATION 046: Canonical Stripe payment ID columns on orders
+-- ============================================================
+
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS stripe_checkout_session_id TEXT,
+  ADD COLUMN IF NOT EXISTS stripe_payment_intent_id   TEXT;
+
+UPDATE public.orders
+  SET stripe_checkout_session_id = stripe_session_id
+  WHERE stripe_checkout_session_id IS NULL
+    AND stripe_session_id IS NOT NULL;
+
+UPDATE public.orders
+  SET stripe_payment_intent_id = payment_intent_id
+  WHERE stripe_payment_intent_id IS NULL
+    AND payment_intent_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_stripe_checkout_session_id
+  ON public.orders (stripe_checkout_session_id)
+  WHERE stripe_checkout_session_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_stripe_payment_intent_id
+  ON public.orders (stripe_payment_intent_id)
+  WHERE stripe_payment_intent_id IS NOT NULL;
+
+COMMENT ON COLUMN public.orders.stripe_checkout_session_id IS
+  'Stripe Checkout Session ID (cs_...) linked to this order. Written by pay/create-session and webhook.';
+
+COMMENT ON COLUMN public.orders.stripe_payment_intent_id IS
+  'Stripe PaymentIntent ID (pi_...) confirmed as succeeded. Written by webhook and sync-payment.';

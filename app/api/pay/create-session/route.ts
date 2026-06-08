@@ -84,13 +84,17 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin
       .from("orders")
       .update({
-        stripe_session_id: session.id,
+        stripe_session_id:          session.id, // legacy column
+        stripe_checkout_session_id: session.id, // canonical column (migration 046)
         payment_status: "pending",
         updated_at: now,
       })
       .eq("id", orderId);
 
-    console.log("[Pay Create Session] Session created", { orderId, sessionId: session.id });
+    console.log("[Pay Create Session] Session created and saved to order", {
+      orderId,
+      sessionId: session.id,
+    });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
