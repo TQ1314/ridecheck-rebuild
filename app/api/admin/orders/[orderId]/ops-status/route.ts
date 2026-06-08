@@ -6,9 +6,9 @@ import { z } from "zod";
 const opsStatusSchema = z.object({
   ops_status: z.enum([
     "new", "seller_outreach", "seller_confirmed", "payment_pending",
-    "payment_received", "inspector_assigned", "scheduled", "in_progress",
-    "report_drafting", "report_review", "delivered", "completed",
-    "on_hold", "cancelled",
+    "payment_received", "contact_seller", "inspector_assigned", "scheduled",
+    "in_progress", "report_drafting", "report_review", "delivered", "completed",
+    "on_hold", "needs_buyer_info", "cancelled",
   ]),
   ops_notes: z.string().optional(),
 });

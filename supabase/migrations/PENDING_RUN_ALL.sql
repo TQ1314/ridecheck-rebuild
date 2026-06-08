@@ -1322,3 +1322,18 @@ COMMENT ON COLUMN public.orders.stripe_checkout_session_id IS
 
 COMMENT ON COLUMN public.orders.stripe_payment_intent_id IS
   'Stripe PaymentIntent ID (pi_...) confirmed as succeeded. Canonical column written by webhook and sync-payment.';
+
+
+-- ============================================================
+-- MIGRATION 047: ops_notes catch-up + ops_internal_note
+-- ============================================================
+
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS ops_notes          TEXT,
+  ADD COLUMN IF NOT EXISTS ops_internal_note  TEXT;
+
+COMMENT ON COLUMN public.orders.ops_notes IS
+  'Free-form notes recorded by ops alongside status transitions.';
+
+COMMENT ON COLUMN public.orders.ops_internal_note IS
+  'Internal-only ops note recorded when vehicle/listing info is corrected. Never surfaced to buyer.';

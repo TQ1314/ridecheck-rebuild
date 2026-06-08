@@ -20,6 +20,7 @@ export type OpsStatus =
   | "seller_confirmed"
   | "payment_pending"
   | "payment_received"
+  | "contact_seller"
   | "inspector_assigned"
   | "scheduled"
   | "in_progress"
@@ -28,6 +29,7 @@ export type OpsStatus =
   | "delivered"
   | "completed"
   | "on_hold"
+  | "needs_buyer_info"
   | "cancelled";
 
 export type PaymentStatus =
@@ -105,6 +107,7 @@ export interface Order {
   report_delivered_at?: string;
   ops_priority?: number;
   ops_notes?: string;
+  ops_internal_note?: string | null;
   hold_status?: string;
   payment_link_url?: string;
   buyer_email?: string;

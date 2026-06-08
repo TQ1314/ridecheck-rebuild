@@ -41,10 +41,12 @@ import {
   FileCheck,
   Loader2,
   AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative, statusLabel, formatEventDetails } from "@/lib/utils/format";
+import { VehicleInfoEditPanel } from "@/components/orders/VehicleInfoEditPanel";
 
 const OPS_STATUSES = [
   "new",
@@ -52,6 +54,8 @@ const OPS_STATUSES = [
   "seller_confirmed",
   "payment_pending",
   "payment_received",
+  "contact_seller",
+  "needs_buyer_info",
   "inspector_assigned",
   "scheduled",
   "in_progress",
@@ -416,6 +420,21 @@ export default function AdminOrderDetailPage() {
         />
       </div>
 
+      {/* ── Needs Buyer Info warning ── */}
+      {order.ops_status === "needs_buyer_info" && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm" data-testid="alert-needs-buyer-info">
+          <HelpCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-800 dark:text-amber-300">Needs Buyer Info</p>
+            <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
+              The listing URL may be dead or vehicle details are incorrect.
+              The order remains <strong>paid</strong> — do not cancel.
+              Correct the vehicle/listing info in the panel below, then restore to Contact Seller.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Payment status mismatch warning ── */}
       {["payment_received", "assigned", "active", "inspection_complete", "report_ready", "delivered"].includes(order.ops_status || "") &&
         !["paid", "paid_manual_verified"].includes(order.payment_status || "") && (
@@ -442,6 +461,7 @@ export default function AdminOrderDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="space-y-4">
           <OrderDetailPanel order={order} activities={activities} />
+          <VehicleInfoEditPanel order={order} onRefresh={loadData} />
           <SellerContactPanel order={order} onRefresh={loadData} />
         </div>
         <div className="space-y-4">
