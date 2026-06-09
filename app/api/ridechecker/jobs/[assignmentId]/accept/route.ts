@@ -3,6 +3,13 @@ import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { writeOrderEvent } from "@/lib/rbac";
 import { emitScoreEvent } from "@/lib/ridechecker/scorecard";
+import { sendPreferred, sendDirect } from "@/lib/notifications/send-preferred";
+import {
+  sellerTrustConfirmationHtml,
+  sellerTrustConfirmationSms,
+} from "@/lib/email/templates/seller-trust-confirmation";
+
+const PAID_STATUSES = ["paid", "paid_manual_verified", "override_approved"] as const;
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +113,117 @@ export async function POST(
       orderId: assignment.order_id,
       eventType: "accepted_job",
     }).catch(() => {});
+
+    // ── Seller Trust Confirmation (non-fatal) ────────────────────────────────
+    // Guards: payment authorized + seller approved inspection + RC profile verified
+    void (async () => {
+      try {
+        const { data: orderRaw } = await supabaseAdmin
+          .from("orders")
+          .select(
+            "id, seller_phone, seller_email, seller_contact_status, payment_status, " +
+            "payment_override_approved, vehicle_year, vehicle_make, vehicle_model, scheduled_date"
+          )
+          .eq("id", assignment.order_id)
+          .maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const order = orderRaw as any;
+
+        if (!order) return;
+
+        const isPaid = PAID_STATUSES.includes(order.payment_status as any)
+          || order.payment_override_approved;
+        const sellerApproved = order.seller_contact_status === "accepted";
+        const rcVerified = profile.role === "ridechecker_active";
+
+        if (!isPaid || !sellerApproved || !rcVerified) return;
+
+        // Fetch RC public profile fields
+        const { data: rcProfileRaw } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name, photo_url, completed_inspections, average_rating")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rcProfile = rcProfileRaw as any;
+
+        const firstName = (rcProfile?.full_name || profile.full_name || "Your RideChecker")
+          .split(" ")[0];
+
+        let etaText: string | null = null;
+        if (order.scheduled_date) {
+          etaText = new Date(order.scheduled_date).toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          });
+        }
+
+        const msgParams = {
+          ridecheckerFirstName: firstName,
+          ridecheckerPhotoUrl: (rcProfile as any)?.photo_url ?? null,
+          ridecheckerRating: (rcProfile as any)?.average_rating ?? null,
+          ridecheckerCompletedInspections: (rcProfile as any)?.completed_inspections ?? null,
+          etaText,
+          vehicleYear: order.vehicle_year,
+          vehicleMake: order.vehicle_make,
+          vehicleModel: order.vehicle_model,
+        };
+
+        const payload = {
+          subject: "Your RideCheck Inspection is Confirmed",
+          html: sellerTrustConfirmationHtml(msgParams),
+          smsBody: sellerTrustConfirmationSms(msgParams),
+        };
+
+        const attemptRows: any[] = [];
+
+        if (order.seller_phone) {
+          const r = await sendDirect("sms", order.seller_phone, payload);
+          attemptRows.push({
+            order_id: assignment.order_id,
+            attempt_number: 99,
+            channel: "sms",
+            destination: order.seller_phone,
+            message_template_key: "seller_trust_confirmation",
+            message_body: payload.smsBody,
+            status: r.success ? "sent" : "failed",
+            created_by: session.user.id,
+          });
+        }
+
+        if (order.seller_email) {
+          const r = await sendDirect("email", order.seller_email, payload);
+          attemptRows.push({
+            order_id: assignment.order_id,
+            attempt_number: 99,
+            channel: "email",
+            destination: order.seller_email,
+            message_template_key: "seller_trust_confirmation",
+            message_body: `Subject: ${payload.subject}`,
+            status: r.success ? "sent" : "failed",
+            created_by: session.user.id,
+          });
+        }
+
+        if (attemptRows.length > 0) {
+          await supabaseAdmin.from("seller_contact_attempts").insert(attemptRows);
+        }
+
+        await writeOrderEvent({
+          orderId: assignment.order_id,
+          eventType: "seller_trust_message_sent",
+          actorId: session.user.id,
+          actorEmail: profile.email ?? session.user.email ?? "",
+          details: {
+            ridechecker_first_name: firstName,
+            channels: attemptRows.map((r) => r.channel),
+          },
+        }).catch(() => {});
+      } catch (err) {
+        console.error("[seller-trust-confirmation error]", err);
+      }
+    })();
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

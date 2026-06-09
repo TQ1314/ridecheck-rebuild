@@ -12,6 +12,7 @@ import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
 import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
 import { ConnecteamPanel } from "@/components/orders/ConnecteamPanel";
+import { SellerRefusalAnalyticsCard } from "@/components/orders/SellerRefusalAnalyticsCard";
 import { JobStatusPanel } from "@/components/orders/JobStatusPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
 import { AssignOpsDialog } from "@/components/orders/AssignOpsDialog";
@@ -583,6 +584,7 @@ export default function OpsOrderDetailPage() {
           <PayPanel order={order} onRefresh={loadData} userRole={role} />
           <ReportPanel order={order} onRefresh={loadData} />
           <RiskFlagsPanel order={order} onRefresh={loadData} />
+          <SellerRefusalAnalyticsCard order={order} />
           <TitleTransferCard orderId={orderId} sellerType={(order as unknown as Record<string, unknown>).seller_type as string | undefined} />
           <ConnecteamPanel order={order} onRefresh={loadData} />
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, ActivityLogEntry } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
+import { BuyerRetentionBanner } from "@/components/orders/BuyerRetentionBanner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -77,6 +78,7 @@ export default function OrderDetailPage() {
           Back to Orders
         </Button>
       </Link>
+      <BuyerRetentionBanner order={order} />
       <OrderDetailPanel order={order} activities={activities} />
     </div>
   );
