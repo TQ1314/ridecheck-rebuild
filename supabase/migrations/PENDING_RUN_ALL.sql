@@ -693,7 +693,7 @@ ALTER TABLE public.ridechecker_job_assignments
       'paid',
       'cancelled'
     )
-  );
+  ) NOT VALID;
 
 -- 4. Index for expiry sweeps
 CREATE INDEX IF NOT EXISTS idx_assignments_expires_at
@@ -811,7 +811,7 @@ ALTER TABLE public.ridechecker_job_assignments
       'report_pending', 'in_progress', 'submitted', 'approved', 'rejected',
       'paid', 'cancelled', 'escalated', 'reassigned'
     )
-  );
+  ) NOT VALID;
 
 -- 2. Add new timestamp and operational columns
 ALTER TABLE public.ridechecker_job_assignments
@@ -971,7 +971,7 @@ ALTER TABLE public.ridechecker_job_assignments
       'paid','cancelled','escalated','reassigned',
       'fraud_hold','unsafe_hold'
     )
-  );
+  ) NOT VALID;
 
 ALTER TABLE public.ridechecker_job_assignments
   ADD COLUMN IF NOT EXISTS flag_type  TEXT,
