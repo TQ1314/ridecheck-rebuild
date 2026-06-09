@@ -29,10 +29,10 @@ import {
   PACKAGE_INFO,
   PRICING,
   formatCurrency,
-  detectListingPlatform,
   type PackageType,
   type BookingType,
 } from "@/lib/utils/pricing";
+import { detectSellerPlatform } from "@/lib/seller-contact/platforms";
 import { type ClassificationResult, TIER_PRICES } from "@/lib/vehicleClassification";
 import { isBuyerArrangedEnabled } from "@/lib/utils/featureFlags";
 import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
@@ -184,7 +184,7 @@ function BookInner() {
       const idempotencyKey = crypto.randomUUID();
 
       const listingPlatform = listingUrl
-        ? detectListingPlatform(listingUrl)
+        ? detectSellerPlatform(listingUrl)
         : null;
 
       const body: Record<string, any> = {

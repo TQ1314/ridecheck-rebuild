@@ -7,6 +7,22 @@ export const dynamic = "force-dynamic";
 
 const AVAIL_SUSPEND_THRESHOLD = 3; // declines in 30 days → availability_status=suspended for 72h
 const HARD_SUSPEND_THRESHOLD = 5;  // declines in 30 days → role downgrade (hard floor, unchanged)
+const SOFT_WARNING_THRESHOLD = 3;  // unjustified declines in 30 days → soft suspension warning score event
+
+const VALID_REJECTION_REASONS = [
+  "too_far",
+  "schedule_conflict",
+  "vehicle_type",
+  "pay_too_low",
+  "emergency",
+  "other",
+] as const;
+type RejectionReason = (typeof VALID_REJECTION_REASONS)[number];
+
+// These reasons are considered unjustified/problematic and count toward the soft warning threshold.
+// too_far is exempted when the RC has a service_radius_miles set (assumed outside their radius).
+// schedule_conflict and emergency are always valid.
+const UNJUSTIFIED_REASONS: RejectionReason[] = ["pay_too_low", "vehicle_type", "other"];
 
 export async function POST(
   req: NextRequest,
@@ -47,7 +63,10 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const reason = body.reason || "declined_by_ridechecker";
+    const rawReason: string = body.reason || "other";
+    const reason: RejectionReason = (VALID_REJECTION_REASONS as readonly string[]).includes(rawReason)
+      ? (rawReason as RejectionReason)
+      : "other";
     const note = body.note || null;
     const now = new Date().toISOString();
 
@@ -85,6 +104,16 @@ export async function POST(
         note: note ?? null,
       },
     }).catch(() => {});
+
+    // ── Log to ridechecker_score_events (non-fatal) ────────────────────────
+    void supabaseAdmin
+      .from("ridechecker_score_events")
+      .insert({
+        ridechecker_id: session.user.id,
+        order_id: assignment.order_id,
+        event_type: "assignment_declined",
+        notes: `Reason: ${reason}${note ? ` — ${note}` : ""}`,
+      });
 
     // ── Decline threshold enforcement ─────────────────────────────────────
     // Only enforce for active RideCheckers (not owners/devs)
@@ -195,6 +224,40 @@ export async function POST(
             }).catch(() => {});
           }
         }
+
+        // ── Unjustified rejection soft-warning (separate from avail suspend) ──
+        // Count only problematic reasons in the last 30 days.
+        // too_far is treated as valid when the RC has a service_radius_miles set.
+        const isRcHasRadius = (profile as any).service_radius_miles > 0;
+        const isUnjustified =
+          UNJUSTIFIED_REASONS.includes(reason) ||
+          (reason === "too_far" && !isRcHasRadius);
+
+        if (isUnjustified) {
+          const { data: recentUnjustified } = await supabaseAdmin
+            .from("ridechecker_score_events")
+            .select("id", { count: "exact", head: false })
+            .eq("ridechecker_id", session.user.id)
+            .eq("event_type", "assignment_declined")
+            .gte("created_at", thirtyDaysAgo);
+
+          // Count declines with unjustified reasons in the last 30 days
+          // (approximate via score_events tagged as assignment_declined)
+          const unjustifiedDeclineEvents = (recentUnjustified ?? []).length;
+
+          if (unjustifiedDeclineEvents >= SOFT_WARNING_THRESHOLD - 1) {
+            // This decline reaches the threshold — log soft suspension warning (non-fatal)
+            void supabaseAdmin
+              .from("ridechecker_score_events")
+              .insert({
+                ridechecker_id: session.user.id,
+                order_id: assignment.order_id,
+                event_type: "soft_suspension_warning",
+                notes: `${SOFT_WARNING_THRESHOLD} unjustified rejections in 30 days. Reason for this decline: ${reason}.`,
+              });
+          }
+        }
+
       } catch (enforcementErr) {
         // Non-fatal — don't fail the decline response
         console.error("[decline enforcement error]", enforcementErr);

@@ -55,9 +55,16 @@ export async function POST(req: NextRequest) {
 
     const trackParam = order.tracking_token ? `&track=${encodeURIComponent(`/track/${orderId}?t=${order.tracking_token}`)}` : "";
 
+    // TODO: FUTURE_SERVICE_FEE_CENTS = 300 — platform fee placeholder (not charged yet)
+    // When enabled, add as a separate line_item with price_data.unit_amount = 300
+    // and update priceCents to exclude it from the inspection line so tax is clean.
+
+    const enableStripeTax = process.env.ENABLE_STRIPE_TAX === "true";
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
+      ...(enableStripeTax ? { automatic_tax: { enabled: true } } : {}),
       line_items: [
         {
           price_data: {
@@ -67,6 +74,9 @@ export async function POST(req: NextRequest) {
               description: vehicleLabel,
             },
             unit_amount: priceCents,
+            // tax_behavior must be set to "exclusive" or "inclusive" when automatic_tax is enabled.
+            // Defaults to "unspecified" (Stripe uses product/account settings) if ENABLE_STRIPE_TAX is off.
+            ...(enableStripeTax ? { tax_behavior: "exclusive" as const } : {}),
           },
           quantity: 1,
         },

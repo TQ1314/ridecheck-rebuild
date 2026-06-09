@@ -70,6 +70,11 @@ export function formatCurrency(amount: number | string): string {
   }).format(n);
 }
 
+/**
+ * @deprecated Use `detectSellerPlatform` from `@/lib/seller-contact/platforms`
+ * instead — it also detects CarGurus, Autotrader, Cars.com, Carfax, and TrueCar.
+ * This function is kept only for backward-compatibility with the booking form.
+ */
 export function detectListingPlatform(
   url: string,
 ): "facebook" | "craigslist" | "other" | null {

@@ -1352,3 +1352,38 @@ COMMENT ON COLUMN public.ridechecker_payouts.payment_method IS
 
 COMMENT ON COLUMN public.ridechecker_payouts.payment_reference IS
   'Transaction ID, check number, or other reference for the payment method';
+
+
+-- ============================================================
+-- MIGRATION 049: buyer notification preferences + RC service radius
+--                + seller reply tracking
+-- ============================================================
+
+-- 49a: Buyer notification preferences on profiles
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS notification_preferences JSONB;
+
+COMMENT ON COLUMN public.profiles.notification_preferences IS
+  'Buyer contact preferences: { primary_method, secondary_method, fastest_response_method, sms_opt_in, email_opt_in, phone_opt_in }';
+
+-- 49b: RideChecker service radius on profiles
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS service_radius_miles INTEGER;
+
+COMMENT ON COLUMN public.profiles.service_radius_miles IS
+  'Maximum miles a RideChecker is willing to travel for a job. NULL = no limit set.';
+
+-- 49c: Seller reply tracking on seller_contact_attempts
+ALTER TABLE public.seller_contact_attempts
+  ADD COLUMN IF NOT EXISTS response_received BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS response_at       TIMESTAMPTZ NULL,
+  ADD COLUMN IF NOT EXISTS response_notes    TEXT NULL;
+
+COMMENT ON COLUMN public.seller_contact_attempts.response_received IS
+  'True when the seller replied to this specific attempt.';
+
+COMMENT ON COLUMN public.seller_contact_attempts.response_at IS
+  'Timestamp when the seller response was received/recorded.';
+
+COMMENT ON COLUMN public.seller_contact_attempts.response_notes IS
+  'Ops notes summarising the seller response content.';

@@ -1,0 +1,139 @@
+RIDECHECK OPS EXTENSION — USE EXISTING SYSTEMS ONLY
+
+Based on the audit, do NOT create duplicate pay, assignment, seller contact, profile, or communication systems.
+
+Extend existing systems only.
+
+Core rule:
+Preserve payment-first workflow.
+No payment or payment override = no seller outreach, no RideChecker assignment, no inspection, no report delivery.
+
+Implement the following targeted changes:
+
+1. Fix shared schema seller_type
+- Add seller_type to shared/schema.ts if missing.
+- Use existing values:
+  private_party
+  dealership
+  auction
+  other
+- Do not create a new seller type system.
+
+2. Unify listing source detection
+- Use existing lib/seller-contact/platforms.ts detectSellerPlatform as the source of truth.
+- Deprecate or stop using weaker detectListingPlatform in lib/utils/pricing.ts.
+- Ensure Facebook Marketplace, Craigslist, CarGurus, Autotrader, Cars.com, Carfax, TrueCar, dealer, and other are detected consistently.
+- Do not create a new detection library.
+
+3. Buyer communication preferences
+- Extend profiles with notification_preferences JSONB.
+- Store:
+  primary_method
+  secondary_method
+  fastest_response_method
+  sms_opt_in
+  email_opt_in
+  phone_opt_in
+- Add buyer profile UI for editing these preferences.
+- Show preferences in existing BuyerCard for Ops.
+- Ops can view buyer contact and preferences.
+- RideChecker should not see buyer private contact info.
+
+4. RideChecker service radius
+- Extend profiles with service_radius_miles INTEGER.
+- Keep existing service_area text field.
+- Add UI to RideChecker availability/profile section to update service radius.
+- Use service_radius_miles during assignment/broadcast filtering.
+- Do not offer jobs outside radius unless Ops Lead/Admin override.
+
+5. Seller reply tracking
+- Extend existing seller_contact_attempts table.
+- Add:
+  response_received BOOLEAN DEFAULT false
+  response_at TIMESTAMPTZ NULL
+  response_notes TEXT NULL
+- Update SellerContactPanel to record seller response.
+- Do not create a new seller contact table.
+
+6. Stripe Tax feature flag
+- Add feature flag:
+  ENABLE_STRIPE_TAX
+- If enabled, add automatic_tax: { enabled: true } to Stripe checkout session creation.
+- Do not hardcode tax rates.
+- Add checkout display support for tax line if Stripe returns it.
+- Keep future service fee disabled for now.
+- Add TODO/config placeholder for FUTURE_SERVICE_FEE_CENTS = 300 but do not charge it yet.
+
+7. RideChecker surge pay using existing payout system
+- Use existing ridechecker_payouts, job_broadcasts.offered_pay, PayPanel, and bonus_breakdown.
+- Do not create new pay tables.
+- Restore/verify PayPanel visibility on Ops order detail.
+- Base offer should continue using calcPayout:
+  Standard $50
+  Plus $65
+  Premium $80
+  Exotic $130
+- Allow Ops to add manual boost when RideChecker rejects.
+- Store boosts in bonus_breakdown JSONB.
+- Log all pay offer changes in activity_log or order_events.
+- Assignment should require:
+  payment authorized
+  RideChecker pay offer set
+  RideChecker available/in radius or override approved
+
+8. RideChecker rejection reasons and soft suspension warning
+- Extend existing decline route:
+  POST /api/ridechecker/jobs/[assignmentId]/decline
+- Require rejection reason:
+  too_far
+  schedule_conflict
+  vehicle_type
+  pay_too_low
+  emergency
+  other
+- Store reason on ridechecker_job_assignments or related existing log.
+- Use ridechecker_score_events to record rejection event.
+- If 3 problematic/unjustified rejections in rolling period, create soft suspension warning event.
+- Do not punish valid too_far if job was outside service_radius_miles.
+
+9. Facebook Marketplace workflow using existing seller contact system
+- Use existing seller_contact_attempts and platform-aware templates.
+- When detected platform = facebook, require buyer bridge workflow.
+- Status:
+  facebook_seller_approval_pending
+  facebook_seller_approved
+  facebook_seller_declined
+  facebook_contact_info_needed
+- Do not scrape Facebook.
+- Do not automate Messenger.
+- Do not request buyer Facebook login.
+- Show buyer copy/paste script:
+  "Hi, I’m interested in your vehicle. Before moving forward, I would like an independent RideCheck inspection. RideCheck may need to coordinate directly with you regarding access to the vehicle. Is that okay?"
+- Ops cannot contact seller directly on Facebook unless buyer provides phone/email/contact info or seller approval is marked.
+- Non-Facebook sources continue normal workflow.
+
+10. Storage security review
+- Do not change bucket privacy yet.
+- Add admin-only warning in code comments or internal docs that payment-evidence and ridechecker-photos are public buckets.
+- Do not break existing image/report display.
+- Create a TODO list for private bucket migration with signed URLs.
+
+Testing:
+A. Existing PayPanel still works.
+B. Existing RideCheckerAssignmentPanel still works.
+C. Paid order with pay offer can assign RideChecker.
+D. Unpaid order cannot contact seller or assign RideChecker.
+E. Buyer preferences save and show in BuyerCard.
+F. Seller reply tracking saves.
+G. Facebook listing triggers buyer bridge workflow.
+H. Craigslist/dealer listings continue normal workflow.
+I. Stripe checkout works with ENABLE_STRIPE_TAX off.
+J. Build passes with zero TypeScript errors.
+
+Return:
+1. Files modified
+2. Migrations added
+3. Existing systems reused
+4. Duplicate systems avoided
+5. Build result
+6. Test result

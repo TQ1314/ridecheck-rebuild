@@ -83,6 +83,11 @@ function getStatusLabel(status: string): string {
     unsafe_location_flagged: "Unsafe Location",
     confirmed: "Confirmed",
     invalid: "Invalid",
+    // Facebook Marketplace buyer-bridge statuses
+    facebook_seller_approval_pending: "FB: Awaiting Seller Approval",
+    facebook_seller_approved: "FB: Seller Approved",
+    facebook_seller_declined: "FB: Seller Declined",
+    facebook_contact_info_needed: "FB: Contact Info Needed",
   };
   return labels[status] || status;
 }
@@ -131,6 +136,11 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+
+  const [responseDialogAttemptId, setResponseDialogAttemptId] = useState<string | null>(null);
+  const [responseNotes, setResponseNotes] = useState("");
+  const [markingResponse, setMarkingResponse] = useState(false);
+  const [settingFbStatus, setSettingFbStatus] = useState(false);
 
   const [reopenOpen, setReopenOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
@@ -299,6 +309,60 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     }
   };
 
+  const handleMarkResponse = async (responseReceived: boolean) => {
+    if (!responseDialogAttemptId) return;
+    setMarkingResponse(true);
+    try {
+      const res = await fetch(
+        `/api/admin/orders/${order.id}/seller-contact/attempt/${responseDialogAttemptId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            response_received: responseReceived,
+            response_notes: responseNotes || undefined,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: responseReceived ? "Seller response recorded" : "Marked no response" });
+      setResponseDialogAttemptId(null);
+      setResponseNotes("");
+      loadAttempts();
+      onRefresh();
+    } catch {
+      toast({ title: "Failed to record response", variant: "destructive" });
+    } finally {
+      setMarkingResponse(false);
+    }
+  };
+
+  const handleSetFbStatus = async (fbStatus: string) => {
+    setSettingFbStatus(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${order.id}/seller-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seller_status: fbStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Error", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: `Status: ${getStatusLabel(fbStatus)}` });
+      onRefresh();
+    } catch {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    } finally {
+      setSettingFbStatus(false);
+    }
+  };
+
   const handleBuyerUpdate = async () => {
     setBuyerSubmitting(true);
     try {
@@ -460,6 +524,68 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           </a>
         )}
 
+        {/* ── Facebook Marketplace buyer bridge ────────────────────────── */}
+        {platform === 'facebook' && isConcierge && (
+          <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Facebook Marketplace — Buyer Bridge Required</p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                  Facebook TOS prohibits direct automated outreach. The buyer must message the seller first to obtain consent.
+                  Direct Facebook contact is only permitted after seller approval is marked or buyer provides off-platform contact info.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-blue-800 dark:text-blue-300">Buyer Script — Send this to the buyer to copy/paste</Label>
+              <div className="p-2.5 rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-blue-950/50 text-xs text-foreground leading-relaxed" data-testid="text-fb-buyer-script">
+                "Hi, I'm interested in your vehicle. Before moving forward, I would like an independent RideCheck inspection. RideCheck may need to coordinate directly with you regarding access to the vehicle. Is that okay?"
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
+                onClick={() => handleCopyMessage(`"Hi, I'm interested in your vehicle. Before moving forward, I would like an independent RideCheck inspection. RideCheck may need to coordinate directly with you regarding access to the vehicle. Is that okay?"`)}
+                data-testid="button-copy-fb-buyer-script"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copy Buyer Script
+              </Button>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+              <Label className="text-xs text-blue-800 dark:text-blue-300">Seller Approval Status</Label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "facebook_seller_approval_pending", label: "Pending" },
+                  { value: "facebook_seller_approved", label: "Seller Approved" },
+                  { value: "facebook_seller_declined", label: "Seller Declined" },
+                  { value: "facebook_contact_info_needed", label: "Need Contact Info" },
+                ] as const).map(({ value, label }) => (
+                  <Button
+                    key={value}
+                    size="sm"
+                    variant={(order.seller_status as string) === value ? "default" : "outline"}
+                    onClick={() => handleSetFbStatus(value)}
+                    disabled={settingFbStatus}
+                    className="text-xs h-7"
+                    data-testid={`button-fb-status-${value}`}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              {order.seller_status?.startsWith("facebook_") && (
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  Current: <strong>{getStatusLabel(order.seller_status)}</strong>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {isConcierge && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
@@ -597,10 +723,32 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                         >
                           {getAttemptStatusLabel(attempt.status)}
                         </Badge>
+                        {attempt.response_received ? (
+                          <Badge className="no-default-hover-elevate no-default-active-elevate text-[10px] bg-green-100 text-green-800 border-green-200">
+                            <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                            Replied
+                          </Badge>
+                        ) : (
+                          <button
+                            className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                            onClick={() => {
+                              setResponseDialogAttemptId(attempt.id);
+                              setResponseNotes("");
+                            }}
+                            data-testid={`button-mark-response-${attempt.id}`}
+                          >
+                            Mark response
+                          </button>
+                        )}
                       </div>
                       {attempt.message_body && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                           {attempt.message_body}
+                        </p>
+                      )}
+                      {attempt.response_received && attempt.response_notes && (
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                          Reply: {attempt.response_notes}
                         </p>
                       )}
                     </div>
@@ -785,6 +933,54 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           </div>
         )}
       </CardContent>
+
+      {/* Seller response dialog */}
+      <Dialog open={!!responseDialogAttemptId} onOpenChange={(o) => { if (!o) setResponseDialogAttemptId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Seller Response</DialogTitle>
+            <DialogDescription>
+              Record whether the seller responded to this contact attempt.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="mb-2 block text-sm">Response notes (optional)</Label>
+              <Textarea
+                value={responseNotes}
+                onChange={(e) => setResponseNotes(e.target.value)}
+                placeholder="e.g. Seller agreed to inspection, will call back tomorrow..."
+                rows={3}
+                data-testid="input-response-notes"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setResponseDialogAttemptId(null)}
+                disabled={markingResponse}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleMarkResponse(false)}
+                disabled={markingResponse}
+                data-testid="button-mark-no-response"
+              >
+                {markingResponse ? "Saving…" : "No Response"}
+              </Button>
+              <Button
+                onClick={() => handleMarkResponse(true)}
+                disabled={markingResponse}
+                data-testid="button-confirm-response"
+              >
+                {markingResponse ? "Saving…" : "Seller Replied"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Decline confirmation dialog */}
       <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>

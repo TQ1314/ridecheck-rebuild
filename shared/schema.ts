@@ -79,6 +79,7 @@ export const orders = pgTable("orders", {
   sellerName: text("seller_name"),
   sellerPhone: text("seller_phone"),
   vehicleLocation: text("vehicle_location").notNull(),
+  sellerType: text("seller_type").default("private_party"),
   bookingType: text("booking_type").notNull(),
   package: text("package").notNull(),
   basePrice: numeric("base_price").notNull(),

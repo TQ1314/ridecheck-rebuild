@@ -232,6 +232,19 @@ export interface SellerContactAttempt {
   error: string | null;
   created_by: string | null;
   created_at: string;
+  // Migration 049c
+  response_received: boolean;
+  response_at: string | null;
+  response_notes: string | null;
+}
+
+export interface NotificationPreferences {
+  primary_method?: 'email' | 'sms' | 'phone';
+  secondary_method?: 'email' | 'sms' | 'phone';
+  fastest_response_method?: 'email' | 'sms' | 'phone';
+  sms_opt_in?: boolean;
+  email_opt_in?: boolean;
+  phone_opt_in?: boolean;
 }
 
 export interface Profile {
@@ -242,6 +255,10 @@ export interface Profile {
   role: string;
   is_active: boolean;
   created_at: string;
+  // Migration 049a
+  notification_preferences: NotificationPreferences | null;
+  // Migration 049b
+  service_radius_miles: number | null;
 }
 
 export interface ActivityLogEntry {

@@ -28,6 +28,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { packageLabel } from "@/lib/utils/format";
+import type { NotificationPreferences } from "@/types/orders";
 
 interface BuyerMessage {
   id: string;
@@ -92,8 +93,22 @@ export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
   const [templateKey, setTemplateKey] = useState("");
   const [msgHistory, setMsgHistory] = useState<BuyerMessage[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [buyerPrefs, setBuyerPrefs] = useState<NotificationPreferences | null>(null);
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    if (!order.customer_id) return;
+    supabase
+      .from("profiles")
+      .select("notification_preferences")
+      .eq("id", order.customer_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.notification_preferences) setBuyerPrefs(data.notification_preferences);
+      });
+  }, [order.customer_id]);
 
   const loadMsgHistory = useCallback(async () => {
     const { data } = await supabase
@@ -219,6 +234,53 @@ export function BuyerCard({ order, onRefresh }: BuyerCardProps) {
             {paymentBadge(order.payment_status)}
           </div>
         </div>
+
+        {/* Notification preferences (ops-visible, read-only) */}
+        {buyerPrefs && (
+          <div className="pt-1 border-t">
+            <button
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground w-full transition-colors"
+              onClick={() => setPrefsOpen((o) => !o)}
+              data-testid="button-toggle-buyer-prefs"
+            >
+              {prefsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              Contact preferences on file
+            </button>
+            {prefsOpen && (
+              <div className="mt-1.5 rounded-md border bg-muted/30 px-2.5 py-2 text-xs space-y-1" data-testid="section-buyer-prefs">
+                {buyerPrefs.primary_method && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Preferred</span>
+                    <span className="font-medium capitalize">{buyerPrefs.primary_method}</span>
+                  </div>
+                )}
+                {buyerPrefs.fastest_response_method && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fastest</span>
+                    <span className="font-medium capitalize">{buyerPrefs.fastest_response_method}</span>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-0.5">
+                  {buyerPrefs.email_opt_in !== false && (
+                    <span className="text-green-700 dark:text-green-400">✓ Email</span>
+                  )}
+                  {buyerPrefs.sms_opt_in !== false && (
+                    <span className="text-green-700 dark:text-green-400">✓ SMS</span>
+                  )}
+                  {buyerPrefs.phone_opt_in && (
+                    <span className="text-green-700 dark:text-green-400">✓ Phone</span>
+                  )}
+                  {buyerPrefs.email_opt_in === false && (
+                    <span className="text-red-600 dark:text-red-400">✗ No email</span>
+                  )}
+                  {buyerPrefs.sms_opt_in === false && (
+                    <span className="text-red-600 dark:text-red-400">✗ No SMS</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {order.report_delivered_at && (
           <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded px-2 py-1.5">

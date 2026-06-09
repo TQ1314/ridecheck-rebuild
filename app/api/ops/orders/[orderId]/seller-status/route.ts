@@ -19,6 +19,11 @@ const SELLER_STATUSES = [
   "confirmed",
   "no_response",
   "invalid",
+  // Facebook Marketplace buyer-bridge workflow statuses
+  "facebook_seller_approval_pending",
+  "facebook_seller_approved",
+  "facebook_seller_declined",
+  "facebook_contact_info_needed",
 ] as const;
 
 const schema = z.object({

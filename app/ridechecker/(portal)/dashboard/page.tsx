@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   Plus,
   Zap,
   ChevronRight,
+  Loader2,
   TrendingUp,
   RefreshCw,
   Layers,
@@ -223,6 +224,8 @@ export default function RideCheckerDashboardPage() {
   const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
   const [dashGuideProgress, setDashGuideProgress] = useState<number>(0);
   const [dashGuideCertified, setDashGuideCertified] = useState<boolean>(false);
+  const [serviceRadius, setServiceRadius] = useState<string>("");
+  const [savingRadius, setSavingRadius] = useState(false);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -281,6 +284,7 @@ export default function RideCheckerDashboardPage() {
       const suspended = prof.availability_status === "suspended" && until !== null && new Date(until) > new Date();
       setIsSuspended(suspended);
       setSuspendedUntil(until);
+      if ((prof as any).service_radius_miles) setServiceRadius(String((prof as any).service_radius_miles));
     }
 
     setLoading(false);
@@ -393,6 +397,27 @@ export default function RideCheckerDashboardPage() {
       toast({ title: d.error || "Failed to save", variant: "destructive" });
     }
     setAvailSubmitting(false);
+  };
+
+  const handleSaveRadius = async () => {
+    const miles = parseInt(serviceRadius, 10);
+    if (isNaN(miles) || miles < 1 || miles > 500) {
+      toast({ title: "Enter a valid radius between 1 and 500 miles", variant: "destructive" });
+      return;
+    }
+    setSavingRadius(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ service_radius_miles: miles } as any)
+        .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "");
+      if (error) throw error;
+      toast({ title: `Service radius updated to ${miles} miles` });
+    } catch {
+      toast({ title: "Failed to save radius", variant: "destructive" });
+    } finally {
+      setSavingRadius(false);
+    }
   };
 
   // Load guide progress when training tab becomes active
@@ -932,6 +957,50 @@ export default function RideCheckerDashboardPage() {
             {/* Availability */}
             {activeTab === "availability" && (
               <div className="space-y-4" data-testid="tab-content-availability">
+
+                {/* Service Radius */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      Service Radius
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Set how far you're willing to travel for inspections. Ops will use this when assigning jobs.
+                      Declining jobs because they're "too far" won't count against you when a radius is on file.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-end gap-3 max-w-xs">
+                      <div className="flex-1">
+                        <label className="text-xs text-muted-foreground mb-1 block">Miles from your location</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={500}
+                          value={serviceRadius}
+                          onChange={(e) => setServiceRadius(e.target.value)}
+                          placeholder="e.g. 25"
+                          data-testid="input-service-radius"
+                        />
+                      </div>
+                      <Button
+                        onClick={handleSaveRadius}
+                        disabled={savingRadius || !serviceRadius}
+                        size="sm"
+                        data-testid="button-save-radius"
+                      >
+                        {savingRadius ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                    {serviceRadius && !isNaN(parseInt(serviceRadius)) && (
+                      <p className="text-xs text-muted-foreground mt-2" data-testid="text-radius-display">
+                        Currently set to <strong>{serviceRadius} miles</strong>. Jobs outside this range that you decline are not penalized.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
