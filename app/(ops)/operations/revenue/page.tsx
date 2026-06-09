@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
+  Download,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/pricing";
 import { formatRelative } from "@/lib/utils/format";
@@ -179,6 +180,9 @@ export default function RevenuePage() {
   const [reconcileError, setReconcileError] = useState<string | null>(null);
   const [showUnverifiable, setShowUnverifiable] = useState(false);
 
+  const [exporting, setExporting]     = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
   // ── Role check ───────────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient();
@@ -221,6 +225,38 @@ export default function RevenuePage() {
   useEffect(() => {
     if (userRole && ALLOWED_ROLES.has(userRole)) loadData();
   }, [userRole, loadData]);
+
+  // ── Export CSV ────────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    const { from, to } = getDateRange(preset, customFrom, customTo);
+    setExporting(true);
+    setExportError(null);
+    try {
+      const params = new URLSearchParams({ from, to });
+      if (filterPackage       !== "all") params.set("package",        filterPackage);
+      if (filterPaymentStatus !== "all") params.set("payment_status", filterPaymentStatus);
+      if (filterOpsStatus     !== "all") params.set("ops_status",     filterOpsStatus);
+
+      const res = await fetch(`/api/ops/revenue/export?${params.toString()}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Export failed");
+      }
+      const blob     = await res.blob();
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement("a");
+      a.href         = url;
+      a.download     = `ridecheck-revenue-${from}-to-${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportError(e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ── Reconcile ─────────────────────────────────────────────────────────────
   const handleReconcile = async () => {
@@ -296,18 +332,38 @@ export default function RevenuePage() {
             Job volume, gross revenue, and Stripe reconciliation
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={loadData}
-          disabled={loading}
-          data-testid="button-refresh"
-          className="gap-1.5"
-        >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExport}
+            disabled={exporting || loading}
+            data-testid="button-export-csv"
+            className="gap-1.5"
+          >
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {exporting ? "Exporting…" : "Export CSV"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadData}
+            disabled={loading}
+            data-testid="button-refresh"
+            className="gap-1.5"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {exportError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          Export failed: {exportError}
+        </div>
+      )}
 
       {/* ── Filters ── */}
       <Card className="p-3">
@@ -480,7 +536,7 @@ export default function RevenuePage() {
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Gross before Stripe fees
+                  Gross revenue shown before Stripe fees.
                   {data.paid_jobs.manual_verified > 0 && (
                     <span className="ml-1 text-amber-600">· {data.paid_jobs.manual_verified} manually verified</span>
                   )}
