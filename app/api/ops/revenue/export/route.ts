@@ -3,7 +3,7 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 import Stripe from "stripe";
 
 const ALLOWED_ROLES = new Set(["admin", "owner", "operations_lead", "ops_lead"]);
-const STRIPE_LOOKUP_CAP = 100; // max per export call to avoid timeout
+const STRIPE_LOOKUP_CAP = 100;
 const AMOUNT_TOLERANCE  = 1.00; // dollars
 
 // ── CSV helpers ────────────────────────────────────────────────────────────────
@@ -89,14 +89,61 @@ export async function GET(req: NextRequest) {
 
     const rows = (orders ?? []) as any[];
 
+    // ── Fetch ridechecker payouts for all orders in export ───────────────────
+    // total_pay, base_pay, bonus are in INTEGER cents → divide by 100
+    const allOrderIds = rows.map((o: any) => o.id);
+    const payoutByOrderId = new Map<string, any>();
+
+    if (allOrderIds.length > 0) {
+      const { data: payouts } = await supabase
+        .from("ridechecker_payouts")
+        .select(
+          "order_id, ridechecker_id, total_pay, status, paid_at, " +
+          "payment_method, payment_reference"
+        )
+        .in("order_id", allOrderIds);
+
+      // Fetch ridechecker names for payouts that have a ridechecker_id
+      const rcIds = [...new Set(
+        ((payouts ?? []) as any[])
+          .map((p: any) => p.ridechecker_id)
+          .filter(Boolean)
+      )];
+
+      const rcNameById = new Map<string, string>();
+      if (rcIds.length > 0) {
+        const { data: rcProfiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, first_name, last_name, email")
+          .in("id", rcIds);
+
+        for (const p of (rcProfiles ?? []) as any[]) {
+          const name =
+            p.full_name ||
+            [p.first_name, p.last_name].filter(Boolean).join(" ") ||
+            p.email ||
+            "Unknown";
+          rcNameById.set(p.id, name);
+        }
+      }
+
+      for (const p of (payouts ?? []) as any[]) {
+        payoutByOrderId.set(p.order_id, {
+          ...p,
+          ridechecker_name: rcNameById.get(p.ridechecker_id) ?? "",
+          total_pay_dollars: Number(p.total_pay ?? 0) / 100,
+        });
+      }
+    }
+
     // ── Stripe lookups for paid orders ────────────────────────────────────────
     type StripeResult = {
-      gross:             number | null;
-      fees:              number | null;
-      net:               number | null;
-      status:            string | null;
-      recon_status:      string;
-      mismatch_reason:   string;
+      gross:           number | null;
+      fees:            number | null;
+      net:             number | null;
+      status:          string | null;
+      recon_status:    string;
+      mismatch_reason: string;
     };
 
     const stripeResultMap = new Map<string, StripeResult>();
@@ -114,7 +161,6 @@ export async function GET(req: NextRequest) {
     const toCheck = paidRows.slice(0, STRIPE_LOOKUP_CAP);
     const skipped = paidRows.slice(STRIPE_LOOKUP_CAP);
 
-    // Mark skipped rows
     for (const o of skipped) {
       stripeResultMap.set(o.id, {
         gross: null, fees: null, net: null, status: null,
@@ -123,7 +169,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Parallel Stripe lookups
     await Promise.allSettled(
       toCheck.map(async (o) => {
         const price    = Number(o.final_price ?? o.base_price ?? 0);
@@ -216,35 +261,72 @@ export async function GET(req: NextRequest) {
       "stripe_fees",
       "stripe_net",
       "mismatch_reason",
+      // RideChecker compensation
+      "ridechecker_name",
+      "ridechecker_pay",
+      "ridechecker_payment_status",
+      "ridechecker_paid_at",
+      "ridechecker_payment_method",
+      "ridechecker_payment_reference",
+      "ridecheck_margin",
     ];
 
     const lines: string[] = [HEADERS.join(",")];
 
     for (const o of rows) {
       const sr       = stripeResultMap.get(o.id);
+      const payout   = payoutByOrderId.get(o.id);
       const price    = Number(o.final_price ?? o.base_price ?? 0);
       const hasPi    = o.stripe_payment_intent_id || o.payment_intent_id;
       const hasSes   = o.stripe_checkout_session_id || o.stripe_session_id;
       const hasStripe = !!(hasPi || hasSes);
 
+      // Stripe reconciliation columns
       let reconStatus    = "";
       let mismatchReason = "";
       let stripeGross    = "";
       let stripeFees     = "";
       let stripeNet      = "";
+      let stripeFeesDollars: number | null = null;
 
       if (sr) {
-        reconStatus    = sr.recon_status;
-        mismatchReason = sr.mismatch_reason;
-        stripeGross    = sr.gross    !== null ? sr.gross.toFixed(2)  : "";
-        stripeFees     = sr.fees     !== null ? sr.fees.toFixed(2)   : "";
-        stripeNet      = sr.net      !== null ? sr.net.toFixed(2)    : "";
+        reconStatus       = sr.recon_status;
+        mismatchReason    = sr.mismatch_reason;
+        stripeGross       = sr.gross    !== null ? sr.gross.toFixed(2)  : "";
+        stripeFees        = sr.fees     !== null ? sr.fees.toFixed(2)   : "";
+        stripeNet         = sr.net      !== null ? sr.net.toFixed(2)    : "";
+        stripeFeesDollars = sr.fees;
       } else if (
         o.payment_status === "paid" ||
         o.payment_status === "paid_manual_verified"
       ) {
         reconStatus    = hasStripe ? "not_checked" : "no_stripe_id";
         mismatchReason = hasStripe ? "" : "No Stripe payment intent or session ID on record";
+      }
+
+      // RideChecker compensation columns
+      const rcName    = payout?.ridechecker_name       ?? "";
+      const rcPay     = payout ? payout.total_pay_dollars.toFixed(2) : "";
+      const rcStatus  = payout?.status                 ?? "";
+      const rcPaidAt  = payout?.paid_at
+        ? new Date(payout.paid_at).toISOString()
+        : "";
+      const rcMethod  = payout?.payment_method          ?? "";
+      const rcRef     = payout?.payment_reference        ?? "";
+
+      // Margin: final_price - stripe_fees - ridechecker_pay
+      let marginStr = "";
+      if (payout || stripeFeesDollars !== null) {
+        const rcPayDollars = payout ? payout.total_pay_dollars : 0;
+        if (stripeFeesDollars !== null) {
+          const margin = price - stripeFeesDollars - rcPayDollars;
+          marginStr = margin.toFixed(2);
+        } else if (!hasStripe) {
+          // No Stripe data at all; show gross - RC pay only
+          const margin = price - rcPayDollars;
+          marginStr = margin.toFixed(2);
+        }
+        // else: has Stripe ID but not checked yet → leave blank
       }
 
       lines.push(
@@ -264,6 +346,13 @@ export async function GET(req: NextRequest) {
           stripeFees,
           stripeNet,
           mismatchReason,
+          rcName,
+          rcPay,
+          rcStatus,
+          rcPaidAt,
+          rcMethod,
+          rcRef,
+          marginStr,
         ])
       );
     }

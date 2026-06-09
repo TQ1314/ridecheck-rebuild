@@ -1337,3 +1337,18 @@ COMMENT ON COLUMN public.orders.ops_notes IS
 
 COMMENT ON COLUMN public.orders.ops_internal_note IS
   'Internal-only ops note recorded when vehicle/listing info is corrected. Never surfaced to buyer.';
+
+
+-- ============================================================
+-- MIGRATION 048: ridechecker_payouts — payment tracking columns
+-- ============================================================
+
+ALTER TABLE public.ridechecker_payouts
+  ADD COLUMN IF NOT EXISTS payment_method    TEXT,
+  ADD COLUMN IF NOT EXISTS payment_reference TEXT;
+
+COMMENT ON COLUMN public.ridechecker_payouts.payment_method IS
+  'How the RideChecker was paid: zelle, paypal, cashapp, venmo, ach, check, cash, other';
+
+COMMENT ON COLUMN public.ridechecker_payouts.payment_reference IS
+  'Transaction ID, check number, or other reference for the payment method';

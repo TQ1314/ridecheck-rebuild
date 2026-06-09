@@ -1,0 +1,202 @@
+Update the Revenue & Jobs dashboard to include RideChecker compensation and true RideCheck margin.
+
+Current page:
+/operations/revenue
+
+Current APIs:
+GET /api/ops/revenue
+POST /api/ops/revenue/reconcile
+GET /api/ops/revenue/export
+
+Goal:
+The Ops Lead should see not only what customers paid and what Stripe collected, but also what RideCheck owes/pays RideCheckers and what RideCheck keeps after Stripe fees + RideChecker pay.
+
+1. Database fields
+First inspect the existing schema.
+
+If these fields do not already exist, create a new Supabase migration adding them to the correct table, likely orders or inspection_assignments depending on current architecture:
+
+- ridechecker_pay NUMERIC(10,2)
+- ridechecker_payment_status TEXT DEFAULT 'pending'
+- ridechecker_paid_at TIMESTAMPTZ
+- ridechecker_payment_method TEXT
+- ridechecker_payment_reference TEXT
+
+Use CHECK constraints where appropriate:
+ridechecker_payment_status IN ('pending', 'approved', 'paid', 'cancelled')
+
+Important:
+Do not break existing orders.
+Migration must be idempotent/safe to run.
+Append the migration to PENDING_RUN_ALL.sql.
+
+2. Determine where RideChecker pay should live
+Before coding, inspect current assignment/order structure.
+
+If each order only has one assigned RideChecker, storing compensation on orders is acceptable.
+
+If there is an inspection_assignments or ridechecker_assignments table, prefer storing compensation there because pay belongs to the assigned RideChecker, not just the customer order.
+
+Make the implementation match the existing data model.
+
+3. Revenue & Jobs dashboard card
+Add a new card called:
+
+RideChecker Compensation
+
+Show, using the same active filters/date range:
+
+- Total RideChecker Pay Owed
+- Total RideChecker Pay Paid
+- Outstanding RideChecker Pay
+- Number of completed/paid inspections included
+
+Definitions:
+- Pay Owed = sum of ridechecker_pay for paid jobs that are completed or report delivered
+- Pay Paid = sum of ridechecker_pay where ridechecker_payment_status = 'paid'
+- Outstanding = Pay Owed - Pay Paid
+- Included Inspections = count of included jobs with ridechecker_pay > 0
+
+Display:
+$X owed
+$Y paid
+$Z outstanding
+
+Color:
+- Green if outstanding = 0
+- Amber if outstanding > 0
+
+4. Profitability / Margin card
+Add another card called:
+
+RideCheck Margin
+
+Show:
+
+Gross Revenue
+Less Stripe Fees
+Less RideChecker Compensation
+RideCheck Margin
+
+Formula:
+RideCheck Margin =
+RideCheck Paid Gross Revenue
+- Stripe Fees
+- RideChecker Pay Owed
+
+Important:
+Use customer-paid gross revenue before Stripe fees.
+Use actual Stripe fees from reconciliation when available.
+If Stripe fees are not available yet, show “Reconcile with Stripe to calculate fees.”
+
+5. Reconciliation API update
+Update POST /api/ops/revenue/reconcile so it also returns:
+
+- ridechecker_pay_owed
+- ridechecker_pay_paid
+- ridechecker_pay_outstanding
+- ridecheck_margin_after_stripe_and_ridechecker
+
+The reconcile response should combine:
+- RideCheck gross revenue
+- Stripe gross
+- Stripe fees
+- Stripe net
+- RideChecker pay owed
+- RideChecker pay paid
+- Outstanding RideChecker pay
+- Final RideCheck margin
+
+6. Revenue API update
+Update GET /api/ops/revenue to include DB-only compensation stats:
+
+- ridechecker_pay_owed
+- ridechecker_pay_paid
+- ridechecker_pay_outstanding
+- included_ridechecker_pay_count
+
+This should respect the same filters:
+- date preset/custom range
+- package
+- payment status
+- ops status
+
+7. Export CSV update
+Update GET /api/ops/revenue/export to include these new columns:
+
+- ridechecker_name
+- ridechecker_pay
+- ridechecker_payment_status
+- ridechecker_paid_at
+- ridechecker_payment_method
+- ridechecker_payment_reference
+- ridecheck_margin
+
+Formula:
+ridecheck_margin =
+final_price
+- stripe_fees
+- ridechecker_pay
+
+If stripe_fees are unavailable, leave ridecheck_margin blank or mark reconciliation_status as not_checked.
+
+8. UI updates
+On /operations/revenue:
+
+Add:
+- RideChecker Compensation card
+- RideCheck Margin card
+- Clear label: “Gross revenue shown before Stripe fees.”
+- Clear label: “RideCheck margin subtracts Stripe fees and RideChecker compensation.”
+
+Keep existing cards:
+- Total Jobs Created
+- Paid Jobs
+- Completed Jobs
+- By Package breakdown
+- Stripe Reconciliation card
+- Export CSV button
+
+9. Admin/Lead permissions
+Only these roles can view compensation and margin:
+- owner
+- admin
+- operations_lead
+
+Do not expose RideChecker pay to:
+- ridechecker
+- regular operations
+- customer/buyer
+- seller
+
+10. Optional payment management
+If there is already an order detail admin page, add editable fields there for owner/admin/operations_lead:
+
+- ridechecker_pay
+- ridechecker_payment_status
+- ridechecker_paid_at
+- ridechecker_payment_method
+- ridechecker_payment_reference
+
+This allows Ops Lead to mark a RideChecker as paid after Zelle, PayPal, Cash App, ACH, etc.
+
+Do not automate payouts yet. This is tracking only.
+
+11. Testing
+Run TypeScript check/build.
+
+Verify:
+- Revenue page loads for admin/owner/operations_lead
+- Locked access for unauthorized roles
+- Compensation totals respect filters
+- CSV export includes new columns
+- Reconciliation still works with Stripe
+- Existing payment reconciliation is not broken
+
+Business rule:
+Revenue alone is not enough. RideCheck must track:
+
+Customer paid RideCheck
+minus Stripe fees
+minus RideChecker compensation
+equals RideCheck margin.

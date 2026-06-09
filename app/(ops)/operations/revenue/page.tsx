@@ -47,8 +47,14 @@ interface RevenueData {
     by_package: Record<string, { count: number; gross: number }>;
     stripe_linked: number; manual_verified: number;
   };
-  completed_jobs: { count: number; gross_total: number };
+  completed_jobs:   { count: number; gross_total: number };
   reconcile_eligible: number;
+  ridechecker_comp: {
+    pay_owed:       number;
+    pay_paid:       number;
+    outstanding:    number;
+    included_count: number;
+  };
 }
 
 interface ReconcileData {
@@ -64,6 +70,10 @@ interface ReconcileData {
   mismatches:           Mismatch[];
   unverifiable:         Unverifiable[];
   reconciled_at:        string;
+  ridechecker_pay_owed:        number;
+  ridechecker_pay_paid:        number;
+  ridechecker_pay_outstanding: number;
+  ridecheck_margin:            number;
 }
 
 interface Mismatch {
@@ -564,6 +574,112 @@ export default function RevenuePage() {
                 <p className="text-[11px] text-muted-foreground mt-1">
                   ops_status = completed or report delivered
                 </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── RideChecker Compensation + RideCheck Margin ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* RideChecker Compensation */}
+            <Card data-testid="card-rc-compensation">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  RideChecker Compensation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {data.ridechecker_comp.included_count === 0 ? (
+                  <div className="text-sm text-muted-foreground py-1">
+                    No completed jobs with payout records in this period.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Pay Owed</span>
+                      <span className="font-semibold" data-testid="stat-rc-pay-owed">
+                        {formatCurrency(data.ridechecker_comp.pay_owed)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Pay Paid</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400" data-testid="stat-rc-pay-paid">
+                        {formatCurrency(data.ridechecker_comp.pay_paid)}
+                      </span>
+                    </div>
+                    <div className={`flex items-center justify-between text-sm rounded-md px-2.5 py-1.5 -mx-2.5 font-semibold ${
+                      data.ridechecker_comp.outstanding <= 0
+                        ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                        : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400"
+                    }`}>
+                      <span>Outstanding</span>
+                      <span data-testid="stat-rc-outstanding">
+                        {formatCurrency(Math.max(0, data.ridechecker_comp.outstanding))}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground pt-0.5">
+                      {data.ridechecker_comp.included_count} completed inspection{data.ridechecker_comp.included_count !== 1 ? "s" : ""} with payout records
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* RideCheck Margin */}
+            <Card data-testid="card-rc-margin">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  RideCheck Margin
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Gross Revenue</span>
+                    <span className="font-medium">{formatCurrency(data.paid_jobs.gross_total)}</span>
+                  </div>
+                  {reconcileData ? (
+                    <div className="flex items-center justify-between text-red-600 dark:text-red-400">
+                      <span>Less Stripe Fees</span>
+                      <span className="font-medium">−{formatCurrency(reconcileData.stripe_fees)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-muted-foreground text-xs italic">
+                      <span>Stripe Fees</span>
+                      <span>Reconcile to calculate</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
+                    <span>Less RC Compensation</span>
+                    <span className="font-medium">−{formatCurrency(data.ridechecker_comp.pay_owed)}</span>
+                  </div>
+                  <div className="border-t pt-1.5 mt-1">
+                    {reconcileData ? (
+                      <div className="flex items-center justify-between font-bold text-base">
+                        <span>RideCheck Margin</span>
+                        <span
+                          className={reconcileData.ridecheck_margin >= 0 ? "text-primary" : "text-red-600 dark:text-red-400"}
+                          data-testid="stat-ridecheck-margin"
+                        >
+                          {formatCurrency(reconcileData.ridecheck_margin)}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between font-semibold">
+                        <span className="text-sm">Partial Margin</span>
+                        <span className="text-primary" data-testid="stat-ridecheck-margin-partial">
+                          {formatCurrency(data.paid_jobs.gross_total - data.ridechecker_comp.pay_owed)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground pt-0.5">
+                    {reconcileData
+                      ? "Gross revenue minus Stripe fees and RideChecker compensation."
+                      : "Stripe fees excluded — reconcile with Stripe for full margin."}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

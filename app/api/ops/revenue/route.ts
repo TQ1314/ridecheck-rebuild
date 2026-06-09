@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     // ── By package ─────────────────────────────────────────────────────────────
     const byPackage: Record<string, { count: number; gross: number }> = {};
-    for (const pkg of PACKAGES) byPackage[pkg] = { count: 0, gross: 0 };
+    for (const p of PACKAGES) byPackage[p] = { count: 0, gross: 0 };
     for (const o of paidRows) {
       const p = (o.package || "standard") as string;
       if (!byPackage[p]) byPackage[p] = { count: 0, gross: 0 };
@@ -91,19 +91,42 @@ export async function GET(req: NextRequest) {
       (o) => o.payment_status === "paid_manual_verified"
     ).length;
 
+    // ── RideChecker compensation (from ridechecker_payouts) ──────────────────
+    // "Pay Owed" = completed+paid orders with a payout entry (non-cancelled)
+    // total_pay is stored in INTEGER cents → divide by 100 for dollars
+    const completedOrderIds = completedRows.map((o: any) => o.id);
+    let rcPayOwed     = 0;
+    let rcPayPaid     = 0;
+    let rcPayCount    = 0;
+
+    if (completedOrderIds.length > 0) {
+      const { data: payouts } = await supabaseAdmin
+        .from("ridechecker_payouts")
+        .select("order_id, total_pay, status")
+        .in("order_id", completedOrderIds)
+        .neq("status", "cancelled");
+
+      for (const p of (payouts ?? []) as any[]) {
+        const pay = Number(p.total_pay ?? 0) / 100;
+        rcPayOwed += pay;
+        if (p.status === "paid") rcPayPaid += pay;
+        rcPayCount++;
+      }
+    }
+
     return NextResponse.json({
       period: { from: fromStr, to: toStr },
       total_jobs: {
-        count: totalCount,
+        count:       totalCount,
         today_count: todayCount,
       },
       paid_jobs: {
-        count:          paidCount,
-        gross_total:    paidGross,
-        today_count:    paidTodayCount,
-        today_gross:    paidTodayGross,
-        by_package:     byPackage,
-        stripe_linked:  stripeLinked,
+        count:           paidCount,
+        gross_total:     paidGross,
+        today_count:     paidTodayCount,
+        today_gross:     paidTodayGross,
+        by_package:      byPackage,
+        stripe_linked:   stripeLinked,
         manual_verified: manualVerified,
       },
       completed_jobs: {
@@ -111,6 +134,12 @@ export async function GET(req: NextRequest) {
         gross_total: completedGross,
       },
       reconcile_eligible: stripeLinked,
+      ridechecker_comp: {
+        pay_owed:       rcPayOwed,
+        pay_paid:       rcPayPaid,
+        outstanding:    rcPayOwed - rcPayPaid,
+        included_count: rcPayCount,
+      },
     });
   } catch (err: any) {
     console.error("[ops/revenue]", err);

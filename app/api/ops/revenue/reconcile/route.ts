@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       .from("orders")
       .select(
         "id, vehicle_year, vehicle_make, vehicle_model, package, " +
-        "payment_status, final_price, base_price, " +
+        "payment_status, ops_status, report_status, final_price, base_price, " +
         "payment_intent_id, stripe_payment_intent_id, stripe_checkout_session_id, stripe_session_id"
       )
       .gte("created_at", fromStr + "T00:00:00.000Z")
@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
     const price = (o: any) => Number(o.final_price ?? o.base_price ?? 0);
     const vehicle = (o: any) =>
       [o.vehicle_year, o.vehicle_make, o.vehicle_model].filter(Boolean).join(" ") || "Unknown Vehicle";
+    const isDone = (o: any) =>
+      o.ops_status === "completed" || o.report_status === "delivered";
 
     const mismatches:    Mismatch[]    = [];
     const unverifiable:  Unverifiable[] = [];
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest) {
             expand: ["charges.data.balance_transaction"],
           } as any);
           stripeStatus      = pi.status;
-          stripeAmountCents = pi.amount; // cents
+          stripeAmountCents = pi.amount;
           const charge      = (pi as any).charges?.data?.[0];
           const bt          = charge?.balance_transaction;
           if (bt && typeof bt === "object") feeCents = (bt as any).fee ?? 0;
@@ -138,15 +140,11 @@ export async function POST(req: NextRequest) {
     ordersChecked = lookupResults.length;
 
     for (const settled of lookupResults) {
-      if (settled.status === "rejected") {
-        // Can't determine which order failed cleanly — skip
-        continue;
-      }
+      if (settled.status === "rejected") continue;
       const { o, stripeAmountCents, stripeStatus, feeCents } = settled.value;
       const rcAmountCents = Math.round(price(o) * 100);
 
       if (stripeAmountCents === null) {
-        // Fetch failed or no useful data
         unverifiable.push({
           order_id:         o.id,
           vehicle:          vehicle(o),
@@ -156,13 +154,11 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Accumulate Stripe totals (only succeeded)
       if (stripeStatus === "succeeded" || stripeStatus === "paid") {
         stripeGrossCents += stripeAmountCents;
         stripeFeesCents  += feeCents;
       }
 
-      // ── Warning: RideCheck says paid, Stripe does not confirm ──────────
       if (
         o.payment_status === "paid" &&
         stripeStatus !== "succeeded" && stripeStatus !== "paid"
@@ -179,7 +175,6 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // ── Warning: Stripe confirmed, RideCheck not marked paid ───────────
       if (
         (stripeStatus === "succeeded" || stripeStatus === "paid") &&
         o.payment_status !== "paid" && o.payment_status !== "paid_manual_verified"
@@ -196,7 +191,6 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // ── Warning: Amount mismatch (> $1 tolerance) ──────────────────────
       if (Math.abs(rcAmountCents - stripeAmountCents) > 100) {
         mismatches.push({
           order_id:         o.id,
@@ -210,11 +204,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── RideChecker compensation for this period ──────────────────────────────
+    // Paid + done orders only; total_pay in cents → divide by 100
+    const doneOrderIds = rows.filter(isDone).map((o: any) => o.id);
+    let rcPayOwed  = 0;
+    let rcPayPaid  = 0;
+
+    if (doneOrderIds.length > 0) {
+      const { data: payouts } = await supabaseAdmin
+        .from("ridechecker_payouts")
+        .select("total_pay, status")
+        .in("order_id", doneOrderIds)
+        .neq("status", "cancelled");
+
+      for (const p of (payouts ?? []) as any[]) {
+        const pay = Number(p.total_pay ?? 0) / 100;
+        rcPayOwed += pay;
+        if (p.status === "paid") rcPayPaid += pay;
+      }
+    }
+
     const rideCheckGross = rows.reduce((s, o) => s + price(o), 0);
     const stripeGross    = stripeGrossCents / 100;
     const stripeFees     = stripeFeesCents  / 100;
     const stripeNet      = stripeGross - stripeFees;
     const difference     = rideCheckGross - stripeGross;
+
+    // Margin = gross revenue - Stripe fees - RideChecker pay owed
+    const rideCheckMargin = rideCheckGross - stripeFees - rcPayOwed;
 
     return NextResponse.json({
       period:              { from: fromStr, to: toStr },
@@ -229,6 +246,11 @@ export async function POST(req: NextRequest) {
       mismatches,
       unverifiable,
       reconciled_at:       new Date().toISOString(),
+      // ── Compensation ──
+      ridechecker_pay_owed:        rcPayOwed,
+      ridechecker_pay_paid:        rcPayPaid,
+      ridechecker_pay_outstanding: rcPayOwed - rcPayPaid,
+      ridecheck_margin:            rideCheckMargin,
     });
   } catch (err: any) {
     console.error("[ops/revenue/reconcile]", err);
