@@ -1,0 +1,202 @@
+RIDECHECK SELLER TRUST + BUYER RETENTION WORKFLOW
+
+Goal:
+Add trust-building messages for sellers and retention flow for buyers when sellers refuse inspection.
+
+Do NOT duplicate existing communication, assignment, payout, or seller contact systems.
+Extend existing profiles, seller_contact_attempts, order_events, activity_log, and notification utilities.
+
+Part 1 — Seller Trust Layer
+
+When a RideChecker is assigned and seller inspection access is approved, send the seller a confirmation message showing who is coming.
+
+Use existing RideChecker profile data:
+- profile photo if available
+- first name
+- rating
+- completed inspections
+- ETA if available
+- RideCheck support contact
+
+If profile photo does not exist, show RideCheck logo fallback.
+
+Seller message should say:
+
+"Your RideCheck inspection is confirmed.
+
+Your assigned RideChecker is [First Name].
+Expected arrival: [ETA].
+
+RideCheck inspections are non-invasive and typically take 45–75 minutes.
+
+For safety, please verify the RideChecker photo/name before allowing access.
+
+Questions? Contact RideCheck support."
+
+Do not expose RideChecker private info:
+- no last name unless already public
+- no phone number
+- no driver's license
+- no personal address
+- no private documents
+
+Add a seller-facing confirmation card or message template.
+
+Log message sent in seller_contact_attempts or activity_log.
+
+Part 2 — Buyer Retention When Seller Refuses
+
+When seller outcome is declined/refused, do not immediately treat the order as lost.
+
+Create buyer retention flow:
+
+Status:
+seller_refused_inspection
+
+Buyer message:
+
+"The seller declined independent inspection access.
+
+This does not automatically mean the vehicle has a problem, but many buyers consider refusal an important signal before moving forward.
+
+Your RideCheck remains active. You can apply it to another vehicle instead of starting over."
+
+CTA:
+"Inspect Another Vehicle"
+
+Options:
+1. Transfer this RideCheck to another vehicle
+2. Request refund
+3. Ask Ops for help
+
+Part 3 — RideCheck Credit
+
+If seller refuses, create or use existing credit/transfer logic.
+
+Preferred:
+- Allow buyer to transfer paid RideCheck to another listing
+- Keep original payment attached to the account/order
+- Create transfer record or order link
+- Do not require new payment if same package price
+- If new package costs more, charge upgrade difference
+- If new package costs less, keep remaining as account credit if credit system exists, otherwise show Ops review needed
+
+If no credit system exists:
+- implement minimal transferable_order_credit table
+
+Fields:
+- id
+- buyer_id
+- original_order_id
+- credit_amount_cents
+- remaining_amount_cents
+- package_type
+- status: active, used, refunded, expired
+- expires_at
+- created_at
+- used_order_id
+
+Part 4 — One-Click Transfer
+
+Add buyer-facing flow:
+
+"Use this RideCheck on another vehicle"
+
+Collect:
+- new listing URL
+- new seller contact info if available
+- seller type
+- vehicle info if parser cannot detect
+
+Create new order or update existing order according to safest existing architecture.
+
+Preserve audit trail:
+- original seller refused
+- buyer transferred RideCheck
+- new vehicle submitted
+
+Part 5 — Track Seller Refusal Rate
+
+Add analytics using existing order_events/activity_log if possible.
+
+Track:
+- seller refused count
+- refusal reason if available
+- listing source
+- seller type
+- platform source
+- whether buyer transferred RideCheck
+- whether buyer requested refund
+
+Show in Ops order detail:
+- Seller refused
+- Buyer retained via transfer: yes/no
+- Credit status
+
+Part 6 — Notifications
+
+Use existing email/SMS utilities.
+
+Buyer notification should go through buyer preferred communication method if notification_preferences exist.
+Fallback:
+- SMS if buyer phone exists
+- email if buyer email exists
+
+Seller confirmation should use seller preferred method if available.
+Fallback:
+- SMS if seller phone exists
+- email if seller email exists
+
+Part 7 — Guards
+
+Do not send seller RideChecker photo until:
+- payment authorized
+- seller approved inspection
+- RideChecker assigned
+- RideChecker profile is approved/verified
+
+Do not allow transfer if:
+- original inspection was already completed
+- report was already delivered
+- credit was refunded
+- credit expired
+
+Part 8 — Testing
+
+Test:
+1. Seller approves + RideChecker assigned
+Expected: seller receives RideChecker first name/photo/ETA message.
+
+2. RideChecker has no profile photo
+Expected: seller receives RideCheck logo fallback.
+
+3. Seller refuses inspection
+Expected: buyer receives retention message and "Inspect Another Vehicle" option.
+
+4. Buyer transfers RideCheck to same package
+Expected: no new payment required.
+
+5. Buyer transfers to higher package
+Expected: upgrade difference required.
+
+6. Buyer requests refund
+Expected: existing refund/ops review workflow used.
+
+7. Completed inspection
+Expected: transfer blocked.
+
+8. Buyer communication preferences exist
+Expected: preferred channel used.
+
+Return:
+- files modified
+- migrations added if any
+- seller trust message implemented
+- buyer retention flow implemented
+- transfer/credit logic implemented
+- analytics/logging added
+- build result
+- test result
+
+Important:
+This should improve trust and retention without disrupting the core RideCheck inspection workflow.
