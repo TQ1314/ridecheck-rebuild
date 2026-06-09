@@ -53,6 +53,7 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
+      { href: "/operations/revenue", label: "Revenue & Jobs", icon: BarChart3 },
       { href: "/operations/payouts", label: "Payouts", icon: Wallet },
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
@@ -66,6 +67,7 @@ function getNavItems(role: Role): NavItem[] {
     return [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
+      { href: "/operations/revenue", label: "Revenue & Jobs", icon: BarChart3 },
       { href: "/operations/payouts", label: "Payouts", icon: Wallet },
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
