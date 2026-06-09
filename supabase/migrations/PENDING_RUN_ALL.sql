@@ -1387,3 +1387,46 @@ COMMENT ON COLUMN public.seller_contact_attempts.response_at IS
 
 COMMENT ON COLUMN public.seller_contact_attempts.response_notes IS
   'Ops notes summarising the seller response content.';
+
+-- ============================================================
+-- Migration 050: Seller Trust + Buyer Retention
+-- ============================================================
+
+-- 50a: RideChecker public profile fields
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS photo_url TEXT,
+  ADD COLUMN IF NOT EXISTS completed_inspections INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS average_rating NUMERIC(3,2);
+
+COMMENT ON COLUMN public.profiles.photo_url IS
+  'Public-facing profile photo URL for RideChecker trust confirmation messages.';
+COMMENT ON COLUMN public.profiles.completed_inspections IS
+  'Running count of completed inspections used in seller trust messages.';
+COMMENT ON COLUMN public.profiles.average_rating IS
+  'Aggregate star rating (0.00–5.00) displayed to sellers in trust confirmation.';
+
+-- 50b: Transferable order credit for buyer retention
+CREATE TABLE IF NOT EXISTS public.transferable_order_credit (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  buyer_id             UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  original_order_id    UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  credit_amount_cents  INTEGER NOT NULL,
+  remaining_amount_cents INTEGER NOT NULL,
+  package_type         TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'active'
+                         CHECK (status IN ('active','used','refunded','expired')),
+  expires_at           TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '12 months'),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  used_order_id        UUID REFERENCES public.orders(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_transferable_order_credit_buyer
+  ON public.transferable_order_credit (buyer_id);
+CREATE INDEX IF NOT EXISTS idx_transferable_order_credit_original_order
+  ON public.transferable_order_credit (original_order_id);
+
+COMMENT ON TABLE public.transferable_order_credit IS
+  'Holds buyer credit created when a seller refuses inspection, enabling transfer to a new vehicle.';
+
+-- 50c: seller_refused_inspection status on order_events (informational — no enum change needed,
+--      stored as event_type TEXT in order_events)

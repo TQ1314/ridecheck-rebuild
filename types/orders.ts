@@ -398,6 +398,19 @@ export interface RideCheckerRawSubmission {
   submitted_at: string;
 }
 
+export interface TransferableOrderCredit {
+  id: string;
+  buyer_id: string;
+  original_order_id: string;
+  credit_amount_cents: number;
+  remaining_amount_cents: number;
+  package_type: string;
+  status: "active" | "used" | "refunded" | "expired";
+  expires_at: string;
+  created_at: string;
+  used_order_id: string | null;
+}
+
 export interface BillOfSaleDocument {
   id: string;
   order_id: string;
