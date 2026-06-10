@@ -14,9 +14,12 @@ function getTwilioClient() {
 export async function sendSMS({
   to,
   body,
+  statusCallback,
 }: {
   to: string;
   body: string;
+  /** Optional HTTPS URL for Twilio to POST delivery status updates */
+  statusCallback?: string;
 }): Promise<{ success: boolean; dev?: boolean; sid?: string; error?: any }> {
   const client = getTwilioClient();
   const from = process.env.TWILIO_PHONE_NUMBER;
@@ -28,7 +31,9 @@ export async function sendSMS({
   }
 
   try {
-    const message = await client.messages.create({ body, from, to });
+    const createParams: Record<string, string> = { body, from, to };
+    if (statusCallback) createParams.statusCallback = statusCallback;
+    const message = await client.messages.create(createParams);
     return { success: true, sid: message.sid };
   } catch (err) {
     console.error("[Twilio Error]", err);

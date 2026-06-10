@@ -178,8 +178,12 @@ export async function POST(
 
         const attemptRows: any[] = [];
 
+        const smsStatusCallback = process.env.NEXT_PUBLIC_APP_URL
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/twilio`
+          : undefined;
+
         if (order.seller_phone) {
-          const r = await sendDirect("sms", order.seller_phone, payload);
+          const r = await sendDirect("sms", order.seller_phone, payload, { statusCallback: smsStatusCallback });
           attemptRows.push({
             order_id: assignment.order_id,
             attempt_number: 99,
@@ -188,6 +192,9 @@ export async function POST(
             message_template_key: "seller_trust_confirmation",
             message_body: payload.smsBody,
             status: r.success ? "sent" : "failed",
+            delivery_status: r.success ? "queued" : "failed",
+            provider_message_id: r.sid ?? null,
+            is_auto_notification: true,
             created_by: session.user.id,
           });
         }
@@ -202,6 +209,9 @@ export async function POST(
             message_template_key: "seller_trust_confirmation",
             message_body: `Subject: ${payload.subject}`,
             status: r.success ? "sent" : "failed",
+            delivery_status: r.success ? "queued" : "failed",
+            provider_message_id: r.messageId ?? null,
+            is_auto_notification: true,
             created_by: session.user.id,
           });
         }

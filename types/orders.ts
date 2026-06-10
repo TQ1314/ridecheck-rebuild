@@ -236,6 +236,13 @@ export interface SellerContactAttempt {
   response_received: boolean;
   response_at: string | null;
   response_notes: string | null;
+  // Migration 051 — delivery tracking
+  provider_message_id: string | null;
+  /** NULL = manual/untracked. Non-null values: queued | sent | delivered | bounced | failed | undeliverable */
+  delivery_status: string | null;
+  delivery_updated_at: string | null;
+  /** System-generated messages (e.g. seller trust confirmation) — excluded from the 3-attempt ops counter */
+  is_auto_notification: boolean;
 }
 
 export interface NotificationPreferences {

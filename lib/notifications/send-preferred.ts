@@ -14,7 +14,15 @@ export interface RecipientInfo {
   notification_preferences?: NotificationPreferences | null;
 }
 
-type ChannelResult = { channel: "email" | "sms" | "none"; success: boolean; error?: any };
+type ChannelResult = {
+  channel: "email" | "sms" | "none";
+  success: boolean;
+  /** Resend message ID (email only) */
+  messageId?: string;
+  /** Twilio SID (SMS only) */
+  sid?: string;
+  error?: any;
+};
 
 /**
  * Send a notification to a recipient via their preferred channel.
@@ -64,13 +72,13 @@ export async function sendPreferred(
         subject: payload.subject,
         html: payload.html,
       });
-      results.push({ channel: "email", success: r.success, error: r.error });
+      results.push({ channel: "email", success: r.success, messageId: r.messageId, error: r.error });
     } else if (channel === "sms" && recipient.phone) {
       const r = await sendSMS({
         to: recipient.phone,
         body: payload.smsBody,
       });
-      results.push({ channel: "sms", success: r.success, error: r.error });
+      results.push({ channel: "sms", success: r.success, sid: r.sid, error: r.error });
     }
   }
 
@@ -84,13 +92,14 @@ export async function sendPreferred(
 export async function sendDirect(
   channel: "email" | "sms",
   to: string,
-  payload: NotificationPayload
+  payload: NotificationPayload,
+  options?: { statusCallback?: string }
 ): Promise<ChannelResult> {
   if (channel === "email") {
     const r = await sendEmail({ to, subject: payload.subject, html: payload.html });
-    return { channel: "email", success: r.success, error: r.error };
+    return { channel: "email", success: r.success, messageId: r.messageId, error: r.error };
   } else {
-    const r = await sendSMS({ to, body: payload.smsBody });
-    return { channel: "sms", success: r.success, error: r.error };
+    const r = await sendSMS({ to, body: payload.smsBody, statusCallback: options?.statusCallback });
+    return { channel: "sms", success: r.success, sid: r.sid, error: r.error };
   }
 }

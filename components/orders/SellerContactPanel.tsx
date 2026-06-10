@@ -39,6 +39,8 @@ import {
   User,
   Info,
   MapPin,
+  Loader2,
+  Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -102,6 +104,51 @@ function getAttemptStatusLabel(status: string): string {
   return labels[status] || status;
 }
 
+function DeliveryStatusBadge({ status }: { status: string }) {
+  type Cfg = { icon: React.ReactNode; label: string; className: string };
+  const config: Record<string, Cfg> = {
+    queued: {
+      icon: <Loader2 className="h-2.5 w-2.5 animate-spin" />,
+      label: "Queued",
+      className: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
+    },
+    sent: {
+      icon: <Send className="h-2.5 w-2.5" />,
+      label: "Sent to Provider",
+      className: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+    },
+    delivered: {
+      icon: <CheckCircle className="h-2.5 w-2.5" />,
+      label: "✓ Delivered",
+      className: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800",
+    },
+    bounced: {
+      icon: <AlertCircle className="h-2.5 w-2.5" />,
+      label: "⚠ Bounced",
+      className: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+    },
+    failed: {
+      icon: <XCircle className="h-2.5 w-2.5" />,
+      label: "✗ Failed",
+      className: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
+    },
+    undeliverable: {
+      icon: <XCircle className="h-2.5 w-2.5" />,
+      label: "⚠ Undeliverable",
+      className: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+    },
+  };
+  const c = config[status] ?? config.sent;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium border no-default-hover-elevate no-default-active-elevate ${c.className}`}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+
 function getChannelIcon(channel: string) {
   switch (channel) {
     case "fb_message":
@@ -146,14 +193,19 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
   const [reopenReason, setReopenReason] = useState("");
   const [reopenLoading, setReopenLoading] = useState(false);
 
+  // Tracks which attempt rows have their delivery details panel expanded
+  const [expandedAttempts, setExpandedAttempts] = useState<Set<string>>(new Set());
+
   const platform = detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
   const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
   const isConcierge = order.booking_type === "concierge";
   const isSelfArranged = order.booking_type === "self_arrange";
   const contactStatus = order.seller_contact_status || "not_started";
-  // Only count real seller contact attempts — exclude buyer_message channel
-  const attemptCount = attempts.filter((a) => a.channel !== "buyer_message").length;
+  // Count only manual ops attempts — exclude automated system notifications and buyer_message entries
+  const attemptCount = attempts.filter(
+    (a) => !a.is_auto_notification && a.channel !== "buyer_message"
+  ).length;
 
   useEffect(() => {
     loadAttempts();
@@ -589,19 +641,25 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
         {isConcierge && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              {attemptCount < 3 ? (
+              <span
+              className="text-xs text-muted-foreground"
+              data-testid="text-attempt-count"
+            >
+              {attemptCount}/3 logged
+            </span>
+            {attemptCount < 3 ? (
               <Button
                 variant="outline"
                 onClick={handleNewAttemptOpen}
                 data-testid="button-new-attempt"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Attempt {attemptCount + 1} of 3
+                Log Attempt {attemptCount + 1}
               </Button>
             ) : contactStatus !== "accepted" ? (
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <CheckCircle className="h-3 w-3 text-amber-500" />
-                3 attempts sent — mark the outcome below.
+                3 attempts logged — mark the outcome below.
               </p>
             ) : null}
             </div>
@@ -717,12 +775,24 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                         {attempt.destination && (
                           <span className="text-xs text-muted-foreground">{attempt.destination}</span>
                         )}
-                        <Badge
-                          variant={attempt.status === "sent" ? "secondary" : "destructive"}
-                          className="no-default-hover-elevate no-default-active-elevate text-[10px]"
-                        >
-                          {getAttemptStatusLabel(attempt.status)}
-                        </Badge>
+                        {attempt.delivery_status ? (
+                          <DeliveryStatusBadge status={attempt.delivery_status} />
+                        ) : (
+                          <Badge
+                            variant={attempt.status === "sent" ? "secondary" : "destructive"}
+                            className="no-default-hover-elevate no-default-active-elevate text-[10px]"
+                          >
+                            {getAttemptStatusLabel(attempt.status)}
+                          </Badge>
+                        )}
+                        {attempt.is_auto_notification && (
+                          <Badge
+                            variant="outline"
+                            className="no-default-hover-elevate no-default-active-elevate text-[10px] opacity-60"
+                          >
+                            auto
+                          </Badge>
+                        )}
                         {attempt.response_received ? (
                           <Badge className="no-default-hover-elevate no-default-active-elevate text-[10px] bg-green-100 text-green-800 border-green-200">
                             <CheckCircle className="h-2.5 w-2.5 mr-1" />
@@ -750,6 +820,42 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                         <p className="text-xs text-green-700 dark:text-green-400 mt-1">
                           Reply: {attempt.response_notes}
                         </p>
+                      )}
+                      {attempt.provider_message_id && (
+                        <div className="mt-1.5">
+                          <button
+                            className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                            onClick={() =>
+                              setExpandedAttempts((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(attempt.id)) next.delete(attempt.id);
+                                else next.add(attempt.id);
+                                return next;
+                              })
+                            }
+                            data-testid={`button-delivery-details-${attempt.id}`}
+                          >
+                            {expandedAttempts.has(attempt.id) ? "Hide details" : "View Delivery Details"}
+                          </button>
+                          {expandedAttempts.has(attempt.id) && (
+                            <div className="mt-1.5 p-2 rounded-md bg-muted/40 border space-y-1 text-[10px] text-muted-foreground">
+                              <div className="flex gap-2">
+                                <span className="font-medium shrink-0">Provider ID:</span>
+                                <span className="font-mono truncate">{attempt.provider_message_id}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <span className="font-medium shrink-0">Channel:</span>
+                                <span className="capitalize">{attempt.channel}</span>
+                              </div>
+                              {attempt.delivery_updated_at && (
+                                <div className="flex gap-2">
+                                  <span className="font-medium shrink-0">Last update:</span>
+                                  <span>{formatRelative(attempt.delivery_updated_at)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                     <span className="text-xs text-muted-foreground flex-shrink-0">

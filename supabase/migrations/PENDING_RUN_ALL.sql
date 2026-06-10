@@ -1430,3 +1430,30 @@ COMMENT ON TABLE public.transferable_order_credit IS
 
 -- 50c: seller_refused_inspection status on order_events (informational — no enum change needed,
 --      stored as event_type TEXT in order_events)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration 051: Delivery tracking on seller_contact_attempts
+-- Run in Supabase SQL Editor after deploying the matching application code.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 51a: Add delivery-tracking columns
+ALTER TABLE public.seller_contact_attempts
+  ADD COLUMN IF NOT EXISTS provider_message_id  TEXT,
+  ADD COLUMN IF NOT EXISTS delivery_status      TEXT
+    CHECK (delivery_status IN ('queued','sent','delivered','bounced','failed','undeliverable')),
+  ADD COLUMN IF NOT EXISTS delivery_updated_at  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS is_auto_notification BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Fast lookup by provider ID for webhook callbacks
+CREATE INDEX IF NOT EXISTS idx_sca_provider_message_id
+  ON public.seller_contact_attempts (provider_message_id)
+  WHERE provider_message_id IS NOT NULL;
+
+COMMENT ON COLUMN public.seller_contact_attempts.provider_message_id IS
+  'Resend email ID or Twilio SID returned at send time; used to match webhook delivery events.';
+COMMENT ON COLUMN public.seller_contact_attempts.delivery_status IS
+  'Provider-confirmed delivery state: queued|sent|delivered|bounced|failed|undeliverable. NULL = manual/untracked attempt.';
+COMMENT ON COLUMN public.seller_contact_attempts.delivery_updated_at IS
+  'Timestamp of the most recent delivery status update from the provider webhook.';
+COMMENT ON COLUMN public.seller_contact_attempts.is_auto_notification IS
+  'TRUE for system-generated messages (e.g. seller trust confirmation). Excluded from the 3-attempt ops counter.';
