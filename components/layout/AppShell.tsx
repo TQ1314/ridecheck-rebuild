@@ -34,6 +34,7 @@ import {
   UserCheck,
   FileText,
   Wallet,
+  MailCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/layout/Logo";
@@ -60,6 +61,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
       { href: "/admin/invite", label: "Invite Links", icon: Link2 },
       { href: "/admin/audit", label: "Audit Log", icon: ClipboardList },
+      { href: "/admin/delivery-diagnostics", label: "Delivery Diagnostics", icon: MailCheck },
       { href: "/admin/users", label: "People", icon: Settings },
     ];
   }
@@ -73,6 +75,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
       { href: "/admin/invite", label: "Invite Links", icon: Link2 },
+      { href: "/admin/delivery-diagnostics", label: "Delivery Diagnostics", icon: MailCheck },
     ];
   }
   if (role === "operations") {
@@ -83,6 +86,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
+      { href: "/admin/delivery-diagnostics", label: "Delivery Diagnostics", icon: MailCheck },
     ];
   }
   if (role === "platform") {
