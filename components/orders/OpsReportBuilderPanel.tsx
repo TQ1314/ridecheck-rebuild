@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, CheckCircle2, XCircle, DollarSign, Camera, AlertTriangle } from "lucide-react";
+import { FileText, CheckCircle2, XCircle, DollarSign, Camera, AlertTriangle, ShieldAlert, ChevronDown, ChevronRight } from "lucide-react";
 
 interface OpsReportBuilderPanelProps {
   order: Order;
@@ -33,6 +33,7 @@ export function OpsReportBuilderPanel({ order, onRefresh }: OpsReportBuilderPane
   const [reportUrl, setReportUrl] = useState(order.ops_report_url || "");
   const [savingDraft, setSavingDraft] = useState(false);
   const [sendingReport, setSendingReport] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [approvingSubmission, setApprovingSubmission] = useState(false);
   const [rejectingSubmission, setRejectingSubmission] = useState(false);
@@ -447,16 +448,6 @@ export function OpsReportBuilderPanel({ order, onRefresh }: OpsReportBuilderPane
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Report URL (optional)</Label>
-                <Input
-                  value={reportUrl}
-                  onChange={(e) => setReportUrl(e.target.value)}
-                  placeholder="https://..."
-                  data-testid="input-report-url"
-                />
-              </div>
-
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
@@ -471,8 +462,42 @@ export function OpsReportBuilderPanel({ order, onRefresh }: OpsReportBuilderPane
                   disabled={sendingReport}
                   data-testid="button-send-report"
                 >
-                  {sendingReport ? "Sending..." : "Send Report"}
+                  {sendingReport ? "Sending..." : "Mark Sent (Status Only)"}
                 </Button>
+              </div>
+
+              {/* Advanced / Admin Only — Manual Report URL override */}
+              <div className="border rounded-md mt-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setAdvancedOpen(!advancedOpen)}
+                  data-testid="toggle-advanced-url"
+                >
+                  {advancedOpen ? (
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  Advanced — Manual Report URL Override
+                </button>
+                {advancedOpen && (
+                  <div className="px-3 pb-3 space-y-2">
+                    <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                      <ShieldAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Admin/Owner only.</strong> Manually setting a report URL bypasses the AI-generated PDF safety system. Only use this for pre-existing reports or admin overrides. AI-generated reports should not need this field.
+                      </span>
+                    </div>
+                    <Label className="text-xs">Manual Report URL</Label>
+                    <Input
+                      value={reportUrl}
+                      onChange={(e) => setReportUrl(e.target.value)}
+                      placeholder="https://..."
+                      data-testid="input-report-url"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

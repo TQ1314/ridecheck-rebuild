@@ -1,0 +1,91 @@
+Add report-to-order safety controls.
+
+Problem:
+Ops must not accidentally send the wrong report to the wrong buyer.
+
+Requirements:
+
+1. Every generated report must be tied to:
+- order_id
+- buyer_id or buyer_email
+- order_number
+- vehicle year/make/model
+- VIN if available
+- generated_report_id
+
+2. Reports table
+Create/confirm reports table:
+- id
+- order_id
+- buyer_email
+- report_storage_path
+- report_url
+- report_status: draft, qa_pending, qa_approved, delivered
+- generated_by
+- qa_approved_by
+- delivered_by
+- delivered_at
+- created_at
+
+3. Send Report button must only send the report attached to the current order_id.
+Do not allow Ops to paste arbitrary report URLs for final delivery.
+
+4. Before sending, show confirmation modal:
+“You are sending this report to:
+Buyer: [name/email/phone]
+Order: [order_number]
+Vehicle: [year make model]
+Report ID: [report_id]”
+
+Buttons:
+- Preview Report
+- Confirm Send
+
+5. QA approval required:
+Report cannot be sent until:
+- report.order_id matches current order.id
+- report.buyer_email matches order.customer_email
+- report_status = qa_approved
+
+6. Server-side validation:
+Before delivery API sends email/SMS:
+- fetch order by order_id
+- fetch report by report_id
+- confirm report.order_id === order.id
+- confirm recipient === order.customer_email/customer_phone
+- confirm report is QA approved
+If mismatch, block delivery and log security/audit event.
+
+7. Report watermark/header:
+Add to every PDF/mobile report:
+- RideCheck order number
+- buyer name/email
+- vehicle year/make/model
+- VIN if available
+- generated timestamp
+
+8. Delivery log:
+Create report_delivery_events:
+- order_id
+- report_id
+- recipient_email
+- recipient_phone
+- channel
+- status
+- delivered_by
+- delivered_at
+
+9. UI:
+On Order Detail page, Report section should show:
+- Current attached report
+- Report ID
+- QA status
+- Delivery status
+- Buyer recipient
+- Preview button
+- Send button only when safe
+
+10. Remove or restrict manual Report URL field.
+If kept for admin-only legacy use, require owner-only permission and warning.
+
+Do not break report generation pipeline, auth, middleware, storage, or existing orders.

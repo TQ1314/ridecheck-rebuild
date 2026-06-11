@@ -482,6 +482,29 @@ export async function POST(
       console.error("[generate-report] order update error:", updateError);
     }
 
+    // 10a. Insert / replace generated_reports row for safety tracking
+    // Mark any prior rows for this order as superseded first
+    await supabaseAdmin
+      .from("generated_reports")
+      .update({ report_status: "superseded", updated_at: new Date().toISOString() })
+      .eq("order_id", params.orderId)
+      .not("report_status", "eq", "superseded");
+
+    await supabaseAdmin.from("generated_reports").insert({
+      order_id:             params.orderId,
+      order_number:         order.order_id ?? null,
+      buyer_email:          (order as any).buyer_email || order.customer_email || null,
+      buyer_name:           order.customer_name || null,
+      vehicle_year:         order.vehicle_year ? String(order.vehicle_year) : null,
+      vehicle_make:         order.vehicle_make || null,
+      vehicle_model:        order.vehicle_model || null,
+      report_storage_path:  storagePath,
+      report_url:           reportUrl,
+      report_status:        "qa_pending",
+      generated_by:         actor.userId,
+      report_logic_version: REPORT_LOGIC_VERSION,
+    });
+
     // 10. Audit
     await Promise.all([
       writeOrderEvent({

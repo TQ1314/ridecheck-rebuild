@@ -1457,3 +1457,70 @@ COMMENT ON COLUMN public.seller_contact_attempts.delivery_updated_at IS
   'Timestamp of the most recent delivery status update from the provider webhook.';
 COMMENT ON COLUMN public.seller_contact_attempts.is_auto_notification IS
   'TRUE for system-generated messages (e.g. seller trust confirmation). Excluded from the 3-attempt ops counter.';
+
+
+-- ============================================================
+-- MIGRATION 052: Report-to-Order Safety Controls
+-- generated_reports and report_delivery_events tables
+-- ============================================================
+
+-- generated_reports: one row per AI-generated report PDF
+-- Enforces that every delivery is tied to a specific order/buyer/report.
+CREATE TABLE IF NOT EXISTS public.generated_reports (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id             UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  order_number         TEXT,
+  buyer_email          TEXT,
+  buyer_name           TEXT,
+  vehicle_year         TEXT,
+  vehicle_make         TEXT,
+  vehicle_model        TEXT,
+  vin                  TEXT,
+  report_storage_path  TEXT,
+  report_url           TEXT,
+  -- qa_pending | qa_approved | delivered | superseded
+  report_status        TEXT NOT NULL DEFAULT 'qa_pending',
+  generated_by         UUID,
+  qa_approved_by       UUID,
+  qa_approved_at       TIMESTAMPTZ,
+  qa_notes             TEXT,
+  delivered_by         UUID,
+  delivered_at         TIMESTAMPTZ,
+  report_logic_version TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_generated_reports_order_id
+  ON public.generated_reports(order_id);
+CREATE INDEX IF NOT EXISTS idx_generated_reports_status
+  ON public.generated_reports(report_status);
+
+ALTER TABLE public.generated_reports ENABLE ROW LEVEL SECURITY;
+
+-- report_delivery_events: immutable log of every delivery attempt
+CREATE TABLE IF NOT EXISTS public.report_delivery_events (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id             UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  report_id            UUID REFERENCES public.generated_reports(id),
+  recipient_email      TEXT,
+  recipient_phone      TEXT,
+  -- email | sms | both
+  channel              TEXT NOT NULL DEFAULT 'email',
+  -- sent | failed | bounced | delivered
+  status               TEXT NOT NULL DEFAULT 'sent',
+  delivered_by         UUID,
+  delivered_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  provider_message_id  TEXT,
+  notes                TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_delivery_events_order_id
+  ON public.report_delivery_events(order_id);
+
+ALTER TABLE public.report_delivery_events ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.generated_reports IS
+  'One row per AI-generated PDF; report_status must be qa_approved before delivery is allowed.';
+COMMENT ON TABLE public.report_delivery_events IS
+  'Immutable audit log of every report delivery attempt (email/SMS).';
