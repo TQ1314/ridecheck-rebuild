@@ -28,11 +28,12 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const sendSchema = z.object({
-  channel:      z.enum(["email", "sms"]),
-  to:           z.string().min(1, "Destination is required"),
-  subject:      z.string().optional(),
-  message_body: z.string().min(1, "Message body is required"),
-  template_key: z.string().optional(),
+  channel:            z.enum(["email", "sms"]),
+  to:                 z.string().min(1, "Destination is required"),
+  subject:            z.string().optional(),
+  message_body:       z.string().min(1, "Message body is required"),
+  template_key:       z.string().optional(),
+  save_seller_email:  z.boolean().optional(),
 });
 
 export async function POST(
@@ -53,7 +54,7 @@ export async function POST(
       );
     }
 
-    const { channel, to, subject, message_body, template_key } = parsed.data;
+    const { channel, to, subject, message_body, template_key, save_seller_email } = parsed.data;
 
     // ── Payment gate ──
     const { data: gateOrder } = await supabaseAdmin
@@ -143,26 +144,39 @@ export async function POST(
       return NextResponse.json({ error: "Failed to record attempt" }, { status: 500 });
     }
 
-    // ── Update order counters + contact status ──
+    // ── Update order counters + contact status (+ optionally save seller_email) ──
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("seller_contact_attempts, seller_contact_status")
+      .select("seller_contact_attempts, seller_contact_status, seller_email")
       .eq("id", params.orderId)
       .single();
 
     const now = new Date().toISOString();
+
+    const orderUpdate: Record<string, unknown> = {
+      seller_contact_attempts: ((order as any)?.seller_contact_attempts ?? 0) + 1,
+      seller_last_contact_at:  now,
+      seller_contact_status:
+        !(order as any)?.seller_contact_status ||
+        (order as any)?.seller_contact_status === "not_started"
+          ? "attempting"
+          : (order as any)?.seller_contact_status,
+      updated_at: now,
+    };
+
+    // If ops pasted a new email address and checked "save to order", persist it
+    if (
+      save_seller_email &&
+      channel === "email" &&
+      to &&
+      to !== (order as any)?.seller_email
+    ) {
+      orderUpdate.seller_email = to;
+    }
+
     await supabaseAdmin
       .from("orders")
-      .update({
-        seller_contact_attempts: ((order as any)?.seller_contact_attempts ?? 0) + 1,
-        seller_last_contact_at:  now,
-        seller_contact_status:
-          !(order as any)?.seller_contact_status ||
-          (order as any)?.seller_contact_status === "not_started"
-            ? "attempting"
-            : (order as any)?.seller_contact_status,
-        updated_at: now,
-      })
+      .update(orderUpdate)
       .eq("id", params.orderId);
 
     // ── Audit + event ──

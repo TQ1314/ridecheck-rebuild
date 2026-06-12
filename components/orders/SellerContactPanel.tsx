@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -195,6 +196,10 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
   const [emailSubject, setEmailSubject]     = useState("");
   const [emailMessage, setEmailMessage]     = useState("");
   const [sending, setSending]               = useState(false);
+  // Email-to-field edit mode (true when no seller_email on file, or when editing)
+  const [emailToEditable, setEmailToEditable]   = useState(false);
+  const [saveEmailToOrder, setSaveEmailToOrder] = useState(false);
+  const [emailError, setEmailError]             = useState("");
 
   const platform       = detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
@@ -255,9 +260,13 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     const nextNum   = attemptCount + 1;
     const templates = getSellerTemplates(platform, vehicleLabel, order.preferred_date, nextNum, order.listing_source);
     const subject   = getSellerEmailSubject(order.listing_source, vehicleLabel);
+    const hasEmail  = !!order.seller_email;
     setEmailTo(order.seller_email || "");
     setEmailSubject(subject);
     setEmailMessage(templates.email || "");
+    setEmailToEditable(!hasEmail);
+    setSaveEmailToOrder(!hasEmail);
+    setEmailError("");
     setEmailModalOpen(true);
   };
 
@@ -300,18 +309,30 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   // ── Send Email ──
   const handleSendEmail = async () => {
-    if (!emailTo || !emailMessage.trim() || !emailSubject.trim()) return;
+    const toTrimmed = emailTo.trim();
+    if (!toTrimmed || !emailMessage.trim() || !emailSubject.trim()) return;
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(toTrimmed)) {
+      setEmailError("Please enter a valid email address (e.g. user@example.com or abc-def@reply.craigslist.org).");
+      return;
+    }
+    setEmailError("");
+
     setSending(true);
     try {
+      const shouldSave = saveEmailToOrder && toTrimmed !== (order.seller_email || "");
       const res = await fetch(`/api/admin/orders/${order.id}/seller-contact/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           channel: "email",
-          to: emailTo,
+          to: toTrimmed,
           subject: emailSubject,
           message_body: emailMessage,
           template_key: `email_seller_contact_attempt_${attemptCount + 1}`,
+          save_seller_email: shouldSave,
         }),
       });
       const data = await res.json();
@@ -322,7 +343,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
       toast({
         title: data.success ? "Email sent" : "Email failed to send",
         description: data.success
-          ? `Attempt #${data.attempt_number} dispatched. Delivery tracking active.`
+          ? `Attempt #${data.attempt_number} dispatched. Delivery tracking active.${shouldSave ? " Email saved to order." : ""}`
           : `Attempt #${data.attempt_number} logged as failed.`,
         variant: data.success ? "default" : "destructive",
       });
@@ -545,8 +566,10 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   // Whether any direct-send button should be visible
   const hasSmsTarget   = !!order.seller_phone;
-  const hasEmailTarget = !!order.seller_email;
+  // Show email button when seller_email is known OR listing_url exists (for Craigslist relay)
+  const hasEmailTarget = !!order.seller_email || !!order.listing_url;
   const hasListing     = !!order.listing_url;
+  const missingEmail   = !order.seller_email && !!order.listing_url;
   const showActionBar  = hasSmsTarget || hasEmailTarget || hasListing;
 
   return (
@@ -699,6 +722,14 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                 <Info className="h-3 w-3 shrink-0" />
                 Click phone/email above or use the buttons below to contact the seller.
               </p>
+              {missingEmail && (
+                <div className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-400">
+                  <Info className="h-3 w-3 shrink-0 mt-0.5" />
+                  <span>
+                    No seller email on file. Open the listing, copy the seller or relay email, paste it in the Send Email dialog, and send through RideCheck.
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
                 {hasSmsTarget && (
                   <Button
@@ -1204,7 +1235,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
         </Dialog>
 
         {/* ── Send Email modal ── */}
-        <Dialog open={emailModalOpen} onOpenChange={(o) => { if (!o && !sending) setEmailModalOpen(false); }}>
+        <Dialog open={emailModalOpen} onOpenChange={(o) => { if (!o && !sending) { setEmailModalOpen(false); setEmailError(""); } }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1216,12 +1247,72 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-1">
+
+              {/* ── To field ── */}
               <div>
-                <Label className="mb-1.5 block text-sm">To</Label>
-                <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground select-all">
-                  {emailTo || "No email address on file"}
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="text-sm">To</Label>
+                  {!emailToEditable && order.seller_email && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary underline"
+                      onClick={() => { setEmailToEditable(true); setSaveEmailToOrder(true); }}
+                      data-testid="button-change-email"
+                    >
+                      Change Email
+                    </button>
+                  )}
                 </div>
+
+                {emailToEditable ? (
+                  <div className="space-y-2">
+                    {/* Craigslist / no-email helper */}
+                    {missingEmail && (
+                      <div className="flex items-start gap-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-400">
+                        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Open the listing, copy the seller or relay email, paste it here, then send through RideCheck.
+                        </span>
+                      </div>
+                    )}
+                    <Input
+                      type="email"
+                      value={emailTo}
+                      onChange={(e) => { setEmailTo(e.target.value); setEmailError(""); }}
+                      placeholder="Paste seller email or Craigslist relay email"
+                      className={emailError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                      data-testid="input-email-to"
+                      autoFocus
+                    />
+                    {emailError && (
+                      <p className="text-xs text-red-600 dark:text-red-400" data-testid="text-email-error">
+                        {emailError}
+                      </p>
+                    )}
+                    {/* Save to order checkbox */}
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="save-email-to-order"
+                        checked={saveEmailToOrder}
+                        onCheckedChange={(checked) => setSaveEmailToOrder(!!checked)}
+                        data-testid="checkbox-save-email"
+                      />
+                      <label
+                        htmlFor="save-email-to-order"
+                        className="text-xs text-muted-foreground cursor-pointer select-none"
+                      >
+                        Save this email to the order for future contact
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/50 px-3 text-sm select-all">
+                    {emailTo || <span className="text-muted-foreground">No email address on file</span>}
+                  </div>
+                )}
               </div>
+
+              {/* ── Subject ── */}
               <div>
                 <Label className="mb-1.5 block text-sm">Subject</Label>
                 <input
@@ -1232,6 +1323,8 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                   data-testid="input-email-subject"
                 />
               </div>
+
+              {/* ── Message body ── */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <Label className="text-sm">
@@ -1249,17 +1342,18 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                   data-testid="input-email-message"
                 />
               </div>
+
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setEmailModalOpen(false)}
+                  onClick={() => { setEmailModalOpen(false); setEmailError(""); }}
                   disabled={sending}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSendEmail}
-                  disabled={sending || !emailMessage.trim() || !emailSubject.trim() || !emailTo}
+                  disabled={sending || !emailMessage.trim() || !emailSubject.trim() || !emailTo.trim()}
                   data-testid="button-send-email"
                 >
                   {sending ? (
@@ -1267,7 +1361,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                   ) : (
                     <Mail className="h-4 w-4 mr-2" />
                   )}
-                  Send Email
+                  {emailToEditable && saveEmailToOrder ? "Save Email & Send" : "Send Email"}
                 </Button>
               </div>
             </div>
