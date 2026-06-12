@@ -46,7 +46,8 @@ END $$;
 -- ── RLS ───────────────────────────────────────────────────────────────────
 ALTER TABLE seller_messages ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "ops_seller_messages_all"
+DROP POLICY IF EXISTS "ops_seller_messages_all" ON seller_messages;
+CREATE POLICY "ops_seller_messages_all"
   ON seller_messages
   FOR ALL
   USING (
