@@ -69,9 +69,26 @@ export async function POST(
 
     // ── 3. Build message payload ──
     const messageBody: string = attempt.message_body ?? "";
+
+    const orderData = Array.isArray(attempt.orders) ? attempt.orders[0] : attempt.orders;
+    let emailHtml: string;
+    if (channel === "email") {
+      const { sellerOutreachEmailHtml } = await import(
+        "@/lib/email/templates/sellerOutreachEmail"
+      );
+      emailHtml = sellerOutreachEmailHtml({
+        messageBody,
+        vehicleYear:  orderData?.vehicle_year  ?? null,
+        vehicleMake:  orderData?.vehicle_make  ?? null,
+        vehicleModel: orderData?.vehicle_model ?? null,
+      });
+    } else {
+      emailHtml = `<div style="font-family: sans-serif; max-width: 600px; line-height: 1.6;">${messageBody.replace(/\n/g, "<br>")}</div>`;
+    }
+
     const payload = {
       subject: "Follow-up: Vehicle Inspection — RideCheck",
-      html: `<div style="font-family: sans-serif; max-width: 600px; line-height: 1.6;">${messageBody.replace(/\n/g, "<br>")}</div>`,
+      html:    emailHtml,
       smsBody: messageBody,
     };
 

@@ -56,10 +56,24 @@ export async function POST(
 
     const { channel, to, subject, message_body, template_key, save_seller_email } = parsed.data;
 
-    // ── Payment gate ──
+    // ── Server-side email format validation ──
+    if (channel === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(to.trim())) {
+        return NextResponse.json(
+          { error: "Invalid email address. Enter a valid seller email or Craigslist relay email." },
+          { status: 400 }
+        );
+      }
+    }
+
+    // ── Fetch order (payment gate + vehicle details for branded email) ──
     const { data: gateOrder } = await supabaseAdmin
       .from("orders")
-      .select("payment_status, payment_required, payment_override_approved")
+      .select(
+        "payment_status, payment_required, payment_override_approved, " +
+        "vehicle_year, vehicle_make, vehicle_model, listing_source, preferred_date"
+      )
       .eq("id", params.orderId)
       .single();
 
@@ -67,27 +81,35 @@ export async function POST(
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
     }
 
-    // ── Build HTML email body (preserve line breaks, add minimal wrapper) ──
-    const paragraphs = message_body
-      .split('\n')
-      .map(line =>
-        line.trim()
-          ? `<p style="margin: 0 0 14px 0;">${line}</p>`
-          : `<p style="margin: 0 0 14px 0;">&nbsp;</p>`
-      )
-      .join('');
+    // ── Build branded HTML email body ──
+    let html: string;
+    if (channel === "email") {
+      const { sellerOutreachEmailHtml } = await import(
+        "@/lib/email/templates/sellerOutreachEmail"
+      );
+      const attemptRaw = await supabaseAdmin
+        .from("seller_contact_attempts")
+        .select("attempt_number")
+        .eq("order_id", params.orderId)
+        .neq("channel", "buyer_message")
+        .order("attempt_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const currentAttemptNumber = ((attemptRaw.data as any)?.attempt_number ?? 0) + 1;
 
-    const html = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            max-width: 600px; margin: 0 auto; padding: 24px 32px;
-            background-color: #ffffff; color: #1a1a1a; line-height: 1.65; font-size: 15px;">
-  ${paragraphs}
-  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 28px 0 20px;" />
-  <p style="font-size: 12px; color: #9ca3af; margin: 0; line-height: 1.5;">
-    This message was sent by RideCheck Operations on behalf of a vehicle buyer.<br>
-    Please reply directly to this email with questions or to confirm availability.
-  </p>
-</div>`.trim();
+      html = sellerOutreachEmailHtml({
+        messageBody:    message_body,
+        vehicleYear:    (gateOrder as any).vehicle_year   ?? null,
+        vehicleMake:    (gateOrder as any).vehicle_make   ?? null,
+        vehicleModel:   (gateOrder as any).vehicle_model  ?? null,
+        listingSource:  (gateOrder as any).listing_source ?? null,
+        preferredDate:  (gateOrder as any).preferred_date ?? null,
+        attemptNumber:  currentAttemptNumber,
+      });
+    } else {
+      // SMS — no HTML needed, but keep a fallback for sendDirect signature
+      html = message_body;
+    }
 
     // ── Twilio StatusCallback URL for SMS delivery tracking ──
     const statusCallback =

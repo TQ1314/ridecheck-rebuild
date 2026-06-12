@@ -1,0 +1,182 @@
+Improve RideCheck outgoing communication branding and validation.
+
+Goal:
+Every outgoing RideCheck email should look professional, branded, trustworthy, and mobile-friendly. Ops should also be able to verify whether emails were actually delivered, bounced, failed, or ignored.
+
+Scope:
+Apply this to all outgoing emails:
+- seller outreach emails
+- seller follow-up emails
+- buyer report delivery emails
+- RideChecker invite/assignment emails
+- payment/request emails where applicable
+
+1. Create shared branded email layout
+
+Create a reusable email wrapper/template, e.g.:
+
+lib/email/templates/brandedEmailLayout.ts
+
+Include:
+- RideCheck logo or shield mark
+- RideCheck brand name
+- tagline: "Don’t Buy Blind."
+- support email: support@ridecheckauto.com
+- website: RideCheckAuto.com
+- clean mobile-responsive design
+- green RideCheck accent color
+- footer disclaimer:
+  "This message was sent by RideCheck Operations regarding a vehicle inspection request."
+
+The template should accept:
+- title
+- subtitle
+- bodyHtml
+- callToAction optional
+- vehicleSummary optional
+- footerNote optional
+
+2. Seller outreach email design
+
+Update seller contact emails to include:
+
+Header:
+RideCheck
+Independent Vehicle Inspection Service
+Don’t Buy Blind.
+
+Vehicle summary card:
+- Vehicle year/make/model
+- Inspection type
+- Requested inspection date/time
+- Estimated inspection length: 30–45 minutes
+- Location type: seller location / dealership / roadside
+
+Message body:
+Explain clearly:
+- A buyer requested an independent pre-purchase inspection
+- Inspection happens at seller/dealership location
+- No repairs, disassembly, or modifications are performed
+- Seller only needs to confirm availability
+
+Add trust section:
+- Performed at your location
+- No obligation to sell
+- Independent documentation
+- Helps serious buyers make informed decisions
+
+3. Source-aware branding
+
+Keep templates source-aware:
+- Online Marketplace / Listing
+- Dealership
+- Roadside / For Sale Sign
+
+Dealership emails should mention dealership/lot/business hours.
+Roadside emails should mention “for sale sign” and avoid online listing language.
+Marketplace emails should mention listing only when listing_url exists.
+
+4. Buyer report delivery email
+
+Brand the report delivery email.
+
+Include:
+- Buyer name
+- Order number
+- Vehicle
+- Report ID
+- CTA button: "View RideCheck Report"
+- Reminder: report belongs to this buyer/order only
+- Support contact
+
+Do not allow arbitrary manual report URL delivery except owner/admin advanced override.
+
+5. RideChecker emails
+
+Brand:
+- RideChecker invite emails
+- assignment notification emails
+- accepted/declined confirmation emails if applicable
+
+Include:
+- assigned vehicle
+- location
+- offered pay
+- required response action
+- link to accept/decline job
+
+6. Delivery validation
+
+Use the existing Resend webhook system.
+
+Make sure every outgoing email stores:
+- provider_message_id
+- delivery_status
+- delivery_updated_at
+- recipient
+- template_key
+- order_id if applicable
+
+Delivery status values:
+- queued
+- sent
+- delivered
+- bounced
+- complained
+- delivery_delayed
+- failed
+
+7. UI visibility
+
+On Seller Contact attempt history and Delivery Diagnostics:
+
+Show:
+- Delivered
+- Bounced
+- Failed
+- Delayed
+- Complained / Spam complaint
+- Timestamp
+- Provider message ID
+
+Add:
+- "View Delivery Details"
+- "Resend Message" only for failed/bounced/undeliverable messages
+
+8. Email validation
+
+Before sending email:
+- validate email format client-side
+- validate server-side
+- allow Craigslist relay emails
+- block empty or malformed addresses
+- show clear error:
+  "Enter a valid seller email or Craigslist relay email."
+
+If pasted email is valid and save_seller_email is checked:
+- save it to orders.seller_email
+- then send the email
+
+9. Reply handling note
+
+Do not build full reply parsing yet.
+For now, ensure outgoing seller emails clearly say:
+"Please reply directly to this email to confirm availability."
+
+10. Testing
+
+Test branded emails for:
+- Gmail
+- Outlook
+- Craigslist relay email
+- buyer report delivery
+- RideChecker invite/assignment
+
+Do not break:
+- auth
+- middleware
+- seller contact history
+- Resend webhook route
+- Twilio SMS flow
+- report safety controls
+- report QA approval flow

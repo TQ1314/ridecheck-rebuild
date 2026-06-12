@@ -225,46 +225,60 @@ export async function POST(
 
     if (buyerEmail) {
       try {
-        const { sendEmail } = await import("@/lib/email/resend");
-        const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
-        const customerFirst = (order.customer_name || "there").split(" ")[0];
+        const { sendEmail }         = await import("@/lib/email/resend");
+        const { brandedEmailLayout } = await import("@/lib/email/templates/brandedEmailLayout");
+        const vehicleLabel    = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
+        const customerFirst   = (order.customer_name || "there").split(" ")[0];
+        const displayOrderId  = (order as any).order_id || order.id;
+        const reportId        = genReport?.id ?? null;
+
+        const bodyHtml = `
+<p style="margin:0 0 14px; color:#1e293b;">Hi ${customerFirst},</p>
+<p style="margin:0 0 14px; color:#475569; line-height:1.7;">
+  Your RideCheck intelligence report for the <strong>${vehicleLabel}</strong> has been
+  reviewed, quality-checked, and is now ready for you.
+</p>
+<table cellpadding="0" cellspacing="0" width="100%"
+  style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin:0 0 24px;">
+  <tr>
+    <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
+               font-weight:600; color:#475569; width:40%;">Order</td>
+    <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
+               color:#1e293b;">${displayOrderId}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
+               font-weight:600; color:#475569;">Vehicle</td>
+    <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
+               color:#1e293b;">${vehicleLabel}</td>
+  </tr>
+  ${reportId ? `<tr>
+    <td style="padding:10px 16px; font-size:13px; font-weight:600; color:#475569;">Report ID</td>
+    <td style="padding:10px 16px; font-size:13px; color:#1e293b; font-family:monospace;">${reportId}</td>
+  </tr>` : ""}
+</table>
+${!reportUrl
+  ? `<p style="color:#475569; line-height:1.6;">Your report is ready. Please log in to your account to access it.</p>`
+  : `<p style="font-size:12px; color:#94a3b8; text-align:center; margin:0;">
+      This secure link expires in 7 days. Download or save your report before it expires.<br>
+      This report belongs to the buyer of record for order ${displayOrderId} only.
+    </p>`
+}`;
+
         await sendEmail({
-          to: buyerEmail,
+          to:      buyerEmail,
           subject: `Your RideCheck Intelligence Report is Ready — ${vehicleLabel}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-              <div style="text-align:center;margin-bottom:24px;">
-                <h1 style="color:#22774F;margin:0;font-size:26px;">RideCheck</h1>
-                <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Pre-Car-Purchase Intelligence</p>
-              </div>
-
-              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px;text-align:center;">
-                <p style="font-size:18px;font-weight:700;color:#166534;margin:0 0 4px;">Your Intelligence Report is Ready</p>
-                <p style="color:#15803d;margin:0;font-size:14px;">${vehicleLabel}</p>
-              </div>
-
-              <p style="color:#1e293b;font-size:15px;">Hi ${customerFirst},</p>
-              <p style="color:#475569;line-height:1.6;">Your RideCheck intelligence report for the <strong>${vehicleLabel}</strong> has been reviewed, quality-checked, and is now ready for you to view.</p>
-
-              <table style="width:100%;border-collapse:collapse;margin:20px 0;background:#f8fafc;border-radius:8px;">
-                <tr><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569;width:40%;">Order</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;color:#1e293b;">${order.order_id || order.id}</td></tr>
-                <tr><td style="padding:10px 16px;font-weight:600;color:#475569;">Vehicle</td><td style="padding:10px 16px;color:#1e293b;">${vehicleLabel}</td></tr>
-              </table>
-
-              ${reportUrl ? `
-              <p style="text-align:center;margin:28px 0;">
-                <a href="${reportUrl}" style="display:inline-block;background:#22774F;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:15px;">View My Report</a>
-              </p>
-              <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:8px;">This secure link expires in 7 days. Download or save your report before it expires.</p>
-              ` : `<p style="color:#475569;">Your report is ready. Please log in to your account to access it.</p>`}
-
-              <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0 16px;" />
-              <p style="color:#94a3b8;font-size:12px;text-align:center;line-height:1.6;">
-                RideCheck — Pre-Car-Purchase Intelligence<br/>
-                Questions? Contact us at <a href="mailto:support@ridecheckauto.com" style="color:#22774F;">support@ridecheckauto.com</a>
-              </p>
-            </div>
-          `,
+          html:    brandedEmailLayout({
+            title:    "Your Intelligence Report Is Ready",
+            subtitle: vehicleLabel,
+            bodyHtml,
+            callToAction: reportUrl
+              ? { url: reportUrl, label: "View My RideCheck Report" }
+              : null,
+            footerDisclaimer:
+              "This report was prepared by RideCheck for the buyer of record only. " +
+              "If you received this in error, please contact us.",
+          }),
         });
       } catch (emailErr) {
         console.error("Failed to send delivery email:", emailErr);

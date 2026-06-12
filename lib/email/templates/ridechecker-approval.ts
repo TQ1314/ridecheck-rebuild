@@ -1,4 +1,5 @@
-const GREEN = "#1a6b45";
+import { brandedEmailLayout } from "./brandedEmailLayout";
+
 const BRAND = "RideCheck";
 
 export function ridecheckerApprovedHtml({
@@ -8,43 +9,41 @@ export function ridecheckerApprovedHtml({
   name: string;
   setupUrl: string;
 }) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
-      <div style="margin-bottom:24px;">
-        <span style="font-size:20px;font-weight:700;color:${GREEN};">${BRAND}</span>
-      </div>
-      <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:#111;">
-        You've been approved as a RideChecker!
-      </h1>
-      <p style="margin-bottom:16px;">Hi ${name},</p>
-      <p style="margin-bottom:16px;">
-        Congratulations — your application has been <strong>approved</strong>. You are now part of
-        the ${BRAND} field team as a certified RideChecker.
-      </p>
-      <p style="margin-bottom:24px;">
-        Click the button below to complete your onboarding setup. This link is unique to you
-        and expires in 72 hours.
-      </p>
-      <a href="${setupUrl}"
-         style="display:inline-block;background:${GREEN};color:#fff;padding:14px 28px;
-                border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
-        Complete Onboarding
-      </a>
-      <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb;">
-        <p style="font-size:13px;color:#6b7280;margin-bottom:8px;"><strong>What happens next:</strong></p>
-        <ul style="font-size:13px;color:#374151;padding-left:18px;line-height:1.7;">
-          <li>Complete your profile and onboarding checklist</li>
-          <li>Vehicle assessment jobs in your area will appear on your dashboard</li>
-          <li>Complete assessments and submit reports through the ${BRAND} app</li>
-          <li>Earn per completed and approved assessment</li>
-        </ul>
-      </div>
-      <p style="font-size:12px;color:#9ca3af;margin-top:32px;">
-        If you did not apply to be a RideChecker, you can safely ignore this email.<br/>
-        ${BRAND} &mdash; Pre-Car-Purchase Intelligence
-      </p>
-    </div>
-  `;
+  const firstName = name.split(" ")[0] || name;
+  const bodyHtml = `
+<p style="margin:0 0 14px; color:#1e293b;">Hi ${firstName},</p>
+<p style="margin:0 0 14px; color:#475569; line-height:1.7;">
+  Congratulations — your application has been <strong>approved</strong>.
+  You are now part of the ${BRAND} field team as a certified RideChecker.
+</p>
+<p style="margin:0 0 20px; color:#475569; line-height:1.7;">
+  Click the button below to complete your onboarding setup.
+  This link is unique to you and <strong>expires in 72 hours</strong>.
+</p>
+<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+            padding:18px 20px; margin:0 0 8px;">
+  <p style="margin:0 0 10px; font-size:14px; font-weight:700; color:#166534;">What happens next:</p>
+  <table cellpadding="0" cellspacing="0" width="100%">
+    ${[
+      "Complete your profile and onboarding checklist",
+      "Vehicle assessment jobs in your area will appear on your dashboard",
+      "Complete assessments and submit reports through the RideCheck app",
+      "Earn per completed and approved assessment",
+    ].map(item => `
+    <tr>
+      <td style="width:22px; padding:5px 0; vertical-align:top; color:#16a34a; font-size:15px;">&#10003;</td>
+      <td style="padding:5px 0; font-size:14px; color:#1e293b; line-height:1.5;">${item}</td>
+    </tr>`).join("")}
+  </table>
+</div>`;
+
+  return brandedEmailLayout({
+    title:    "You've Been Approved as a RideChecker!",
+    bodyHtml,
+    callToAction: { url: setupUrl, label: "Complete Onboarding" },
+    footerDisclaimer:
+      "If you did not apply to be a RideChecker, you can safely ignore this email.",
+  });
 }
 
 export function ridecheckerRejectedHtml({
@@ -54,29 +53,30 @@ export function ridecheckerRejectedHtml({
   name: string;
   reason?: string;
 }) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
-      <div style="margin-bottom:24px;">
-        <span style="font-size:20px;font-weight:700;color:${GREEN};">${BRAND}</span>
-      </div>
-      <h1 style="font-size:22px;font-weight:700;margin-bottom:8px;color:#111;">
-        RideChecker Application Update
-      </h1>
-      <p style="margin-bottom:16px;">Hi ${name},</p>
-      <p style="margin-bottom:16px;">
-        Thank you for your interest in joining the ${BRAND} field team. After reviewing your
-        application, we are unable to move forward at this time.
-      </p>
-      ${reason ? `<p style="background:#f9fafb;border-left:3px solid #d1d5db;padding:12px 16px;font-size:14px;color:#374151;"><strong>Feedback:</strong> ${reason}</p>` : ""}
-      <p style="margin-top:16px;">
-        If your circumstances change in the future, we encourage you to reapply. You're also
-        welcome to reach out to our team with any questions.
-      </p>
-      <p style="font-size:12px;color:#9ca3af;margin-top:32px;">
-        ${BRAND} &mdash; Pre-Car-Purchase Intelligence
-      </p>
-    </div>
-  `;
+  const firstName = name.split(" ")[0] || name;
+  const bodyHtml = `
+<p style="margin:0 0 14px; color:#1e293b;">Hi ${firstName},</p>
+<p style="margin:0 0 14px; color:#475569; line-height:1.7;">
+  Thank you for your interest in joining the ${BRAND} field team.
+  After reviewing your application, we are unable to move forward at this time.
+</p>
+${reason ? `
+<div style="background:#f8fafc; border-left:3px solid #d1d5db; padding:12px 16px;
+            margin:0 0 14px; border-radius:0 4px 4px 0;">
+  <p style="margin:0; font-size:14px; color:#374151; line-height:1.6;">
+    <strong>Feedback:</strong> ${reason}
+  </p>
+</div>` : ""}
+<p style="margin:0; color:#475569; line-height:1.7;">
+  If your circumstances change in the future, we encourage you to reapply.
+  You're also welcome to reach out with any questions.
+</p>`;
+
+  return brandedEmailLayout({
+    title:    "RideChecker Application Update",
+    bodyHtml,
+    footerDisclaimer: `${BRAND} — Pre-Car-Purchase Intelligence`,
+  });
 }
 
 export function ridecheckerStageUpdateHtml({
@@ -99,27 +99,29 @@ export function ridecheckerStageUpdateHtml({
     ready_for_approval:  "Ready for Final Approval",
   };
   const label = stageLabel[toStage] ?? toStage.replace(/_/g, " ");
+  const firstName = name.split(" ")[0] || name;
 
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
-      <div style="margin-bottom:24px;">
-        <span style="font-size:20px;font-weight:700;color:${GREEN};">${BRAND}</span>
-      </div>
-      <h1 style="font-size:20px;font-weight:700;margin-bottom:8px;color:#111;">
-        Application Status Update
-      </h1>
-      <p style="margin-bottom:16px;">Hi ${name},</p>
-      <p style="margin-bottom:16px;">
-        Your RideChecker application status has been updated to:
-        <strong>${label}</strong>
-      </p>
-      ${notes ? `<p style="background:#f9fafb;border-left:3px solid #d1d5db;padding:12px 16px;font-size:14px;color:#374151;">${notes}</p>` : ""}
-      <p style="margin-top:16px;font-size:13px;color:#6b7280;">
-        Our team will be in touch with next steps. If you have any questions, reply to this email.
-      </p>
-      <p style="font-size:12px;color:#9ca3af;margin-top:32px;">
-        ${BRAND} &mdash; Pre-Car-Purchase Intelligence
-      </p>
-    </div>
-  `;
+  const bodyHtml = `
+<p style="margin:0 0 14px; color:#1e293b;">Hi ${firstName},</p>
+<p style="margin:0 0 14px; color:#475569; line-height:1.7;">
+  Your RideChecker application status has been updated to:
+</p>
+<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+            padding:14px 18px; margin:0 0 14px; text-align:center;">
+  <p style="margin:0; font-size:18px; font-weight:700; color:#166534;">${label}</p>
+</div>
+${notes ? `
+<div style="background:#f8fafc; border-left:3px solid #d1d5db; padding:12px 16px;
+            margin:0 0 14px; border-radius:0 4px 4px 0;">
+  <p style="margin:0; font-size:14px; color:#374151; line-height:1.6;">${notes}</p>
+</div>` : ""}
+<p style="margin:0; font-size:14px; color:#64748b; line-height:1.7;">
+  Our team will be in touch with next steps. If you have any questions, reply to this email.
+</p>`;
+
+  return brandedEmailLayout({
+    title:    "Application Status Update",
+    bodyHtml,
+    footerDisclaimer: `${BRAND} — Pre-Car-Purchase Intelligence`,
+  });
 }

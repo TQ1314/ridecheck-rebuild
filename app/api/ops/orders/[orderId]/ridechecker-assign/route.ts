@@ -164,25 +164,18 @@ export async function PATCH(
 
           const smsBody = `RideCheck: Hi ${firstName}, a new job has been assigned to you${pay ? ` ($${pay})` : ""} — ${vehicleLabel}. You have 15 minutes to accept. Check your dashboard: ${jobUrl}`;
 
-          const emailHtml = `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-              <div style="text-align:center;margin-bottom:20px;">
-                <h1 style="color:#22774F;margin:0;font-size:24px;">RideCheck</h1>
-                <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Field Inspection Network</p>
-              </div>
-              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px;margin-bottom:20px;">
-                <p style="font-weight:700;color:#166534;margin:0 0 4px;font-size:16px;">New job assigned to you</p>
-                <p style="color:#15803d;margin:0;font-size:13px;">You have 15 minutes to accept. Act fast.</p>
-              </div>
-              <p style="color:#1e293b;">Hi ${firstName},</p>
-              <p style="color:#475569;line-height:1.6;">A vehicle assessment job for a <strong>${vehicleLabel}</strong>${pay ? ` at <strong>$${pay}</strong>` : ""} has been assigned directly to you. Log in to your dashboard to review the details and accept.</p>
-              <p style="text-align:center;margin:24px 0;">
-                <a href="${jobUrl}" style="display:inline-block;background:#22774F;color:#fff;padding:13px 28px;border-radius:6px;text-decoration:none;font-weight:700;">View &amp; Accept Job</a>
-              </p>
-              <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0 12px;" />
-              <p style="color:#94a3b8;font-size:12px;text-align:center;">RideCheck — Pre-Car-Purchase Intelligence<br/>Questions? <a href="mailto:support@ridecheckauto.com" style="color:#22774F;">support@ridecheckauto.com</a></p>
-            </div>
-          `;
+          const { ridecheckerJobOfferHtml } = await import(
+            "@/lib/email/templates/ridecheckerJobOffer"
+          );
+          const emailHtml = ridecheckerJobOfferHtml({
+            firstName,
+            offeredPay:   pay ?? 0,
+            vehicleYear:  order.vehicle_year  ?? null,
+            vehicleMake:  order.vehicle_make  ?? null,
+            vehicleModel: order.vehicle_model ?? null,
+            orderId:      order.order_id      ?? null,
+            dashboardUrl: jobUrl,
+          });
 
           const notifs: Promise<any>[] = [];
           if (rc.phone) {
