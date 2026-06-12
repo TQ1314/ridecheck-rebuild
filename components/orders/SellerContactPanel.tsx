@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import type { Order, SellerContactAttempt, SellerContactChannel } from "@/types/orders";
 import { detectSellerPlatform, getAllowedChannels, getChannelLabel } from "@/lib/seller-contact/platforms";
-import { getTemplateForChannel, getSellerTemplates, getSellerEmailSubject } from "@/lib/seller-contact/templates";
+import { getTemplateForChannel, getSellerTemplates } from "@/lib/seller-contact/templates";
+import { getSellerMessage, getAllAttempts, getAttemptLabel } from "@/lib/seller-contact/sellerMessaging";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,9 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
   const [emailToEditable, setEmailToEditable]   = useState(false);
   const [saveEmailToOrder, setSaveEmailToOrder] = useState(false);
   const [emailError, setEmailError]             = useState("");
+  // Template variant pickers (1 = Initial, 2 = Follow-up, 3 = Final)
+  const [smsVariant, setSmsVariant]     = useState<1 | 2 | 3>(1);
+  const [emailVariant, setEmailVariant] = useState<1 | 2 | 3>(1);
 
   const platform       = detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
@@ -248,26 +252,42 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   // ── Open SMS send modal ──
   const openSmsModal = () => {
-    const nextNum   = attemptCount + 1;
-    const templates = getSellerTemplates(platform, vehicleLabel, order.preferred_date, nextNum, order.listing_source);
+    const defaultVariant = Math.min(attemptCount + 1, 3) as 1 | 2 | 3;
+    const msg = getSellerMessage({ vehicleLabel, listingSource: order.listing_source, preferredDate: order.preferred_date, attemptNumber: defaultVariant });
     setSmsTo(order.seller_phone || "");
-    setSmsMessage(templates.sms || "");
+    setSmsMessage(msg.smsBody);
+    setSmsVariant(defaultVariant);
     setSmsModalOpen(true);
+  };
+
+  // ── Switch SMS template variant ──
+  const selectSmsVariant = (n: 1 | 2 | 3) => {
+    const msg = getSellerMessage({ vehicleLabel, listingSource: order.listing_source, preferredDate: order.preferred_date, attemptNumber: n });
+    setSmsMessage(msg.smsBody);
+    setSmsVariant(n);
   };
 
   // ── Open Email send modal ──
   const openEmailModal = () => {
-    const nextNum   = attemptCount + 1;
-    const templates = getSellerTemplates(platform, vehicleLabel, order.preferred_date, nextNum, order.listing_source);
-    const subject   = getSellerEmailSubject(order.listing_source, vehicleLabel);
-    const hasEmail  = !!order.seller_email;
+    const defaultVariant = Math.min(attemptCount + 1, 3) as 1 | 2 | 3;
+    const msg    = getSellerMessage({ vehicleLabel, listingSource: order.listing_source, preferredDate: order.preferred_date, attemptNumber: defaultVariant });
+    const hasEmail = !!order.seller_email;
     setEmailTo(order.seller_email || "");
-    setEmailSubject(subject);
-    setEmailMessage(templates.email || "");
+    setEmailSubject(msg.emailSubject);
+    setEmailMessage(msg.emailText);
+    setEmailVariant(defaultVariant);
     setEmailToEditable(!hasEmail);
     setSaveEmailToOrder(!hasEmail);
     setEmailError("");
     setEmailModalOpen(true);
+  };
+
+  // ── Switch Email template variant ──
+  const selectEmailVariant = (n: 1 | 2 | 3) => {
+    const msg = getSellerMessage({ vehicleLabel, listingSource: order.listing_source, preferredDate: order.preferred_date, attemptNumber: n });
+    setEmailMessage(msg.emailText);
+    setEmailSubject(msg.emailSubject);
+    setEmailVariant(n);
   };
 
   // ── Send SMS ──
@@ -275,6 +295,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     if (!smsTo || !smsMessage.trim()) return;
     setSending(true);
     try {
+      const variantKey = smsVariant === 1 ? "initial" : smsVariant === 2 ? "followup" : "final";
       const res = await fetch(`/api/admin/orders/${order.id}/seller-contact/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -282,7 +303,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           channel: "sms",
           to: smsTo,
           message_body: smsMessage,
-          template_key: `sms_seller_contact_attempt_${attemptCount + 1}`,
+          template_key: `sms_seller_${variantKey}`,
         }),
       });
       const data = await res.json();
@@ -323,6 +344,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     setSending(true);
     try {
       const shouldSave = saveEmailToOrder && toTrimmed !== (order.seller_email || "");
+      const variantKey = emailVariant === 1 ? "initial" : emailVariant === 2 ? "followup" : "final";
       const res = await fetch(`/api/admin/orders/${order.id}/seller-contact/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -331,7 +353,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           to: toTrimmed,
           subject: emailSubject,
           message_body: emailMessage,
-          template_key: `email_seller_contact_attempt_${attemptCount + 1}`,
+          template_key: `email_seller_${variantKey}`,
           save_seller_email: shouldSave,
         }),
       });
@@ -1188,19 +1210,29 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
                 </div>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-sm">
-                    Message
-                    <span className="ml-2 text-xs text-muted-foreground font-normal">
-                      Attempt {attemptCount + 1}
-                      {order.listing_source && order.listing_source !== "online_marketplace"
-                        ? ` · ${order.listing_source === "dealership" ? "Dealership" : "Roadside"} template`
-                        : ""}
-                    </span>
-                  </Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm">Message</Label>
                   <span className={`text-xs ${smsMessage.length > 160 ? "text-amber-600" : "text-muted-foreground"}`}>
                     {smsMessage.length} chars{smsMessage.length > 160 ? " (multi-part)" : ""}
                   </span>
+                </div>
+                <div className="flex items-center gap-1 mb-2">
+                  <span className="text-xs text-muted-foreground mr-1 shrink-0">Template:</span>
+                  {([1, 2, 3] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => selectSmsVariant(n)}
+                      data-testid={`button-sms-variant-${n}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        smsVariant === n
+                          ? "bg-[#22774F] text-white border-[#22774F]"
+                          : "bg-transparent text-muted-foreground border-input hover:border-[#22774F] hover:text-[#22774F]"
+                      }`}
+                    >
+                      {getAttemptLabel(n)}
+                    </button>
+                  ))}
                 </div>
                 <Textarea
                   value={smsMessage}
@@ -1326,13 +1358,27 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
               {/* ── Message body ── */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-sm">
-                    Message
-                    <span className="ml-2 text-xs text-muted-foreground font-normal">
-                      Attempt {attemptCount + 1} · Plain text, sent as formatted email
-                    </span>
-                  </Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm">Message</Label>
+                  <span className="text-xs text-muted-foreground">Plain text · sent as formatted email</span>
+                </div>
+                <div className="flex items-center gap-1 mb-2">
+                  <span className="text-xs text-muted-foreground mr-1 shrink-0">Template:</span>
+                  {([1, 2, 3] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => selectEmailVariant(n)}
+                      data-testid={`button-email-variant-${n}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        emailVariant === n
+                          ? "bg-[#22774F] text-white border-[#22774F]"
+                          : "bg-transparent text-muted-foreground border-input hover:border-[#22774F] hover:text-[#22774F]"
+                      }`}
+                    >
+                      {getAttemptLabel(n)}
+                    </button>
+                  ))}
                 </div>
                 <Textarea
                   value={emailMessage}

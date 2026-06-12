@@ -1,0 +1,125 @@
+Update all seller-facing communication to use one unified conversion-focused messaging system.
+
+Goal:
+Every seller-facing message — SMS, email, Craigslist relay email, dealership email, roadside message, and future WhatsApp/message templates — must follow the same RideCheck persuasion framework.
+
+We are not just contacting sellers. We are trying to win seller cooperation.
+
+Create a centralized seller messaging module:
+lib/seller-contact/sellerMessaging.ts
+
+It should generate:
+- SMS body
+- email subject
+- email plain text
+- email branded HTML
+- short follow-up variants
+
+Use the same core message logic across all channels.
+
+SELLER CONVERSION FRAMEWORK:
+
+Every seller message should communicate:
+
+1. Serious buyer
+“The buyer is serious and has already requested a RideCheck inspection.”
+
+2. Low friction
+“The inspection is brief, usually 30–45 minutes.”
+
+3. Convenience
+“We come to you / your lot / where the vehicle is parked.”
+
+4. Non-invasive
+“No repairs, no disassembly, no modifications.”
+
+5. Trust
+“RideCheck is an independent vehicle inspection service.”
+
+6. Benefit to seller
+“Confirming the inspection helps serious buyers move forward with confidence.”
+
+7. Clear CTA
+“Reply with a time that works.”
+
+SOURCE-AWARE VARIANTS:
+
+Online Marketplace / Listing:
+- Reference the vehicle/listing.
+- Do not sound accusatory.
+- Emphasize serious buyer and quick inspection.
+
+Dealership:
+- Use dealership language.
+- “A customer is interested in a vehicle on your lot.”
+- “We can work around your business hours.”
+- Avoid private seller wording.
+
+Roadside / For Sale Sign:
+- “I’m reaching out about the vehicle with the For Sale sign.”
+- “A buyer would like to arrange an independent inspection.”
+- Avoid marketplace/listing language.
+
+TONE:
+- Professional
+- Warm
+- Clear
+- Non-threatening
+- Seller-friendly
+- No scam/fraud language
+- No “red flag” language
+- No aggressive pressure
+- No accusations
+
+SMS TEMPLATE EXAMPLE:
+“Hi, this is RideCheck. A serious buyer requested a quick 30–45 min inspection for your [vehicle]. We come to you and do not perform repairs or take anything apart. What time works for you?”
+
+EMAIL TEMPLATE STRUCTURE:
+Subject:
+“Inspection request for your [vehicle] — RideCheck”
+
+Body:
+- Greeting
+- Serious buyer has requested inspection
+- What RideCheck does
+- Inspection is brief and non-invasive
+- Seller convenience
+- CTA: reply with availability
+- RideCheck signature and support info
+
+FOLLOW-UP SEQUENCE:
+Attempt 1:
+Polite intro / serious buyer / schedule request
+
+Attempt 2:
+Short reminder / buyer still interested / flexible timing
+
+Attempt 3:
+Final follow-up / if no reply, buyer will be advised that seller was unreachable
+
+IMPORTANT:
+Attempt 3 should be firm but still professional.
+Do not say seller refused unless they explicitly refused.
+Use “unreachable” or “unable to confirm availability.”
+
+DELIVERY CHANNEL RULE:
+The core message should remain consistent across SMS and email.
+Email can be longer and branded.
+SMS should be shorter but must carry the same persuasion points.
+
+UI:
+In SellerContactPanel, label templates clearly:
+- Initial outreach
+- Follow-up
+- Final follow-up
+
+Ops should be able to review/edit before sending.
+
+Do not break:
+- existing seller contact history
+- delivery tracking
+- Resend webhook
+- Twilio SMS
+- source-aware templates
+- email validation
+- report safety controls
