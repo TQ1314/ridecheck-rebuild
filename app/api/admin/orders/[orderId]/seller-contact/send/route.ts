@@ -77,7 +77,7 @@ export async function POST(
       .eq("id", params.orderId)
       .single();
 
-    if (!gateOrder || !canProceedWithRideCheck(gateOrder)) {
+    if (!gateOrder || !canProceedWithRideCheck(gateOrder as any)) {
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
     }
 
@@ -117,6 +117,14 @@ export async function POST(
         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/twilio`
         : undefined;
 
+    // ── Reply-to address for email (encodes order number so inbound parser can match) ──
+    const orderRef    = (gateOrder as any)?.order_number ?? null;
+    const appDomain   = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "").split("/")[0];
+    const replyToDomain = appDomain || "ridecheckauto.com";
+    const replyTo     = channel === "email" && orderRef
+      ? `RideCheck Ops <replies+${orderRef}@${replyToDomain}>`
+      : undefined;
+
     // ── Send ──
     const r = await sendDirect(
       channel,
@@ -126,7 +134,7 @@ export async function POST(
         html,
         smsBody: message_body,
       },
-      { statusCallback }
+      { statusCallback, replyTo }
     );
 
     // ── Determine next attempt_number (non-buyer_message rows) ──

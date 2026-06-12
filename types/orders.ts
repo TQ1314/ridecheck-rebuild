@@ -132,6 +132,10 @@ export interface Order {
   seller_platform?: string;
   seller_contact_status?: string;
   seller_outcome_notes?: string;
+  seller_replied_at?: string;
+  seller_available_date?: string;
+  seller_available_time?: string;
+  seller_inspection_address?: string;
   service_zip?: string;
   service_county?: string;
   service_state?: string;

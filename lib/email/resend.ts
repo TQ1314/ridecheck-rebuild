@@ -15,24 +15,23 @@ export async function sendEmail({
   to,
   subject,
   html,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
+  replyTo?: string;
 }): Promise<{ success: boolean; dev?: boolean; messageId?: string; data?: any; error?: any }> {
   if (!resend) {
     const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : html;
-    console.log(`[EMAIL-TEST] to=${to} subject=${subject} body=${safeBody}`);
+    console.log(`[EMAIL-TEST] to=${to} subject=${subject} reply_to=${replyTo ?? "n/a"} body=${safeBody}`);
     return { success: true, dev: true };
   }
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: fromDisplay,
-      to,
-      subject,
-      html,
-    });
+    const sendParams: any = { from: fromDisplay, to, subject, html };
+    if (replyTo) sendParams.reply_to = replyTo;
+    const { data, error } = await resend.emails.send(sendParams);
     if (error) {
       console.error("[Resend Error]", error);
       return { success: false, error };

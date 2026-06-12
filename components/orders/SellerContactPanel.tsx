@@ -40,6 +40,7 @@ import {
   Copy,
   Plus,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   AlertCircle,
   Clock,
@@ -49,7 +50,12 @@ import {
   Loader2,
   Send,
   ClipboardList,
+  ArrowDownLeft,
+  Calendar,
+  RefreshCw,
+  CalendarCheck,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
 
@@ -205,6 +211,18 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
   const [smsVariant, setSmsVariant]     = useState<1 | 2 | 3>(1);
   const [emailVariant, setEmailVariant] = useState<1 | 2 | 3>(1);
 
+  // ── Communication Center ──
+  const [commTab, setCommTab]               = useState("replies");
+  const [replies, setReplies]               = useState<any[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [unreadCount, setUnreadCount]       = useState(0);
+  const [sellerConfirming, setSellerConfirming] = useState(false);
+  const [scheduleOpen, setScheduleOpen]     = useState(false);
+  const [scheduleAddress, setScheduleAddress] = useState(order.seller_inspection_address || "");
+  const [scheduleDate, setScheduleDate]     = useState(order.seller_available_date || "");
+  const [scheduleTime, setScheduleTime]     = useState(order.seller_available_time || "");
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+
   const platform       = detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
   const vehicleLabel   = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
@@ -217,7 +235,24 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     (a) => !a.is_auto_notification && a.channel !== "buyer_message"
   ).length;
 
-  useEffect(() => { loadAttempts(); }, [order.id]);
+  useEffect(() => { loadAttempts(); loadReplies(); }, [order.id]);
+
+  async function loadReplies() {
+    setRepliesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/seller-replies`);
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data.replies) ? data.replies : [];
+        setReplies(list);
+        setUnreadCount(list.filter((r: any) => !r.is_read).length);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setRepliesLoading(false);
+    }
+  }
 
   async function loadAttempts() {
     setAttemptsLoading(true);
@@ -288,6 +323,82 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
     setEmailMessage(msg.emailText);
     setEmailSubject(msg.emailSubject);
     setEmailVariant(n);
+  };
+
+  // ── Mark Seller Confirmed ──
+  const handleMarkSellerConfirmed = async () => {
+    setSellerConfirming(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/seller-confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inspection_address: scheduleAddress || undefined,
+          available_date:     scheduleDate || undefined,
+          available_time:     scheduleTime || undefined,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: "Seller confirmed", description: "Status updated to Confirmed." });
+        onRefresh();
+      } else {
+        const d = await res.json();
+        toast({ title: "Error", description: d.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    } finally {
+      setSellerConfirming(false);
+    }
+  };
+
+  // ── Save schedule details ──
+  const handleSaveSchedule = async () => {
+    setScheduleSaving(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/seller-replies`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reply_id:      "00000000-0000-0000-0000-000000000000",
+          apply_date:    scheduleDate || undefined,
+          apply_time:    scheduleTime || undefined,
+          apply_address: scheduleAddress || undefined,
+          mark_read:     false,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: "Saved", description: "Schedule details saved to order." });
+        setScheduleOpen(false);
+        onRefresh();
+      } else {
+        const d = await res.json();
+        toast({ title: "Error", description: d.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  // ── Apply extracted data from a reply ──
+  const handleApplyExtracted = async (reply: any, field: "date" | "time" | "address", value: string) => {
+    try {
+      const body: any = { reply_id: reply.id, mark_read: true };
+      if (field === "date")    body.apply_date    = value;
+      if (field === "time")    body.apply_time    = value;
+      if (field === "address") body.apply_address = value;
+      await fetch(`/api/admin/orders/${order.id}/seller-replies`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      toast({ title: "Applied", description: `${field.charAt(0).toUpperCase() + field.slice(1)} saved to order.` });
+      onRefresh();
+    } catch {
+      toast({ title: "Error", description: "Failed to apply", variant: "destructive" });
+    }
   };
 
   // ── Send SMS ──
@@ -1622,6 +1733,430 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
           </DialogContent>
         </Dialog>
       </Card>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          SELLER COMMUNICATION CENTER
+          Shows all outbound attempts organised by channel, plus inbound
+          seller replies with AI-extracted scheduling data.
+      ══════════════════════════════════════════════════════════════════ */}
+      <Card className="mt-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-[#22774F]" />
+              Seller Communication
+              {unreadCount > 0 && (
+                <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { loadAttempts(); loadReplies(); }}
+              data-testid="button-refresh-comms"
+              className="h-7 px-2 text-xs text-muted-foreground"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh
+            </Button>
+          </div>
+
+          {/* ── Extracted availability summary ── */}
+          {(order.seller_available_date || order.seller_available_time || order.seller_inspection_address) && (
+            <div className="mt-2 rounded-md border border-[#22774F]/20 bg-[#22774F]/5 p-3 text-sm space-y-1">
+              <p className="text-xs font-semibold text-[#22774F] uppercase tracking-wide mb-1.5">Seller Provided</p>
+              {order.seller_available_date && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-3.5 w-3.5 text-[#22774F] shrink-0" />
+                  <span className="font-medium">Date:</span>
+                  <span>{order.seller_available_date}</span>
+                </div>
+              )}
+              {order.seller_available_time && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-3.5 w-3.5 text-[#22774F] shrink-0" />
+                  <span className="font-medium">Time:</span>
+                  <span>{order.seller_available_time}</span>
+                </div>
+              )}
+              {order.seller_inspection_address && (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-3.5 w-3.5 text-[#22774F] shrink-0" />
+                  <span className="font-medium">Address:</span>
+                  <span>{order.seller_inspection_address}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </CardHeader>
+
+        <CardContent className="pt-0">
+          <Tabs value={commTab} onValueChange={setCommTab}>
+            <TabsList className="w-full mb-4 h-9">
+              <TabsTrigger value="replies" className="flex-1 text-xs" data-testid="tab-comms-replies">
+                <ArrowDownLeft className="h-3 w-3 mr-1" />
+                Replies
+                {unreadCount > 0 && (
+                  <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="email" className="flex-1 text-xs" data-testid="tab-comms-email">
+                <Mail className="h-3 w-3 mr-1" />
+                Email
+                <span className="ml-1 text-[10px] text-muted-foreground">
+                  ({attempts.filter((a) => a.channel === "email").length})
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="sms" className="flex-1 text-xs" data-testid="tab-comms-sms">
+                <MessageSquare className="h-3 w-3 mr-1" />
+                SMS
+                <span className="ml-1 text-[10px] text-muted-foreground">
+                  ({attempts.filter((a) => a.channel === "sms").length})
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="calls" className="flex-1 text-xs" data-testid="tab-comms-calls">
+                <Phone className="h-3 w-3 mr-1" />
+                Calls
+                <span className="ml-1 text-[10px] text-muted-foreground">
+                  ({attempts.filter((a) => ["call", "fb_message", "buyer_message"].includes(a.channel)).length})
+                </span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Replies tab ── */}
+            <TabsContent value="replies" className="mt-0">
+              {repliesLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Loading replies…
+                </div>
+              ) : replies.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  <ArrowDownLeft className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                  <p>No seller replies yet.</p>
+                  <p className="text-xs mt-1 opacity-70">
+                    Replies come in automatically via SMS (Twilio) and email (inbound routing).
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {replies.map((reply: any) => (
+                    <div
+                      key={reply.id}
+                      data-testid={`reply-card-${reply.id}`}
+                      className="rounded-lg border bg-muted/30 p-3 space-y-2"
+                    >
+                      {/* Header row */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {reply.channel === "sms"
+                          ? <MessageSquare className="h-3 w-3 text-blue-500" />
+                          : <Mail className="h-3 w-3 text-purple-500" />}
+                        <span className="font-medium text-foreground capitalize">{reply.channel}</span>
+                        <span>·</span>
+                        <span>{reply.from_address}</span>
+                        <span>·</span>
+                        <span>{new Date(reply.created_at).toLocaleString()}</span>
+                        {!reply.is_read && (
+                          <span className="ml-auto rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-600 uppercase">
+                            New
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Subject (email only) */}
+                      {reply.subject && (
+                        <p className="text-xs font-medium">{reply.subject}</p>
+                      )}
+
+                      {/* Body */}
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{reply.body}</p>
+
+                      {/* Extracted data chips */}
+                      {(reply.extracted_dates?.length > 0 ||
+                        reply.extracted_times?.length > 0 ||
+                        reply.extracted_addresses?.length > 0 ||
+                        reply.extracted_phones?.length > 0) && (
+                        <div className="pt-1 border-t border-dashed border-border">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                            Auto-extracted
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(reply.extracted_dates || []).map((d: string, i: number) => (
+                              <button
+                                key={`d${i}`}
+                                onClick={() => handleApplyExtracted(reply, "date", d)}
+                                data-testid={`chip-date-${reply.id}-${i}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-[#22774F]/30 bg-[#22774F]/10 px-2 py-0.5 text-[11px] font-medium text-[#22774F] hover:bg-[#22774F]/20 transition-colors"
+                                title="Click to apply to order"
+                              >
+                                <Calendar className="h-2.5 w-2.5" />
+                                {d}
+                              </button>
+                            ))}
+                            {(reply.extracted_times || []).map((t: string, i: number) => (
+                              <button
+                                key={`t${i}`}
+                                onClick={() => handleApplyExtracted(reply, "time", t)}
+                                data-testid={`chip-time-${reply.id}-${i}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-blue-300/50 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                                title="Click to apply to order"
+                              >
+                                <Clock className="h-2.5 w-2.5" />
+                                {t}
+                              </button>
+                            ))}
+                            {(reply.extracted_addresses || []).map((a: string, i: number) => (
+                              <button
+                                key={`a${i}`}
+                                onClick={() => handleApplyExtracted(reply, "address", a)}
+                                data-testid={`chip-address-${reply.id}-${i}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                                title="Click to apply to order"
+                              >
+                                <MapPin className="h-2.5 w-2.5" />
+                                {a}
+                              </button>
+                            ))}
+                            {(reply.extracted_phones || []).map((p: string, i: number) => (
+                              <span
+                                key={`p${i}`}
+                                data-testid={`chip-phone-${reply.id}-${i}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-gray-300/50 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                              >
+                                <Phone className="h-2.5 w-2.5" />
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Click a chip to apply it to the order fields.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── Email tab ── */}
+            <TabsContent value="email" className="mt-0">
+              {attempts.filter((a) => a.channel === "email").length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No email attempts yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {attempts
+                    .filter((a) => a.channel === "email")
+                    .map((a) => (
+                      <div key={a.id} className="flex items-start gap-2 rounded-md border p-3 text-sm" data-testid={`email-attempt-${a.id}`}>
+                        <Mail className="h-3.5 w-3.5 mt-0.5 text-purple-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-muted-foreground">Attempt #{a.attempt_number}</span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                            {a.delivery_status && (
+                              <span className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${
+                                a.delivery_status === "delivered" ? "bg-green-100 text-green-700" :
+                                a.delivery_status === "failed" ? "bg-red-100 text-red-700" :
+                                "bg-gray-100 text-gray-600"
+                              }`}>{a.delivery_status}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{a.destination}</p>
+                          {a.message_body && (
+                            <p className="mt-1 text-xs line-clamp-2 text-muted-foreground">{a.message_body}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── SMS tab ── */}
+            <TabsContent value="sms" className="mt-0">
+              {attempts.filter((a) => a.channel === "sms").length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No SMS attempts yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {attempts
+                    .filter((a) => a.channel === "sms")
+                    .map((a) => (
+                      <div key={a.id} className="flex items-start gap-2 rounded-md border p-3 text-sm" data-testid={`sms-attempt-${a.id}`}>
+                        <MessageSquare className="h-3.5 w-3.5 mt-0.5 text-blue-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-muted-foreground">Attempt #{a.attempt_number}</span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                            {a.delivery_status && (
+                              <span className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${
+                                a.delivery_status === "delivered" ? "bg-green-100 text-green-700" :
+                                a.delivery_status === "failed" ? "bg-red-100 text-red-700" :
+                                "bg-gray-100 text-gray-600"
+                              }`}>{a.delivery_status}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{a.destination}</p>
+                          {a.message_body && (
+                            <p className="mt-1 text-xs text-muted-foreground">{a.message_body}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── Calls tab ── */}
+            <TabsContent value="calls" className="mt-0">
+              {attempts.filter((a) => ["call", "fb_message", "buyer_message"].includes(a.channel)).length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No calls or manual contact logged yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {attempts
+                    .filter((a) => ["call", "fb_message", "buyer_message"].includes(a.channel))
+                    .map((a) => (
+                      <div key={a.id} className="flex items-start gap-2 rounded-md border p-3 text-sm" data-testid={`call-attempt-${a.id}`}>
+                        <Phone className="h-3.5 w-3.5 mt-0.5 text-gray-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium capitalize">{a.channel.replace("_", " ")}</span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">Attempt #{a.attempt_number}</span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                          </div>
+                          {a.message_body && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">{a.message_body}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* ── Action buttons ── */}
+          <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
+            {/* Schedule Inspection */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setScheduleOpen(true)}
+              data-testid="button-schedule-inspection"
+              className="text-xs gap-1.5"
+            >
+              <CalendarCheck className="h-3.5 w-3.5" />
+              Schedule Inspection
+            </Button>
+
+            {/* Assign RideChecker — scrolls to assignment section in the ops panel */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const el = document.getElementById("assignment-section");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+                else toast({ title: "Use the Assignment section above to assign a RideChecker." });
+              }}
+              data-testid="button-assign-ridechecker"
+              className="text-xs gap-1.5"
+            >
+              <User className="h-3.5 w-3.5" />
+              Assign RideChecker
+            </Button>
+
+            {/* Mark Seller Confirmed */}
+            {contactStatus !== "confirmed" ? (
+              <Button
+                size="sm"
+                onClick={handleMarkSellerConfirmed}
+                disabled={sellerConfirming}
+                data-testid="button-mark-seller-confirmed"
+                className="text-xs gap-1.5 bg-[#22774F] hover:bg-[#1a5c3c] text-white"
+              >
+                {sellerConfirming
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Mark Seller Confirmed
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Seller Confirmed
+                {order.seller_confirmed_at && (
+                  <span className="text-green-500 font-normal">· {new Date(order.seller_confirmed_at).toLocaleDateString()}</span>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Schedule Inspection dialog ── */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4 text-[#22774F]" />
+              Schedule Inspection
+            </DialogTitle>
+            <DialogDescription>
+              Record the seller's confirmed availability and inspection address. These will be saved to the order.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label className="text-sm mb-1.5 block">Available Date</Label>
+              <Input
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                placeholder="e.g. Tuesday March 18, or 3/18/2026"
+                data-testid="input-schedule-date"
+              />
+            </div>
+            <div>
+              <Label className="text-sm mb-1.5 block">Available Time</Label>
+              <Input
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                placeholder="e.g. 10am, afternoon, 2:00 PM"
+                data-testid="input-schedule-time"
+              />
+            </div>
+            <div>
+              <Label className="text-sm mb-1.5 block">Inspection Address</Label>
+              <Input
+                value={scheduleAddress}
+                onChange={(e) => setScheduleAddress(e.target.value)}
+                placeholder="e.g. 456 Oak Ave, Waukegan, IL 60085"
+                data-testid="input-schedule-address"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setScheduleOpen(false)} disabled={scheduleSaving}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveSchedule}
+                disabled={scheduleSaving || (!scheduleDate && !scheduleTime && !scheduleAddress)}
+                data-testid="button-save-schedule"
+                className="bg-[#22774F] hover:bg-[#1a5c3c] text-white"
+              >
+                {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Details"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </TooltipProvider>
   );
 }

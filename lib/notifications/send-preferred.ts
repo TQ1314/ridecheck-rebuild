@@ -93,10 +93,10 @@ export async function sendDirect(
   channel: "email" | "sms",
   to: string,
   payload: NotificationPayload,
-  options?: { statusCallback?: string }
+  options?: { statusCallback?: string; replyTo?: string }
 ): Promise<ChannelResult> {
   if (channel === "email") {
-    const r = await sendEmail({ to, subject: payload.subject, html: payload.html });
+    const r = await sendEmail({ to, subject: payload.subject, html: payload.html, replyTo: options?.replyTo });
     return { channel: "email", success: r.success, messageId: r.messageId, error: r.error };
   } else {
     const r = await sendSMS({ to, body: payload.smsBody, statusCallback: options?.statusCallback });
