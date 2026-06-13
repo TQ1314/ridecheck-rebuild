@@ -63,6 +63,7 @@ interface RideCheckerSuggestion {
 interface RideCheckerAssignmentPanelProps {
   order: Order;
   onRefresh: () => void;
+  onNoPay?: () => void;
 }
 
 function useCountdown(expiresAt: string | null | undefined, active: boolean) {
@@ -124,7 +125,7 @@ function broadcastStatusLabel(status: string) {
   }
 }
 
-export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssignmentPanelProps) {
+export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCheckerAssignmentPanelProps) {
   const { toast } = useToast();
 
   const [ridecheckers, setRidecheckers] = useState<RideCheckerSuggestion[]>([]);
@@ -238,7 +239,20 @@ export function RideCheckerAssignmentPanel({ order, onRefresh }: RideCheckerAssi
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Assignment failed", description: data.error, variant: "destructive" });
+        const isNoPayError =
+          res.status === 400 &&
+          typeof data.error === "string" &&
+          data.error.toLowerCase().includes("pay rate must be set");
+        if (isNoPayError && onNoPay) {
+          onNoPay();
+          toast({
+            title: "Compensation required",
+            description: "Please calculate and save a RideChecker offer before assigning.",
+            variant: "destructive",
+          });
+        } else {
+          toast({ title: "Assignment failed", description: data.error, variant: "destructive" });
+        }
         return;
       }
       const rc = ridecheckers.find((r) => r.id === selectedDirect);

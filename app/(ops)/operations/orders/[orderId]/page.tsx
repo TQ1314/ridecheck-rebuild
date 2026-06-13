@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, ActivityLogEntry, Profile } from "@/types/orders";
@@ -8,6 +8,7 @@ import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { SellerContactPanel } from "@/components/orders/SellerContactPanel";
 import { BuyerCard } from "@/components/orders/BuyerCard";
 import { RideCheckerAssignmentPanel } from "@/components/orders/RideCheckerAssignmentPanel";
+import { RideCheckerCompensationPanel } from "@/components/orders/RideCheckerCompensationPanel";
 import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
 import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
@@ -228,6 +229,15 @@ export default function OpsOrderDetailPage() {
   const [paymentOverrideConfirmed, setPaymentOverrideConfirmed] = useState(false);
   const [paymentOverrideLoading,   setPaymentOverrideLoading]   = useState(false);
   const [showPaymentOverrideCard,  setShowPaymentOverrideCard]  = useState(false);
+
+  // Compensation panel scroll + highlight
+  const [compensationHighlighted, setCompensationHighlighted] = useState(false);
+  const handleNoPay = useCallback(() => {
+    const el = document.getElementById("rc-compensation-panel");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setCompensationHighlighted(true);
+    setTimeout(() => setCompensationHighlighted(false), 3200);
+  }, []);
 
   const loadData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -579,7 +589,13 @@ export default function OpsOrderDetailPage() {
         {/* ── RIGHT column ───────────────────────────────── */}
         <div className="space-y-4">
           <BuyerCard order={order} onRefresh={loadData} />
-          <RideCheckerAssignmentPanel order={order} onRefresh={loadData} />
+          <RideCheckerCompensationPanel
+            order={order}
+            onRefresh={loadData}
+            userRole={role}
+            highlighted={compensationHighlighted}
+          />
+          <RideCheckerAssignmentPanel order={order} onRefresh={loadData} onNoPay={handleNoPay} />
           <JobStatusPanel order={order} onRefresh={loadData} />
           <PayPanel order={order} onRefresh={loadData} userRole={role} />
           <ReportPanel order={order} onRefresh={loadData} />
