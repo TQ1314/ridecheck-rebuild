@@ -28,9 +28,10 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Core profile fetch — always-present columns only
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role, full_name, email, agreement_status, current_agreement_version")
+      .select("role, full_name, email")
       .eq("id", session.user.id)
       .maybeSingle();
 
@@ -38,7 +39,16 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (!hasSignedCurrentAgreement(profile as any)) {
+    // Agreement gate — separate query so it degrades gracefully if migration 057
+    // hasn't been run yet (PostgREST errors on missing columns; we skip the gate
+    // rather than returning a confusing 403 Forbidden).
+    const { data: profileAgreement, error: agreementFetchErr } = await supabaseAdmin
+      .from("profiles")
+      .select("agreement_status, current_agreement_version")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!agreementFetchErr && !hasSignedCurrentAgreement((profileAgreement ?? {}) as any)) {
       return NextResponse.json(
         {
           error: "You must sign the current RideCheck Contractor Agreement before accepting assignments.",

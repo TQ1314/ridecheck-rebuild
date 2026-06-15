@@ -80,9 +80,10 @@ export async function PATCH(
     let rcName: string | null = null;
 
     if (ridechecker_id) {
+      // Fetch core profile fields — always-present columns only
       const { data: rc, error: rcErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, full_name, role, agreement_status, current_agreement_version")
+        .select("id, full_name, role")
         .eq("id", ridechecker_id)
         .single();
 
@@ -92,12 +93,23 @@ export async function PATCH(
       if (!["ridechecker", "ridechecker_active", "owner", "developer"].includes(rc.role)) {
         return NextResponse.json({ error: "User is not a RideChecker" }, { status: 400 });
       }
-      if (!hasSignedCurrentAgreement(rc as any)) {
+
+      // Agreement gate — separate query so it degrades gracefully if migration 057
+      // hasn't been run yet (PostgREST returns an error for missing columns; we skip
+      // the gate rather than surfacing a confusing "RideChecker not found" 404).
+      const { data: rcAgreement, error: agreementFetchErr } = await supabaseAdmin
+        .from("profiles")
+        .select("agreement_status, current_agreement_version")
+        .eq("id", ridechecker_id)
+        .maybeSingle();
+
+      if (!agreementFetchErr && !hasSignedCurrentAgreement((rcAgreement ?? {}) as any)) {
         return NextResponse.json(
           { error: "This RideChecker has not signed the current contractor agreement. They must sign before receiving assignments." },
           { status: 400 }
         );
       }
+
       rcName = rc.full_name;
     }
 
