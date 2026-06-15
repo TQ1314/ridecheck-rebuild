@@ -157,6 +157,12 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
   const [rcMsg, setRcMsg] = useState("");
   const [rcMsgSending, setRcMsgSending] = useState(false);
   const [rcMsgOpen, setRcMsgOpen] = useState(false);
+
+  // Agreement reminder state — populated when an assign attempt is blocked by unsigned agreement
+  const [agreementBlockedRc, setAgreementBlockedRc] = useState<RideCheckerSuggestion | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderSent, setReminderSent] = useState(false);
+
   const isAwaitingAcceptance = order.assignment_status === "awaiting_acceptance";
 
   const secsLeft = useCountdown(assignmentExpiresAt, isAwaitingAcceptance);
@@ -246,6 +252,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
           typeof data.error === "string" &&
           (data.error.toLowerCase().includes("pay rate must be set") ||
            data.error.toLowerCase().includes("compensation offer"));
+        const isAgreementError =
+          res.status === 400 &&
+          typeof data.error === "string" &&
+          data.error.toLowerCase().includes("contractor agreement");
+
         if (isNoPayError && onNoPay) {
           onNoPay();
           toast({
@@ -253,11 +264,17 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
             description: "Please calculate and save a RideChecker offer before assigning.",
             variant: "destructive",
           });
+        } else if (isAgreementError) {
+          const blockedRc = ridecheckers.find((r) => r.id === selectedDirect);
+          setAgreementBlockedRc(blockedRc ?? null);
+          setReminderSent(false);
         } else {
           toast({ title: "Assignment failed", description: data.error, variant: "destructive" });
         }
         return;
       }
+      setAgreementBlockedRc(null);
+      setReminderSent(false);
       const rc = ridecheckers.find((r) => r.id === selectedDirect);
       toast({
         title: "RideChecker notified",
@@ -323,6 +340,32 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
       toast({ title: "Unexpected error", variant: "destructive" });
     } finally {
       setRcMsgSending(false);
+    }
+  }
+
+  async function handleSendReminder() {
+    if (!agreementBlockedRc) return;
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`/api/ops/orders/${order.id}/agreement-reminder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ridechecker_id: agreementBlockedRc.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Reminder failed", description: data.error, variant: "destructive" });
+        return;
+      }
+      setReminderSent(true);
+      toast({
+        title: "Agreement reminder sent",
+        description: `${agreementBlockedRc.full_name} was notified via ${(data.channels as string[]).join(" and ")}.`,
+      });
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setSendingReminder(false);
     }
   }
 
@@ -651,7 +694,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
           <div className="flex gap-2">
             <Select
               value={selectedDirect}
-              onValueChange={setSelectedDirect}
+              onValueChange={(v) => {
+                setSelectedDirect(v);
+                setAgreementBlockedRc(null);
+                setReminderSent(false);
+              }}
               disabled={rcLoading}
             >
               <SelectTrigger
@@ -722,12 +769,48 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                   </div>
                 )}
                 {(selectedRc as any).agreement_status !== "signed" && (
-                  <div className="flex items-center gap-2 p-2 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800">
-                    <Ban className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
-                    <p className="text-xs text-red-700 dark:text-red-400">
-                      <strong>{selectedRc.full_name}</strong> has not signed the current contractor agreement. Assignment will be blocked.
-                    </p>
-                  </div>
+                  agreementBlockedRc?.id === selectedRc.id ? (
+                    <div className="rounded-md border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                            Contractor agreement required
+                          </p>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                            {selectedRc.full_name} must sign the current contractor agreement before receiving assignments.
+                          </p>
+                        </div>
+                      </div>
+                      {reminderSent ? (
+                        <div className="flex items-center gap-1.5 pl-6 text-xs text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                          Reminder sent — waiting for {selectedRc.full_name} to sign.
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-6 h-7 text-xs gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                          onClick={handleSendReminder}
+                          disabled={sendingReminder}
+                          data-testid="button-send-agreement-reminder"
+                        >
+                          {sendingReminder
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Bell className="h-3 w-3" />}
+                          Send Agreement Reminder
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800">
+                      <Ban className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+                      <p className="text-xs text-red-700 dark:text-red-400">
+                        <strong>{selectedRc.full_name}</strong> has not signed the current contractor agreement. Assignment will be blocked.
+                      </p>
+                    </div>
+                  )
                 )}
               </div>
             );

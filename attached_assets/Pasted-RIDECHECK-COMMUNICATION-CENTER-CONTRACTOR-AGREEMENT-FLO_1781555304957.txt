@@ -1,0 +1,138 @@
+RIDECHECK COMMUNICATION CENTER + CONTRACTOR AGREEMENT FLOW
+
+Goal:
+All RideCheck communication must happen inside RideCheck and be logged to the order.
+
+Do not use personal phones, personal email, or untracked side conversations.
+
+Extend existing communication systems only:
+- seller_contact_attempts
+- seller_messages
+- activity_log
+- order_events
+- notification utilities
+- RideChecker dashboard
+- Ops dashboard
+
+1. Central Communication Center
+
+Create one order-level Communication Center showing threaded messages for:
+
+- Buyer
+- Seller
+- RideChecker
+- Ops
+- System
+
+Each message should include:
+
+- order_id
+- sender_type: ops, buyer, seller, ridechecker, system
+- recipient_type
+- channel: sms, email, in_app, phone_call, facebook_bridge
+- message_body
+- direction: inbound/outbound/internal
+- status: draft, sent, delivered, failed, received
+- created_by
+- created_at
+
+Reuse seller_messages if possible. Do not create duplicate tables unless existing schema cannot support all parties.
+
+2. Seller Communication
+
+Seller SMS/email/call notes must appear inside Communication Center.
+
+Seller replies from SMS/email/webhooks must appear inside Communication Center.
+
+Facebook Marketplace remains buyer-bridge compliant:
+- no scraping
+- no automated Messenger
+- no Facebook login
+- buyer provides seller approval/contact info
+
+3. Buyer Communication
+
+Ops can message buyer from order page.
+
+Buyer replies should attach to the order.
+
+Use buyer preferred communication method if available.
+
+Buyer should receive:
+- payment links
+- seller refusal message
+- seller delay message
+- report ready message
+- issue/escalation updates
+
+4. RideChecker Communication
+
+Ops can message RideChecker from order page.
+
+RideChecker replies must appear inside Communication Center.
+
+RideChecker should receive:
+- job offer
+- assignment confirmation
+- seller/site details
+- changes/cancellations
+- QA correction requests
+- payout updates
+
+5. Contractor Agreement Gate UX
+
+Current behavior blocks assignment if RideChecker has not signed current agreement.
+
+Keep the gate.
+
+But improve flow:
+
+When Ops tries to assign unsigned RideChecker, show:
+"This RideChecker must sign the current contractor agreement before receiving assignments."
+
+Add action:
+"Send Agreement Reminder"
+
+This sends RideChecker an in-app/email/SMS reminder with link to sign.
+
+On RideChecker dashboard:
+Show blocking banner:
+"Action required: Sign current RideCheck contractor agreement before accepting jobs."
+
+Button:
+"Review and Sign Agreement"
+
+After signing:
+- agreement_status = signed
+- current_agreement_version recorded
+- signed_at recorded
+- assignment becomes allowed
+
+6. Logging
+
+Every message and agreement reminder must log to:
+- Communication Center
+- activity_log or order_events
+
+7. Testing
+
+Test:
+- Ops sends seller SMS/email
+- Seller reply appears inside RideCheck
+- Ops sends buyer message
+- Buyer reply appears inside RideCheck
+- Ops sends RideChecker message
+- RideChecker reply appears inside RideCheck
+- Unsigned RideChecker blocked
+- Agreement reminder sends
+- RideChecker signs
+- Assignment allowed
+
+Return:
+- files modified
+- migrations added if needed
+- communication center updated
+- agreement reminder added
+- RideChecker signing flow updated
+- build result
+- test result
