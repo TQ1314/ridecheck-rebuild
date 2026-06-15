@@ -13,6 +13,7 @@ import { PayPanel } from "@/components/orders/PayPanel";
 import { ReportPanel } from "@/components/orders/ReportPanel";
 import { RiskFlagsPanel } from "@/components/orders/RiskFlagsPanel";
 import { ConnecteamPanel } from "@/components/orders/ConnecteamPanel";
+import { CommunicationCenter } from "@/components/orders/CommunicationCenter";
 import { SellerRefusalAnalyticsCard } from "@/components/orders/SellerRefusalAnalyticsCard";
 import { JobStatusPanel } from "@/components/orders/JobStatusPanel";
 import { StatusUpdateDialog } from "@/components/orders/StatusUpdateDialog";
@@ -584,6 +585,7 @@ export default function OpsOrderDetailPage() {
         <div className="space-y-4">
           <OrderDetailPanel order={order} activities={activities} />
           <SellerContactPanel order={order} onRefresh={loadData} />
+          <CommunicationCenter order={order} onRefresh={loadData} />
         </div>
 
         {/* ── RIGHT column ───────────────────────────────── */}
