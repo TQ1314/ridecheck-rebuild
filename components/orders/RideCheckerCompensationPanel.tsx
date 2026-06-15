@@ -569,7 +569,7 @@ export function RideCheckerCompensationPanel({ order, onRefresh, userRole, highl
                 <Button
                   size="sm"
                   onClick={handleSave}
-                  disabled={saving || (!preview && !distanceMiles)}
+                  disabled={saving}
                   data-testid="button-save-offer"
                 >
                   {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
