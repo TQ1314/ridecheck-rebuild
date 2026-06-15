@@ -471,8 +471,14 @@ export function RideCheckerCompensationPanel({ order, onRefresh, userRole, highl
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-                No offer calculated yet. Enter the distance and click <strong>Calculate Offer</strong>.
+              <div className="rounded-md border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  No RideChecker offer has been saved yet.
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 pl-5">
+                  Calculate and save an offer below before assigning a RideChecker.
+                </p>
               </div>
             )}
 

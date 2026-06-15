@@ -22,17 +22,17 @@ export interface CompOfferResult {
 }
 
 const BASE_PAY: Record<string, number> = {
-  standard:      45,
-  basic:         45,
-  plus:          55,
-  premium:       65,
+  standard:      50,
+  basic:         50,
+  plus:          60,
+  premium:       70,
   exotic:         0,
   comprehensive:  0,
 };
 
 export function calcOffer(input: CompOfferInput): CompOfferResult {
   const pkg = (input.packageType || "standard").toLowerCase();
-  const basePay = BASE_PAY[pkg] ?? 45;
+  const basePay = BASE_PAY[pkg] ?? 50;
   const isManualReview = pkg === "exotic" || pkg === "comprehensive";
 
   // Distance bonus
