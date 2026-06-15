@@ -109,6 +109,7 @@ export function RideCheckerCompensationPanel({ order, onRefresh, userRole, highl
   const [currentOffer, setCurrentOffer] = useState<CompOffer | null>(null);
   const [history, setHistory] = useState<CompOffer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // Calculation inputs
@@ -146,14 +147,19 @@ export function RideCheckerCompensationPanel({ order, onRefresh, userRole, highl
   }, [highlighted]);
 
   const loadOffer = useCallback(async () => {
+    setLoadError(null);
     try {
       const res = await fetch(`/api/ops/orders/${order.id}/compensation`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setLoadError(errData.error ?? "Compensation module unavailable. Run migration 056 to enable it.");
+        return;
+      }
       const data = await res.json();
       setCurrentOffer(data.current ?? null);
       setHistory(data.history ?? []);
     } catch {
-      // silently fail — panel is additive
+      setLoadError("Unable to load compensation data. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -388,6 +394,26 @@ export function RideCheckerCompensationPanel({ order, onRefresh, userRole, highl
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             Loading compensation data…
+          </div>
+        ) : loadError ? (
+          <div className="rounded-md border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Compensation module unavailable
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                  {loadError}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 dark:text-amber-400 pl-6">
+              Assignment will still work — pay can be set via the <strong>Base Pay</strong> field in the Pay panel below, or via the Supabase admin panel.
+            </p>
+            <Button size="sm" variant="outline" onClick={loadOffer} className="h-7 text-xs ml-6">
+              Retry
+            </Button>
           </div>
         ) : (
           <>

@@ -50,7 +50,7 @@ export async function PATCH(
     // Fallback: legacy orders.base_pay / orders.current_offer fields
     let offeredPayForNotification: number | null = null;
     if (ridechecker_id) {
-      const { data: savedOffer } = await supabaseAdmin
+      const { data: savedOffer, error: offerQueryErr } = await supabaseAdmin
         .from("rc_compensation_offers")
         .select("id, total_offer, pay_status")
         .eq("order_id", params.orderId)
@@ -58,15 +58,14 @@ export async function PATCH(
         .in("pay_status", ["saved", "approved", "override_approved"])
         .maybeSingle();
 
+      // If the query errored, the compensation table likely hasn't been migrated yet.
+      // In that case degrade gracefully — skip the offer gate so assignment proceeds.
+      const compensationTableReady = !offerQueryErr;
       const compensationPay = (savedOffer as any)?.total_offer ?? 0;
-      const legacyPay = (order.base_pay ?? 0) > 0
-        ? order.base_pay!
-        : (order.current_offer ?? 0) > 0
-          ? order.current_offer!
-          : 0;
+      const legacyPay = Math.max(order.base_pay ?? 0, order.current_offer ?? 0);
 
-      const hasPay = compensationPay > 0 || legacyPay > 0;
-      if (!hasPay) {
+      // Only enforce the gate when the compensation table is accessible
+      if (compensationTableReady && compensationPay === 0 && legacyPay === 0) {
         return NextResponse.json(
           { error: "Set and save a RideChecker compensation offer before assigning." },
           { status: 400 }
@@ -74,7 +73,8 @@ export async function PATCH(
       }
 
       // Use the most accurate pay figure for notifications
-      offeredPayForNotification = compensationPay > 0 ? compensationPay : legacyPay;
+      const effectivePay = compensationPay > 0 ? compensationPay : legacyPay;
+      offeredPayForNotification = effectivePay > 0 ? effectivePay : null;
     }
 
     let rcName: string | null = null;
