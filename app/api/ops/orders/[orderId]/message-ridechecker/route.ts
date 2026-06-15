@@ -27,7 +27,7 @@ export async function POST(
 
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, assigned_ridechecker_id, vehicle_year, vehicle_make, vehicle_model")
+      .select("id, order_number, assigned_ridechecker_id, vehicle_year, vehicle_make, vehicle_model")
       .eq("id", params.orderId)
       .maybeSingle();
 
@@ -44,9 +44,16 @@ export async function POST(
 
     if (!rc) return NextResponse.json({ error: "RideChecker not found" }, { status: 404 });
 
-    const firstName = (rc.full_name || "there").split(" ")[0];
+    const firstName    = ((rc as any).full_name || "there").split(" ")[0];
     const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
+    const appUrl       = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
+
+    // Build reply-to so RC replies are routed back into RideCheck
+    const appDomain  = appUrl.replace(/^https?:\/\//, "").split("/")[0];
+    const orderRef   = (order as any).order_number ?? null;
+    const replyTo    = orderRef
+      ? `RideCheck Ops <replies+${orderRef}@${appDomain}>`
+      : undefined;
 
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -70,38 +77,56 @@ export async function POST(
 
     const results: Record<string, boolean> = { email: false, sms: false };
 
-    if (rc.email) {
+    if ((rc as any).email) {
       const { sendEmail } = await import("@/lib/notifications/email");
       const r = await sendEmail({
-        to: rc.email,
+        to:      (rc as any).email,
         subject: `Ops message — ${vehicleLabel}`,
-        html: emailHtml,
+        html:    emailHtml,
+        replyTo,
       });
       results.email = r.success;
     }
 
-    if (rc.phone) {
+    if ((rc as any).phone) {
       const { sendSMS } = await import("@/lib/notifications/sms");
       const r = await sendSMS({
-        to: rc.phone,
+        to:   (rc as any).phone,
         body: `RideCheck Ops (${vehicleLabel}): ${message}`,
       });
       results.sms = r.success;
     }
 
     await writeOrderEvent({
-      orderId: params.orderId,
+      orderId:   params.orderId,
       eventType: "ops_message_to_ridechecker",
-      actorId: actor.userId,
+      actorId:   actor.userId,
       actorEmail: actor.email,
       details: {
-        ridechecker_id: rc.id,
-        ridechecker_name: rc.full_name,
+        ridechecker_id:   (rc as any).id,
+        ridechecker_name: (rc as any).full_name,
         message,
         email_sent: results.email,
-        sms_sent: results.sms,
+        sms_sent:   results.sms,
       },
     }).catch(() => {});
+
+    // Mirror to seller_messages for Communication Center feed
+    try {
+      await supabaseAdmin.from("seller_messages").insert({
+        order_id:       params.orderId,
+        channel:        results.email ? "email" : "sms",
+        direction:      "outbound",
+        body:           message,
+        sender_type:    "ops",
+        recipient_type: "ridechecker",
+        status:         results.email || results.sms ? "sent" : "failed",
+        created_by:     actor.userId,
+        is_read:        true,
+      });
+    } catch {
+      // non-fatal
+    }
 
     return NextResponse.json({ success: true, ...results });
   } catch (err: any) {

@@ -28,16 +28,24 @@ export async function POST(
 
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, buyer_email, customer_email, buyer_phone, customer_phone, customer_name, vehicle_year, vehicle_make, vehicle_model")
+      .select("id, order_number, buyer_email, customer_email, buyer_phone, customer_phone, customer_name, vehicle_year, vehicle_make, vehicle_model")
       .eq("id", params.orderId)
       .maybeSingle();
 
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-    const buyerEmail = order.buyer_email || order.customer_email;
-    const buyerPhone = order.buyer_phone || order.customer_phone;
-    const firstName = (order.customer_name || "there").split(" ")[0];
+    const buyerEmail  = order.buyer_email || order.customer_email;
+    const buyerPhone  = order.buyer_phone || order.customer_phone;
+    const firstName   = (order.customer_name || "there").split(" ")[0];
     const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
+
+    // Build reply-to so buyer replies are routed back into RideCheck
+    const appUrl    = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "").split("/")[0];
+    const domain    = appUrl || "ridecheckauto.com";
+    const orderRef  = (order as any).order_number ?? null;
+    const replyTo   = orderRef
+      ? `RideCheck Ops <replies+${orderRef}@${domain}>`
+      : undefined;
 
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -61,6 +69,7 @@ export async function POST(
         to: buyerEmail,
         subject: `Update on your RideCheck — ${vehicleLabel}`,
         html: emailHtml,
+        replyTo,
       });
       results.email = r.success;
     }
@@ -81,6 +90,23 @@ export async function POST(
       actorEmail: actor.email,
       details: { message, channel, email_sent: results.email, sms_sent: results.sms },
     }).catch(() => {});
+
+    // Mirror to seller_messages for Communication Center feed
+    try {
+      await supabaseAdmin.from("seller_messages").insert({
+        order_id:       params.orderId,
+        channel:        channel === "both" ? (results.email ? "email" : "sms") : channel,
+        direction:      "outbound",
+        body:           message,
+        sender_type:    "ops",
+        recipient_type: "buyer",
+        status:         results.email || results.sms ? "sent" : "failed",
+        created_by:     actor.userId,
+        is_read:        true,
+      });
+    } catch {
+      // non-fatal
+    }
 
     return NextResponse.json({ success: true, ...results });
   } catch (err: any) {
