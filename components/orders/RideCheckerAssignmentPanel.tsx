@@ -58,6 +58,8 @@ interface RideCheckerSuggestion {
   score: number;
   is_available: boolean;
   availability_updated_at: string | null;
+  agreement_status?: string | null;
+  current_agreement_version?: string | null;
 }
 
 interface RideCheckerAssignmentPanelProps {
@@ -242,7 +244,8 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
         const isNoPayError =
           res.status === 400 &&
           typeof data.error === "string" &&
-          data.error.toLowerCase().includes("pay rate must be set");
+          (data.error.toLowerCase().includes("pay rate must be set") ||
+           data.error.toLowerCase().includes("compensation offer"));
         if (isNoPayError && onNoPay) {
           onNoPay();
           toast({

@@ -46,14 +46,35 @@ export async function PATCH(
     }
 
     // Enforce pay-before-assign rule
+    // Primary source of truth: rc_compensation_offers (Compensation Panel)
+    // Fallback: legacy orders.base_pay / orders.current_offer fields
+    let offeredPayForNotification: number | null = null;
     if (ridechecker_id) {
-      const hasPay = (order.base_pay ?? 0) > 0 || (order.current_offer ?? 0) > 0;
+      const { data: savedOffer } = await supabaseAdmin
+        .from("rc_compensation_offers")
+        .select("id, total_offer, pay_status")
+        .eq("order_id", params.orderId)
+        .eq("is_current", true)
+        .in("pay_status", ["saved", "approved", "override_approved"])
+        .maybeSingle();
+
+      const compensationPay = (savedOffer as any)?.total_offer ?? 0;
+      const legacyPay = (order.base_pay ?? 0) > 0
+        ? order.base_pay!
+        : (order.current_offer ?? 0) > 0
+          ? order.current_offer!
+          : 0;
+
+      const hasPay = compensationPay > 0 || legacyPay > 0;
       if (!hasPay) {
         return NextResponse.json(
-          { error: "A pay rate must be set before assigning a RideChecker. Use the Pay panel to configure distance, urgency, and any boosts." },
+          { error: "Set and save a RideChecker compensation offer before assigning." },
           { status: 400 }
         );
       }
+
+      // Use the most accurate pay figure for notifications
+      offeredPayForNotification = compensationPay > 0 ? compensationPay : legacyPay;
     }
 
     let rcName: string | null = null;
@@ -165,7 +186,7 @@ export async function PATCH(
         if (rc) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
           const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
-          const pay = order.current_offer ?? order.base_pay ?? null;
+          const pay = offeredPayForNotification ?? order.current_offer ?? order.base_pay ?? null;
           const firstName = (rc.full_name || "there").split(" ")[0];
           const jobUrl = `${appUrl}/ridechecker/dashboard`;
 
