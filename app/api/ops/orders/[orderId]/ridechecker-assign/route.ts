@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
+import { hasSignedCurrentAgreement } from "@/lib/agreements/rccpa-v1-2026-06";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +61,7 @@ export async function PATCH(
     if (ridechecker_id) {
       const { data: rc, error: rcErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, full_name, role")
+        .select("id, full_name, role, agreement_status, current_agreement_version")
         .eq("id", ridechecker_id)
         .single();
 
@@ -69,6 +70,12 @@ export async function PATCH(
       }
       if (!["ridechecker", "ridechecker_active", "owner", "developer"].includes(rc.role)) {
         return NextResponse.json({ error: "User is not a RideChecker" }, { status: 400 });
+      }
+      if (!hasSignedCurrentAgreement(rc as any)) {
+        return NextResponse.json(
+          { error: "This RideChecker has not signed the current contractor agreement. They must sign before receiving assignments." },
+          { status: 400 }
+        );
       }
       rcName = rc.full_name;
     }

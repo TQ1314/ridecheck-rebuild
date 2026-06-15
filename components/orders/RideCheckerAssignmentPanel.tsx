@@ -679,6 +679,9 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                       {rc.decline_count_30d >= 3 && (
                         <span className="text-amber-600">⚠ {rc.decline_count_30d}d</span>
                       )}
+                      {rc.agreement_status !== "signed" && (
+                        <span className="text-red-600 font-bold">⚠ No Agreement</span>
+                      )}
                     </span>
                   </SelectItem>
                 ))}
@@ -704,17 +707,27 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
           </div>
           {selectedDirect && (() => {
             const selectedRc = ridecheckers.find((r) => r.id === selectedDirect);
-            if (selectedRc && !selectedRc.is_available) {
-              return (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    <strong>{selectedRc.full_name}</strong> is currently marked unavailable. You can still assign them, but they may not respond promptly.
-                  </p>
-                </div>
-              );
-            }
-            return null;
+            if (!selectedRc) return null;
+            return (
+              <div className="space-y-1.5">
+                {!selectedRc.is_available && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      <strong>{selectedRc.full_name}</strong> is currently marked unavailable. You can still assign them, but they may not respond promptly.
+                    </p>
+                  </div>
+                )}
+                {(selectedRc as any).agreement_status !== "signed" && (
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800">
+                    <Ban className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+                    <p className="text-xs text-red-700 dark:text-red-400">
+                      <strong>{selectedRc.full_name}</strong> has not signed the current contractor agreement. Assignment will be blocked.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
           })()}
           <p className="text-xs text-muted-foreground">
             RideChecker will have 15 minutes to accept before the offer expires.
@@ -781,6 +794,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                       {rc.decline_count_30d === 3 && (
                         <span className="text-[10px] font-semibold px-1 py-0 rounded bg-amber-100 text-amber-700 border border-amber-200 leading-4" title="Has received a warning for declines">
                           3 declines
+                        </span>
+                      )}
+                      {(rc as any).agreement_status !== "signed" && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4" title="Has not signed the current contractor agreement">
+                          No Agreement
                         </span>
                       )}
                     </div>

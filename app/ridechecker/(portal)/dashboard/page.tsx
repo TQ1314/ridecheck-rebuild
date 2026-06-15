@@ -43,6 +43,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
 import { ScoreCard } from "@/components/ridechecker/ScoreCard";
+import {
+  CURRENT_AGREEMENT_VERSION,
+  hasSignedCurrentAgreement,
+} from "@/lib/agreements/rccpa-v1-2026-06";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DashboardStats {
@@ -447,6 +451,9 @@ export default function RideCheckerDashboardPage() {
   const isActive = profile?.role === "ridechecker_active";
   const isPending = profile?.role === "ridechecker";
 
+  // Agreement gate — must sign RCCPA before accepting any assignments
+  const needsAgreement = isActive && !hasSignedCurrentAgreement(profile ?? {});
+
   // Partition assignments by status
   const pendingAcceptance = assignments.filter((a) => a.status === "awaiting_acceptance");
   const activeAssignments = assignments.filter((a) =>
@@ -552,6 +559,35 @@ export default function RideCheckerDashboardPage() {
           </Card>
         )}
 
+        {/* ── Agreement Required banner ────────────────────────────────── */}
+        {needsAgreement && (
+          <Card className="border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40" data-testid="card-agreement-required">
+            <CardContent className="flex items-start gap-4 p-5">
+              <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <h3 className="font-semibold text-amber-900 dark:text-amber-200" data-testid="text-agreement-banner-title">
+                  Action Required: Contractor Agreement
+                </h3>
+                <p className="text-sm text-amber-800 dark:text-amber-300" data-testid="text-agreement-banner-message">
+                  Before receiving RideCheck assignments, you must review and accept the current
+                  RideCheck Independent Contractor Compensation &amp; Performance Agreement.
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-500 font-mono">
+                  Version: {CURRENT_AGREEMENT_VERSION}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => router.push("/ridechecker/agreement")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white mt-1"
+                  data-testid="button-review-agreement"
+                >
+                  Review and Sign Agreement
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* ── Pending approval notice ─────────────────────────────────── */}
         {isPending && (
           <Card>
@@ -620,11 +656,27 @@ export default function RideCheckerDashboardPage() {
                 Action Required — {pendingAcceptance.length} Job Offer{pendingAcceptance.length > 1 ? "s" : ""}
               </h2>
             </div>
+            {needsAgreement && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30 text-sm text-amber-800 dark:text-amber-300">
+                <FileText className="h-4 w-4 flex-shrink-0" />
+                <span>Sign the contractor agreement above to unlock job acceptance.</span>
+              </div>
+            )}
             {pendingAcceptance.map((a) => (
               <ActionRequiredCard
                 key={a.id}
                 assignment={a}
-                onAccept={handleAccept}
+                onAccept={needsAgreement
+                  ? (_id: string) => {
+                      toast({
+                        title: "Agreement required",
+                        description: "Sign the contractor agreement before accepting assignments.",
+                        variant: "destructive",
+                      });
+                      router.push("/ridechecker/agreement");
+                    }
+                  : handleAccept
+                }
                 onDecline={handleDecline}
                 actionLoading={actionLoading}
               />

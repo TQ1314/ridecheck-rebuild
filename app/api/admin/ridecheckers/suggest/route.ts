@@ -5,9 +5,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 // Layered selects: each tier falls back if columns are missing
-const FULL_SELECT    = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until";
-const SCORE_SELECT   = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs";
-const MINIMAL_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs";
+const FULL_SELECT    = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until, agreement_status, current_agreement_version";
+const SCORE_SELECT   = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version";
+const MINIMAL_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version";
 
 async function fetchProfiles(select: string) {
   return supabaseAdmin
@@ -135,6 +135,8 @@ export async function GET(req: NextRequest) {
       suspended_until: suspendedUntil,
       is_suspended: isSuspended,
       availability_updated_at: availabilityColumnsPresent ? (rc.availability_updated_at ?? null) : null,
+      agreement_status: (rc as any).agreement_status ?? "not_signed",
+      current_agreement_version: (rc as any).current_agreement_version ?? null,
     };
   });
 

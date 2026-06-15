@@ -207,13 +207,14 @@ export async function PATCH(req: NextRequest) {
     const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({
-        role:           "ridechecker_active",   // grant dashboard access
-        is_active:      true,
-        workflow_stage: "approved",
-        approved_at:    now,
-        approved_by:    actor.userId,
-        invite_token:   inviteToken,
-        invite_sent_at: now,
+        role:              "ridechecker_active",   // grant dashboard access
+        is_active:         true,
+        workflow_stage:    "approved",
+        approved_at:       now,
+        approved_by:       actor.userId,
+        invite_token:      inviteToken,
+        invite_sent_at:    now,
+        agreement_status:  "not_signed",           // must sign RCCPA before first assignment
       })
       .eq("id", userId);
 

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { writeOrderEvent } from "@/lib/rbac";
 import { emitScoreEvent } from "@/lib/ridechecker/scorecard";
 import { sendPreferred, sendDirect } from "@/lib/notifications/send-preferred";
+import { hasSignedCurrentAgreement } from "@/lib/agreements/rccpa-v1-2026-06";
 import {
   sellerTrustConfirmationHtml,
   sellerTrustConfirmationSms,
@@ -29,12 +30,23 @@ export async function POST(
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role, full_name, email")
+      .select("role, full_name, email, agreement_status, current_agreement_version")
       .eq("id", session.user.id)
       .maybeSingle();
 
     if (!profile || !["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!hasSignedCurrentAgreement(profile as any)) {
+      return NextResponse.json(
+        {
+          error: "You must sign the current RideCheck Contractor Agreement before accepting assignments.",
+          agreement_required: true,
+          redirect: "/ridechecker/agreement",
+        },
+        { status: 403 }
+      );
     }
 
     const { data: assignment, error: fetchError } = await supabaseAdmin

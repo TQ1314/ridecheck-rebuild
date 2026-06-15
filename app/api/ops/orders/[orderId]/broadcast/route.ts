@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
+import { hasSignedCurrentAgreement, CURRENT_AGREEMENT_VERSION } from "@/lib/agreements/rccpa-v1-2026-06";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,30 @@ export async function POST(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    // Agreement gate — check all selected RideCheckers have signed the current agreement
+    const { data: rcProfiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, agreement_status, current_agreement_version")
+      .in("id", ridechecker_ids);
+
+    const unsignedRcs = (rcProfiles ?? []).filter(
+      (rc) => !hasSignedCurrentAgreement(rc as any)
+    );
+    const eligibleIds = ridechecker_ids.filter(
+      (id) => !unsignedRcs.some((u) => u.id === id)
+    );
+
+    if (eligibleIds.length === 0) {
+      const names = unsignedRcs.map((u) => u.full_name || u.id).join(", ");
+      return NextResponse.json(
+        {
+          error: `None of the selected RideCheckers have signed the current contractor agreement (${CURRENT_AGREEMENT_VERSION}). Unsigned: ${names}`,
+          unsigned_ridecheckers: unsignedRcs.map((u) => ({ id: u.id, full_name: u.full_name })),
+        },
+        { status: 400 }
+      );
+    }
+
     const now = new Date().toISOString();
 
     // Expire any existing open broadcasts for this order
@@ -49,8 +74,8 @@ export async function POST(
       .eq("order_id", params.orderId)
       .eq("status", "sent");
 
-    // Insert new broadcast rows
-    const rows = ridechecker_ids.map((rcId) => ({
+    // Insert new broadcast rows — only for agreement-eligible RideCheckers
+    const rows = eligibleIds.map((rcId) => ({
       order_id: params.orderId,
       ridechecker_id: rcId,
       status: "sent" as const,
