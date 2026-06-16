@@ -49,11 +49,8 @@ export async function POST(
     const appUrl       = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
 
     // Build reply-to so RC replies are routed back into RideCheck
-    const appDomain  = appUrl.replace(/^https?:\/\//, "").split("/")[0];
-    const orderRef   = (order as any).order_number ?? null;
-    const replyTo    = orderRef
-      ? `RideCheck Ops <replies+${orderRef}@${appDomain}>`
-      : undefined;
+    const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
+    const replyTo = buildReplyTo((order as any).order_number ?? null);
 
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">

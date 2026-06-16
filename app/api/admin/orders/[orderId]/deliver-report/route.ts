@@ -45,7 +45,7 @@ export async function POST(
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, payment_status, payment_required, payment_override_approved, seller_type"
+        "id, order_id, order_number, report_status, report_storage_path, ops_report_url, buyer_email, customer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, payment_status, payment_required, payment_override_approved, seller_type"
       )
       .eq("id", params.orderId)
       .single();
@@ -265,9 +265,11 @@ ${!reportUrl
     </p>`
 }`;
 
+        const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
         await sendEmail({
           to:      buyerEmail,
           subject: `Your RideCheck Intelligence Report is Ready — ${vehicleLabel}`,
+          replyTo: buildReplyTo((order as any).order_number ?? null),
           html:    brandedEmailLayout({
             title:    "Your Intelligence Report Is Ready",
             subtitle: vehicleLabel,

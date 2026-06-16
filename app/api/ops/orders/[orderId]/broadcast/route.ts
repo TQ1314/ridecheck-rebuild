@@ -122,7 +122,7 @@ export async function POST(
         // Fetch order vehicle details for the email
         const { data: orderDetails } = await supabaseAdmin
           .from("orders")
-          .select("order_id, vehicle_year, vehicle_make, vehicle_model")
+          .select("order_id, order_number, vehicle_year, vehicle_make, vehicle_model")
           .eq("id", params.orderId)
           .maybeSingle();
 
@@ -138,11 +138,13 @@ export async function POST(
               orderId:      (orderDetails as any)?.order_id      ?? null,
               dashboardUrl: jobUrl,
             });
+            const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
             const notifs: Promise<any>[] = [
               sendEmail({
                 to: rc.email,
                 subject: "New RideCheck Job Available — Quick Response Needed",
                 html: emailHtml,
+                replyTo: buildReplyTo((orderDetails as any)?.order_number ?? null),
               }),
             ];
             if ((rc as any).phone) {

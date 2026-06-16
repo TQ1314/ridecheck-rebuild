@@ -118,12 +118,9 @@ export async function POST(
         : undefined;
 
     // ── Reply-to address for email (encodes order number so inbound parser can match) ──
-    const orderRef    = (gateOrder as any)?.order_number ?? null;
-    const appDomain   = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "").split("/")[0];
-    const replyToDomain = appDomain || "ridecheckauto.com";
-    const replyTo     = channel === "email" && orderRef
-      ? `RideCheck Ops <replies+${orderRef}@${replyToDomain}>`
-      : undefined;
+    const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
+    const orderRef = (gateOrder as any)?.order_number ?? null;
+    const replyTo  = channel === "email" ? buildReplyTo(orderRef) : undefined;
 
     // ── Send ──
     const r = await sendDirect(

@@ -40,12 +40,8 @@ export async function POST(
     const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
 
     // Build reply-to so buyer replies are routed back into RideCheck
-    const appUrl    = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "").split("/")[0];
-    const domain    = appUrl || "ridecheckauto.com";
-    const orderRef  = (order as any).order_number ?? null;
-    const replyTo   = orderRef
-      ? `RideCheck Ops <replies+${orderRef}@${domain}>`
-      : undefined;
+    const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
+    const replyTo = buildReplyTo((order as any).order_number ?? null);
 
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">

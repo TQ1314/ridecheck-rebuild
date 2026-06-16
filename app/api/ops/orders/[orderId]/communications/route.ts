@@ -371,9 +371,8 @@ export async function POST(
     const vehicleLabel = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
 
     // Reply-to so buyer/RC replies route back into RideCheck
-    const appDomain = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/^https?:\/\//, "").split("/")[0] || "ridecheckauto.com";
-    const orderRef  = (order as any).order_number ?? null;
-    const replyTo   = orderRef ? `RideCheck Ops <replies+${orderRef}@${appDomain}>` : undefined;
+    const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
+    const replyTo = buildReplyTo((order as any).order_number ?? null);
 
     const results: Record<string, boolean> = { email: false, sms: false };
 

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeOrderEvent } from "@/lib/rbac";
 import { sendSMS } from "@/lib/notifications/sms";
 import { sendEmail } from "@/lib/notifications/email";
+import { buildReplyTo } from "@/lib/notifications/replyToAddress";
 import { CURRENT_AGREEMENT_VERSION } from "@/lib/agreements/rccpa-v1-2026-06";
 import { z } from "zod";
 
@@ -44,6 +45,14 @@ export async function POST(
     const agreementUrl = `${appUrl}/ridechecker/agreement`;
     const firstName = ((rc as any).full_name ?? "").split(" ")[0] || "RideChecker";
 
+    // Fetch order_number so replies route back to the Communication Center
+    const { data: orderRow } = await supabaseAdmin
+      .from("orders")
+      .select("order_number")
+      .eq("id", params.orderId)
+      .maybeSingle();
+    const replyTo = buildReplyTo((orderRow as any)?.order_number ?? null);
+
     let smsOk = false;
     let emailOk = false;
 
@@ -59,6 +68,7 @@ export async function POST(
       const emailResult = await sendEmail({
         to: (rc as any).email,
         subject: "Action Required: Sign Your RideCheck Contractor Agreement",
+        replyTo,
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
             <h2 style="color:#1a1a1a;margin-bottom:8px">Contractor Agreement Required</h2>

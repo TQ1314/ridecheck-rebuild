@@ -32,7 +32,7 @@ export async function PATCH(
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved")
+      .select("id, order_id, order_number, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved")
       .eq("id", params.orderId)
       .single();
 
@@ -224,10 +224,12 @@ export async function PATCH(
           }
           if (rc.email) {
             const { sendEmail } = await import("@/lib/notifications/email");
+            const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
             notifs.push(sendEmail({
               to: rc.email,
               subject: `New RideCheck Job — Action Required: ${vehicleLabel}`,
               html: emailHtml,
+              replyTo: buildReplyTo((order as any).order_number ?? null),
             }));
           }
           await Promise.allSettled(notifs);
