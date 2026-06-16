@@ -126,6 +126,9 @@ export async function POST(
           .eq("id", params.orderId)
           .maybeSingle();
 
+        const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
+        const broadcastReplyTo = buildReplyTo((orderDetails as any)?.order_number ?? null);
+
         await Promise.allSettled(
           rcs.flatMap((rc) => {
             const firstName = rc.full_name?.split(" ")[0] || "there";
@@ -138,13 +141,12 @@ export async function POST(
               orderId:      (orderDetails as any)?.order_id      ?? null,
               dashboardUrl: jobUrl,
             });
-            const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
             const notifs: Promise<any>[] = [
               sendEmail({
                 to: rc.email,
                 subject: "New RideCheck Job Available — Quick Response Needed",
                 html: emailHtml,
-                replyTo: buildReplyTo((orderDetails as any)?.order_number ?? null),
+                replyTo: broadcastReplyTo,
               }),
             ];
             if ((rc as any).phone) {
