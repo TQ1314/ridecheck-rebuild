@@ -19,6 +19,7 @@ import {
   FileText, Shield, BookOpen, History, Search,
   MapPin, Truck, Star, Activity,
 } from "lucide-react";
+import { RideCheckerProfileDrawer } from "@/components/ridecheckers/RideCheckerProfileDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -460,7 +461,12 @@ export default function RideCheckersAdminPage() {
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Detail modal
+  // Profile drawer (quick view — name click)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerRcId, setDrawerRcId] = useState<string | null>(null);
+  const [drawerProfile, setDrawerProfile] = useState<RideChecker | null>(null);
+
+  // Detail modal (full edit — opened from drawer or card actions)
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRc, setDetailRc] = useState<RideChecker | null>(null);
   const [stageHistory, setStageHistory] = useState<StageHistoryEntry[]>([]);
@@ -509,6 +515,14 @@ export default function RideCheckersAdminPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Name click → profile drawer (quick view)
+  function openDrawer(rc: RideChecker) {
+    setDrawerProfile(rc);
+    setDrawerRcId(rc.id);
+    setDrawerOpen(true);
+  }
+
+  // "Manage" inside drawer → full detail dialog with editing
   async function openDetail(rc: RideChecker) {
     setDetailRc(rc);
     setDetailOpen(true);
@@ -725,7 +739,7 @@ export default function RideCheckersAdminPage() {
               rc={rc}
               canApprove={canApprove}
               actionLoading={actionLoading}
-              onDetail={openDetail}
+              onDetail={openDrawer}
               onApprove={handleApprove}
               onReject={openRejectDialog}
               onSuspend={openSuspendDialog}
@@ -735,7 +749,20 @@ export default function RideCheckersAdminPage() {
         </div>
       )}
 
-      {/* ── Candidate Detail Dialog ── */}
+      {/* ── RC Profile Drawer (quick view — name click) ── */}
+      <RideCheckerProfileDrawer
+        rcId={drawerRcId}
+        initialProfile={drawerProfile ?? undefined}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onEditDetails={(id) => {
+          setDrawerOpen(false);
+          const rc = ridecheckers.find((r) => r.id === id) ?? drawerProfile;
+          if (rc) openDetail(rc as RideChecker);
+        }}
+      />
+
+      {/* ── Candidate Detail Dialog (full edit — from drawer or action buttons) ── */}
       <CandidateDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}

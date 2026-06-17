@@ -39,7 +39,10 @@ import {
   EyeOff,
   Bell,
   MessageSquare,
+  UserSquare2,
+  ShieldOff,
 } from "lucide-react";
+import { RideCheckerProfileDrawer } from "@/components/ridecheckers/RideCheckerProfileDrawer";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { formatRelative } from "@/lib/utils/format";
@@ -157,6 +160,13 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
   const [rcMsg, setRcMsg] = useState("");
   const [rcMsgSending, setRcMsgSending] = useState(false);
   const [rcMsgOpen, setRcMsgOpen] = useState(false);
+
+  // RC profile drawer
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [profileDrawerRcId, setProfileDrawerRcId] = useState<string | null>(null);
+
+  // Broadcast eligibility filter (default: show eligible only)
+  const [showAllRcs, setShowAllRcs] = useState(false);
 
   // Agreement reminder state — populated when an assign attempt is blocked by unsigned agreement
   const [agreementBlockedRc, setAgreementBlockedRc] = useState<RideCheckerSuggestion | null>(null);
@@ -421,10 +431,10 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
   }
 
   function toggleSelectAll() {
-    if (selectedBroadcast.size === ridecheckers.length) {
+    if (selectedBroadcast.size === visibleRcs.length) {
       setSelectedBroadcast(new Set());
     } else {
-      setSelectedBroadcast(new Set(ridecheckers.map((r) => r.id)));
+      setSelectedBroadcast(new Set(visibleRcs.map((r) => r.id)));
     }
   }
 
@@ -472,6 +482,17 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
     ? ridecheckers.find((r) => r.id === order.assigned_ridechecker_id)
     : null;
 
+  // Eligibility helpers for the broadcast list
+  function getBlockReason(rc: RideCheckerSuggestion): string | null {
+    if ((rc as any).is_suspended) return "Suspended";
+    if (rc.agreement_status !== "signed") return "Agreement not signed";
+    if (rc.active_jobs >= rc.max_daily_jobs) return "At capacity";
+    return null;
+  }
+  const isEligible = (rc: RideCheckerSuggestion) => getBlockReason(rc) === null;
+  const eligibleCount = ridecheckers.filter(isEligible).length;
+  const visibleRcs = showAllRcs ? ridecheckers : ridecheckers.filter(isEligible);
+
   const openBroadcasts = broadcasts.filter((b) => b.status === "sent");
   const hasHistory = broadcasts.length > 0;
 
@@ -508,9 +529,18 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
 
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate text-foreground">
-                  {currentRc?.full_name ?? "Assigned RideChecker"}
-                </p>
+                {currentRc ? (
+                  <button
+                    className="text-xs font-semibold text-left hover:underline flex items-center gap-1 text-foreground"
+                    onClick={() => { setProfileDrawerRcId(currentRc.id); setProfileDrawerOpen(true); }}
+                    data-testid="button-view-rc-profile-awaiting"
+                  >
+                    <UserSquare2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {currentRc.full_name}
+                  </button>
+                ) : (
+                  <p className="text-xs font-semibold truncate text-foreground">Assigned RideChecker</p>
+                )}
                 {currentRc?.email && (
                   <p className="text-xs text-muted-foreground truncate">{currentRc.email}</p>
                 )}
@@ -591,9 +621,18 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-md px-3 py-2">
               <div className="min-w-0">
-                <p className="text-xs font-medium truncate">
-                  {currentRc?.full_name ?? "Assigned RideChecker"}
-                </p>
+                {currentRc ? (
+                  <button
+                    className="text-xs font-medium text-left hover:underline flex items-center gap-1"
+                    onClick={() => { setProfileDrawerRcId(currentRc.id); setProfileDrawerOpen(true); }}
+                    data-testid="button-view-rc-profile-assigned"
+                  >
+                    <UserSquare2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    {currentRc.full_name}
+                  </button>
+                ) : (
+                  <p className="text-xs font-medium truncate">Assigned RideChecker</p>
+                )}
                 {currentRc?.email && (
                   <p className="text-xs text-muted-foreground truncate">{currentRc.email}</p>
                 )}
@@ -831,31 +870,56 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
 
         {/* ── Broadcast ───────────────────────────────────────── */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <Label className="text-xs font-medium">Broadcast to RideCheckers</Label>
-            {ridecheckers.length > 0 && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={toggleSelectAll}
-                className="text-xs text-primary hover:underline"
-                data-testid="button-select-all-broadcast"
+                onClick={() => setShowAllRcs((v) => !v)}
+                className={`text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                  showAllRcs
+                    ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:border-amber-700"
+                    : "text-muted-foreground border-border hover:text-foreground"
+                }`}
+                data-testid="button-toggle-eligible-filter"
+                title={showAllRcs ? "Showing all RideCheckers — click to show eligible only" : `Showing ${eligibleCount} eligible — click to show all`}
               >
-                {selectedBroadcast.size === ridecheckers.length ? "Deselect all" : "Select all"}
+                <ShieldOff className="h-3 w-3" />
+                {showAllRcs ? `All (${ridecheckers.length})` : `Eligible (${eligibleCount})`}
               </button>
-            )}
+              {visibleRcs.length > 0 && (
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-xs text-primary hover:underline"
+                  data-testid="button-select-all-broadcast"
+                >
+                  {selectedBroadcast.size === visibleRcs.length ? "Deselect all" : "Select all"}
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="max-h-40 overflow-y-auto rounded-md border divide-y">
+          <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
             {rcLoading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : ridecheckers.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-3">No active RideCheckers</p>
+            ) : visibleRcs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-4 gap-1.5">
+                <ShieldOff className="h-4 w-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground text-center">No eligible RideCheckers</p>
+                <button onClick={() => setShowAllRcs(true)} className="text-xs text-primary hover:underline">
+                  Show all ({ridecheckers.length})
+                </button>
+              </div>
             ) : (
-              ridecheckers.map((rc) => (
-                <label
+              visibleRcs.map((rc) => {
+                const blockReason = getBlockReason(rc);
+                return (
+                <div
                   key={rc.id}
-                  className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer"
+                  className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50"
                   data-testid={`item-broadcast-rc-${rc.id}`}
                 >
                   <Checkbox
@@ -863,11 +927,16 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                     onCheckedChange={() => toggleBroadcastSelect(rc.id)}
                     data-testid={`checkbox-broadcast-${rc.id}`}
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleBroadcastSelect(rc.id)}>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`h-2 w-2 rounded-full flex-shrink-0 ${rc.is_available ? "bg-green-500" : "bg-gray-300"}`} title={rc.is_available ? "Available" : "Unavailable"} />
                       <p className="text-xs font-medium truncate">{rc.full_name}</p>
-                      {!rc.is_available && (
+                      {blockReason && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-amber-100 text-amber-700 border border-amber-200 leading-4">
+                          {blockReason}
+                        </span>
+                      )}
+                      {!blockReason && !rc.is_available && (
                         <span className="text-[10px] font-semibold px-1 py-0 rounded bg-gray-100 text-gray-600 border border-gray-200 leading-4">
                           Unavailable
                         </span>
@@ -877,22 +946,12 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                           {rc.decline_count_30d} declines
                         </span>
                       )}
-                      {rc.decline_count_30d === 3 && (
-                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-amber-100 text-amber-700 border border-amber-200 leading-4" title="Has received a warning for declines">
-                          3 declines
-                        </span>
-                      )}
-                      {(rc as any).agreement_status !== "signed" && (
-                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4" title="Has not signed the current contractor agreement">
-                          No Agreement
-                        </span>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {rc.service_area || rc.email}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
                     <span className="flex items-center gap-0.5">
                       <Star className="h-2.5 w-2.5" />
                       {rc.rating.toFixed(1)}
@@ -906,9 +965,18 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                       <Briefcase className="h-2.5 w-2.5" />
                       {rc.active_jobs}/{rc.max_daily_jobs}
                     </span>
+                    <button
+                      className="ml-0.5 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setProfileDrawerRcId(rc.id); setProfileDrawerOpen(true); }}
+                      title={`View ${rc.full_name}'s profile`}
+                      data-testid={`button-view-profile-${rc.id}`}
+                    >
+                      <UserSquare2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                </label>
-              ))
+                </div>
+                );
+              })
             )}
           </div>
 
@@ -997,6 +1065,13 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
           </Collapsible>
         )}
       </CardContent>
+
+      {/* ── RC Profile Drawer ── */}
+      <RideCheckerProfileDrawer
+        rcId={profileDrawerRcId}
+        open={profileDrawerOpen}
+        onOpenChange={setProfileDrawerOpen}
+      />
     </Card>
   );
 }

@@ -1,0 +1,182 @@
+ou need one unified RideChecker profile system across:
+
+RC Applications
+RC Pipeline
+Active RideCheckers
+Assignment modal
+
+Right now the data is split. That is why Tom can appear eligible in one place but blocked during assignment.
+
+Use this Replit prompt:
+
+Fix RideChecker profile and workforce management.
+
+Problem:
+RideChecker data is split across RC Applications, RC Pipeline, Active RideCheckers, and the Assign RideChecker modal. Ops needs one clickable RideChecker profile that shows exactly what is complete, what is missing, and whether the person is eligible for assignment.
+
+Build requirements:
+
+1. Make every RideChecker card/row clickable
+- In RC Applications
+- RC Pipeline
+- Active RideCheckers
+- Assign RideChecker modal
+Clicking opens the same RideChecker Profile drawer/page.
+
+2. RideChecker Profile must show:
+- Name
+- Masked email by default, reveal/copy only for ops lead/owner
+- Masked phone by default, reveal/copy only for ops lead/owner
+- City
+- State
+- ZIP code
+- Service radius
+- Region/service area
+- Current pipeline status
+- Progress percentage
+- Dispatch eligible yes/no
+- Blocked reason
+- Next required action
+- Completed RideChecks count
+- Current assigned jobs
+- Capacity
+- Rating
+- Last activity date
+
+3. Eligibility checklist must show:
+- Application submitted
+- Phone verified
+- Email verified
+- Location provided
+- Service radius provided
+- ID verification submitted
+- ID verification approved
+- Background check ordered
+- Background check passed
+- Training guide completed
+- Test RideCheck completed
+- Contractor agreement signed
+- Final approval completed
+
+Each item should show:
+complete / pending / missing / failed
+and the date completed if available.
+
+4. Location must be required
+RideCheckers cannot become dispatch eligible unless they provide:
+- city
+- state
+- ZIP code
+- service radius
+
+If location is missing, show:
+Blocked reason: Location missing
+Next action: Request location update
+
+Also update the RideChecker application/signup flow so location is required before submission.
+
+5. Assignment modal must only show truly eligible RideCheckers by default
+A RideChecker is eligible only if:
+- status is active
+- location exists
+- contractor agreement signed
+- training complete
+- background check passed
+- not suspended
+- capacity available
+
+Add a toggle:
+Show blocked RideCheckers
+
+When blocked RideCheckers are shown, display the reason:
+- Missing location
+- Agreement not signed
+- Background check incomplete
+- Training incomplete
+- Capacity full
+- Suspended
+
+6. Add group messaging/reminders
+From RC Pipeline and Active RideCheckers pages, add multi-select checkboxes.
+
+Ops can select multiple RideCheckers and send:
+- Reminder to complete location
+- Reminder to sign contractor agreement
+- Reminder to complete training
+- Reminder to complete ID verification
+- General announcement
+
+Send by email first. SMS can be added later.
+
+Create API:
+POST /api/admin/ridecheckers/message
+
+Payload:
+{
+  ridechecker_ids: string[],
+  message_type: "location_reminder" | "agreement_reminder" | "training_reminder" | "verification_reminder" | "general",
+  subject?: string,
+  body?: string
+}
+
+Log every sent message in ridechecker_message_events.
+
+7. Add quick action buttons inside profile:
+- Send location reminder
+- Send agreement reminder
+- Send training reminder
+- Send verification reminder
+- Mark training complete
+- Mark test RideCheck complete
+- Approve
+- Suspend
+- Reject
+
+8. Data consistency
+Use one canonical source of truth for RideChecker eligibility.
+Do not let one page say Active/Eligible while assignment blocks the person for missing requirements.
+
+Create a shared helper:
+getRideCheckerEligibility(profile)
+
+It should return:
+{
+  dispatchEligible: boolean,
+  progressPercent: number,
+  blockedReasons: string[],
+  nextAction: string,
+  checklist: [...]
+}
+
+Use this same helper in:
+- RC Pipeline
+- Active RideCheckers
+- Assignment modal
+- RideChecker profile drawer/page
+
+9. Privacy
+Mask phone/email by default:
+Email example: j***@gmail.com
+Phone example: (***) ***-1824
+
+Only ops_lead and owner can reveal/copy full contact info.
+
+10. Validation
+Run TypeScript check and build.
+Do not remove existing dialogs or actions.
+Do not break existing RideChecker approval, reject, suspend, or stage update flows.
+
+The big principle is this:
+
+Active should not mean assignable.
+RideCheck needs two separate labels:
+
+Account Status: Active
+Dispatch Eligibility: Blocked / Eligible
+
+Tom may be active, but if the contractor agreement is not signed, he should show:
+
+Active
+Dispatch Eligible: No
+Blocked Reason: Contractor agreement not signed
+Next Action: Send agreement reminder
