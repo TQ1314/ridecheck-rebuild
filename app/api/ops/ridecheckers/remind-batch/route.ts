@@ -45,19 +45,20 @@ export async function POST(req: NextRequest) {
     .eq("is_active", true);
 
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
-  if (!profiles?.length) {
+  const profileRows = (profiles ?? []) as any[];
+  if (!profileRows.length) {
     return NextResponse.json({ sent: 0, skipped_dedup: 0, skipped_no_match: 0, skipped_no_contact: 0 });
   }
 
   // Filter to those where pickTemplate selects this template
-  const targets = profiles.filter((p) => {
+  const targets = profileRows.filter((p: any) => {
     const picked = pickTemplate(p as EligibilityProfile);
     return picked?.template.key === template_key;
   });
 
   if (targets.length === 0) {
     return NextResponse.json({
-      sent: 0, skipped_dedup: 0, skipped_no_match: profiles.length, skipped_no_contact: 0,
+      sent: 0, skipped_dedup: 0, skipped_no_match: profileRows.length, skipped_no_contact: 0,
       message: `No active RideCheckers need a "${template.label}" reminder right now.`,
     });
   }
