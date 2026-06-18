@@ -35,6 +35,7 @@ import {
   FileText,
   Wallet,
   MailCheck,
+  Megaphone,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/layout/Logo";
@@ -56,6 +57,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin/orders", label: "Order Queue", icon: Package },
       { href: "/operations/revenue", label: "Revenue & Jobs", icon: BarChart3 },
       { href: "/operations/payouts", label: "Payouts", icon: Wallet },
+      { href: "/operations/announcements", label: "Group Message", icon: Megaphone },
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
@@ -71,6 +73,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin/orders", label: "Order Queue", icon: Package },
       { href: "/operations/revenue", label: "Revenue & Jobs", icon: BarChart3 },
       { href: "/operations/payouts", label: "Payouts", icon: Wallet },
+      { href: "/operations/announcements", label: "Group Message", icon: Megaphone },
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
@@ -83,6 +86,7 @@ function getNavItems(role: Role): NavItem[] {
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/orders", label: "Order Queue", icon: Package },
       { href: "/operations/payouts", label: "Payouts", icon: Wallet },
+      { href: "/operations/announcements", label: "Group Message", icon: Megaphone },
       { href: "/admin/applications", label: "RC Applications", icon: FileText },
       { href: "/admin/ridecheckers", label: "RC Pipeline", icon: UserCheck },
       { href: "/admin/inspectors", label: "Active RideCheckers", icon: Wrench },
