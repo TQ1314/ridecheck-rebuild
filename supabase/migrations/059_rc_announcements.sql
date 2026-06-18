@@ -19,6 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_rc_announcements_created_at ON rc_announcements(c
 
 ALTER TABLE rc_announcements ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "ops can manage announcements" ON rc_announcements;
 CREATE POLICY "ops can manage announcements"
   ON rc_announcements FOR ALL
   USING (
