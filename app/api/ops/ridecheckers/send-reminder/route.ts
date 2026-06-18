@@ -46,10 +46,11 @@ export async function POST(req: NextRequest) {
   if (profileErr || !profile) {
     return NextResponse.json({ error: "RideChecker not found" }, { status: 404 });
   }
+  const p = profile as any;
 
   // Pick template
   const key: ReminderTemplateKey | null =
-    template_key ?? pickTemplate(profile as EligibilityProfile)?.template.key ?? null;
+    template_key ?? pickTemplate(p as EligibilityProfile)?.template.key ?? null;
 
   if (!key) {
     return NextResponse.json(
@@ -87,26 +88,26 @@ export async function POST(req: NextRequest) {
   }
 
   const useChannels = channels ?? ["email"];
-  const firstName = profile.full_name?.split(" ")[0] || "there";
+  const firstName = p.full_name?.split(" ")[0] || "there";
 
   // Resolve detail string (for training/background/one_step_away)
-  const picked = pickTemplate(profile as EligibilityProfile);
+  const picked = pickTemplate(p as EligibilityProfile);
   const detail = picked?.template.key === key ? picked.detail : undefined;
 
   let emailSent = false;
   let smsSent = false;
   const errors: string[] = [];
 
-  if (useChannels.includes("email") && profile.email) {
+  if (useChannels.includes("email") && p.email) {
     const html = template.emailHtml(firstName, DASHBOARD_URL, detail);
-    const result = await sendEmail({ to: profile.email, subject: template.subject, html });
+    const result = await sendEmail({ to: p.email, subject: template.subject, html });
     if (result.success) emailSent = true;
     else errors.push(`Email failed: ${result.error}`);
   }
 
-  if (useChannels.includes("sms") && profile.phone) {
+  if (useChannels.includes("sms") && p.phone) {
     const body = template.smsBody(firstName, DASHBOARD_URL, detail);
-    const result = await sendSMS({ to: profile.phone, body });
+    const result = await sendSMS({ to: p.phone, body });
     if (result.success) smsSent = true;
     else errors.push(`SMS failed: ${result.error}`);
   }
@@ -134,6 +135,6 @@ export async function POST(req: NextRequest) {
     template_label: template.label,
     email_sent: emailSent,
     sms_sent: smsSent,
-    rc_name: profile.full_name,
+    rc_name: p.full_name,
   });
 }
