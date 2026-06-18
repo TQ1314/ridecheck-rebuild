@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/rbac";
+import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/notifications/email";
 import { sendSMS } from "@/lib/notifications/sms";
@@ -8,8 +8,8 @@ const OPS_ROLES = ["operations", "operations_lead", "ops_lead", "admin", "owner"
 
 // GET /api/ops/announcements — history of past announcements
 export async function GET() {
-  const auth = await requireRole(OPS_ROLES);
-  if (auth instanceof NextResponse) return auth;
+  const authResult = await requireRole(OPS_ROLES);
+  if (!isAuthorized(authResult)) return authResult.error;
 
   const { data, error } = await supabaseAdmin
     .from("rc_announcements")
@@ -23,8 +23,9 @@ export async function GET() {
 
 // POST /api/ops/announcements — send a new group message
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(OPS_ROLES);
-  if (auth instanceof NextResponse) return auth;
+  const authResult = await requireRole(OPS_ROLES);
+  if (!isAuthorized(authResult)) return authResult.error;
+  const auth = authResult.actor;
 
   const body = await req.json();
   const { subject, message, channels, recipient_group, area_filter } = body as {
