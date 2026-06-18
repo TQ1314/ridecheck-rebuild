@@ -17,8 +17,9 @@ import {
   CheckCircle2, XCircle, Clock, Users, ShieldOff,
   AlertTriangle, Ban, ChevronRight,
   FileText, Shield, BookOpen, History, Search,
-  MapPin, Truck, Star, Activity,
+  MapPin, Truck, Star, Activity, Bell,
 } from "lucide-react";
+import { pickTemplate } from "@/lib/ridecheckers/reminderTemplates";
 import { RideCheckerProfileDrawer } from "@/components/ridecheckers/RideCheckerProfileDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -311,11 +312,12 @@ interface PipelineCardProps {
   onReject: (rc: RideChecker) => void;
   onSuspend: (rc: RideChecker) => void;
   onStageUpdate: (rc: RideChecker) => void;
+  onRemind: (rc: RideChecker) => void;
 }
 
 function PipelineCard({
   rc, canApprove, actionLoading,
-  onDetail, onApprove, onReject, onSuspend, onStageUpdate,
+  onDetail, onApprove, onReject, onSuspend, onStageUpdate, onRemind,
 }: PipelineCardProps) {
   const { checkpoints, percent, nextAction, dispatchEligible } = getPipelineInfo(rc);
   const stage = rc.workflow_stage ?? "";
@@ -389,6 +391,23 @@ function PipelineCard({
             ? "✓ No action required"
             : `⤳ ${nextAction}`}
         </div>
+
+        {/* ── Send Reminder (all ops roles) ── */}
+        {!isTerminal && !dispatchEligible && (() => {
+          const picked = pickTemplate(rc);
+          if (!picked) return null;
+          return (
+            <button
+              onClick={() => onRemind(rc)}
+              disabled={isBusy}
+              className="w-full text-left rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 text-xs text-amber-800 font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              data-testid={`button-remind-${rc.id}`}
+            >
+              <Bell className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">Remind: {picked.template.label}</span>
+            </button>
+          );
+        })()}
 
         {/* ── Action buttons (ops_lead / owner only) ── */}
         {canApprove && (
@@ -475,6 +494,9 @@ export default function RideCheckersAdminPage() {
   // Stage update dialog
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [stageTarget, setStageTarget] = useState<RideChecker | null>(null);
+
+  // Reminder
+  const [remindLoading, setRemindLoading] = useState<string | null>(null);
   const [newStage, setNewStage] = useState("");
   const [stageNotes, setStageNotes] = useState("");
 
@@ -566,6 +588,34 @@ export default function RideCheckersAdminPage() {
 
   const handleApprove = (rc: RideChecker) =>
     patchRc({ userId: rc.id, action: "approve" }, `${rc.full_name} approved`);
+
+  const handleSendReminder = async (rc: RideChecker) => {
+    setRemindLoading(rc.id);
+    try {
+      const res = await fetch("/api/ops/ridecheckers/send-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ridechecker_id: rc.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: data.dedup ? "Already sent recently" : "Could not send reminder",
+          description: data.error,
+          variant: data.dedup ? "default" : "destructive",
+        });
+      } else {
+        toast({
+          title: `Reminder sent to ${rc.full_name}`,
+          description: `"${data.template_label}" via ${[data.email_sent && "email", data.sms_sent && "SMS"].filter(Boolean).join(" + ")}`,
+        });
+      }
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setRemindLoading(null);
+    }
+  };
 
   const openStageDialog = (rc: RideChecker) => {
     setStageTarget(rc);
@@ -738,12 +788,13 @@ export default function RideCheckersAdminPage() {
               key={rc.id}
               rc={rc}
               canApprove={canApprove}
-              actionLoading={actionLoading}
+              actionLoading={remindLoading === rc.id ? rc.id : actionLoading}
               onDetail={openDrawer}
               onApprove={handleApprove}
               onReject={openRejectDialog}
               onSuspend={openSuspendDialog}
               onStageUpdate={openStageDialog}
+              onRemind={handleSendReminder}
             />
           ))}
         </div>

@@ -53,6 +53,36 @@ CREATE TRIGGER trg_rrs_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
+-- ── rc_reminder_log (migration 060) ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rc_reminder_log (
+  id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at      timestamptz DEFAULT now(),
+  ridechecker_id  uuid        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  template_key    text        NOT NULL,
+  sent_by         uuid        REFERENCES public.profiles(id) ON DELETE SET NULL,
+  channels        text[]      NOT NULL DEFAULT '{email}',
+  email_sent      boolean     NOT NULL DEFAULT false,
+  sms_sent        boolean     NOT NULL DEFAULT false
+);
+
+CREATE INDEX IF NOT EXISTS idx_rc_reminder_log_rc_template
+  ON public.rc_reminder_log(ridechecker_id, template_key, created_at DESC);
+
+ALTER TABLE public.rc_reminder_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "ops can manage reminder log" ON public.rc_reminder_log;
+CREATE POLICY "ops can manage reminder log"
+  ON public.rc_reminder_log FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+        AND profiles.role IN ('operations','operations_lead','ops_lead','admin','owner','ops')
+        AND profiles.is_active = true
+    )
+  );
+
+
 -- ── rc_announcements (migration 059) ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.rc_announcements (
   id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,

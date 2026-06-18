@@ -26,7 +26,10 @@ import {
   Loader2,
   ShieldCheck,
   ShieldOff,
+  Bell,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { pickTemplate } from "@/lib/ridecheckers/reminderTemplates";
 import { cn } from "@/lib/utils";
 import { getRideCheckerEligibility, type EligibilityProfile } from "@/lib/ridecheckers/eligibility";
 
@@ -113,11 +116,42 @@ export function RideCheckerProfileDrawer({
   onOpenChange,
   onEditDetails,
 }: Props) {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<RcProfile | null>(
     initialProfile && initialProfile.id ? (initialProfile as RcProfile) : null
   );
   const [loading, setLoading] = useState(false);
   const [contactRevealed, setContactRevealed] = useState(false);
+  const [remindLoading, setRemindLoading] = useState(false);
+
+  async function handleSendReminder() {
+    if (!profile) return;
+    setRemindLoading(true);
+    try {
+      const res = await fetch("/api/ops/ridecheckers/send-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ridechecker_id: profile.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: data.dedup ? "Already sent recently" : "Could not send reminder",
+          description: data.error,
+          variant: data.dedup ? "default" : "destructive",
+        });
+      } else {
+        toast({
+          title: `Reminder sent to ${profile.full_name}`,
+          description: `"${data.template_label}" via ${[data.email_sent && "email", data.sms_sent && "SMS"].filter(Boolean).join(" + ")}`,
+        });
+      }
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setRemindLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!open || !rcId) return;
@@ -349,6 +383,28 @@ export function RideCheckerProfileDrawer({
                 <p className="text-xs text-red-700">{profile.rejection_reason}</p>
               </div>
             )}
+
+            {/* ── Send Reminder ── */}
+            {!isTerminal && !eligibility.dispatchEligible && (() => {
+              const picked = pickTemplate(profile);
+              if (!picked) return null;
+              return (
+                <button
+                  onClick={handleSendReminder}
+                  disabled={remindLoading}
+                  className="w-full text-left rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-2 text-xs text-amber-800 font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+                  data-testid="button-send-reminder-drawer"
+                >
+                  {remindLoading
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+                    : <Bell className="h-3.5 w-3.5 flex-shrink-0" />
+                  }
+                  <span className="truncate">
+                    {remindLoading ? "Sending…" : `Remind: ${picked.template.label}`}
+                  </span>
+                </button>
+              );
+            })()}
 
             {/* ── Actions footer ── */}
             <div className="flex gap-2 pt-2 border-t">
