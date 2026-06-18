@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   // Pick template
   const key: ReminderTemplateKey | null =
-    template_key ?? pickTemplate(profile as EligibilityProfile)?.key ?? null;
+    template_key ?? pickTemplate(profile as EligibilityProfile)?.template.key ?? null;
 
   if (!key) {
     return NextResponse.json(

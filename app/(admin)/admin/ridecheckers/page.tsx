@@ -18,6 +18,7 @@ import {
   AlertTriangle, Ban, ChevronRight,
   FileText, Shield, BookOpen, History, Search,
   MapPin, Truck, Star, Activity, Bell, Loader2,
+  type LucideIcon,
 } from "lucide-react";
 import { pickTemplate, type ReminderTemplateKey } from "@/lib/ridecheckers/reminderTemplates";
 import { getRideCheckerEligibility } from "@/lib/ridecheckers/eligibility";
@@ -475,7 +476,7 @@ const BLOCKER_DEFS: Array<{
   key: ReminderTemplateKey;
   label: string;
   match: string;
-  Icon: (props: { className?: string }) => JSX.Element | null;
+  Icon: LucideIcon;
   color: string;
 }> = [
   { key: "location",   label: "Location Missing",    match: "Location missing",                   Icon: MapPin,   color: "text-red-600" },
