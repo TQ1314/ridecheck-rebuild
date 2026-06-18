@@ -5,9 +5,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 // Layered selects: each tier falls back if columns are missing
-const FULL_SELECT    = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until, agreement_status, current_agreement_version";
-const SCORE_SELECT   = "id, full_name, email, phone, service_area, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version";
-const MINIMAL_SELECT = "id, full_name, email, phone, service_area, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version";
+const LOC_COLS       = "rc_city, rc_state, rc_zip, service_radius_miles";
+const FULL_SELECT    = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until, agreement_status, current_agreement_version`;
+const SCORE_SELECT   = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version`;
+const MINIMAL_SELECT = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version`;
 
 async function fetchProfiles(select: string) {
   return supabaseAdmin
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
   const rcIds = activeRidecheckers.map((rc: any) => rc.id);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [activeJobsRes, declinesRes] = await Promise.all([
+  const [activeJobsRes, declinesRes, lastActiveRes] = await Promise.all([
     supabaseAdmin
       .from("orders")
       .select("assigned_inspector_id")
@@ -77,7 +78,19 @@ export async function GET(req: NextRequest) {
       .in("ridechecker_id", rcIds)
       .eq("status", "declined")
       .gte("declined_at", thirtyDaysAgo),
+    supabaseAdmin
+      .from("ridechecker_job_assignments")
+      .select("ridechecker_id, updated_at")
+      .in("ridechecker_id", rcIds)
+      .order("updated_at", { ascending: false }),
   ]);
+
+  const lastActiveMap: Record<string, string> = {};
+  for (const row of lastActiveRes.data ?? []) {
+    if (row.ridechecker_id && !lastActiveMap[row.ridechecker_id]) {
+      lastActiveMap[row.ridechecker_id] = row.updated_at;
+    }
+  }
 
   const loadMap: Record<string, number> = {};
   for (const job of activeJobsRes.data ?? []) {
@@ -124,6 +137,10 @@ export async function GET(req: NextRequest) {
       email: rc.email,
       phone: rc.phone,
       service_area: rc.service_area,
+      rc_city: rc.rc_city ?? null,
+      rc_state: rc.rc_state ?? null,
+      rc_zip: rc.rc_zip ?? null,
+      service_radius_miles: rc.service_radius_miles ?? 30,
       rating,
       ridechecker_score: scoreColumnPresent ? (rc.ridechecker_score ?? 0) : 0,
       active_jobs: currentLoad,
@@ -137,6 +154,7 @@ export async function GET(req: NextRequest) {
       availability_updated_at: availabilityColumnsPresent ? (rc.availability_updated_at ?? null) : null,
       agreement_status: (rc as any).agreement_status ?? "not_signed",
       current_agreement_version: (rc as any).current_agreement_version ?? null,
+      last_active_at: lastActiveMap[rc.id] ?? null,
     };
   });
 

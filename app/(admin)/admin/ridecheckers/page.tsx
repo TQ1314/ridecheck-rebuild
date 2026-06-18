@@ -17,9 +17,10 @@ import {
   CheckCircle2, XCircle, Clock, Users, ShieldOff,
   AlertTriangle, Ban, ChevronRight,
   FileText, Shield, BookOpen, History, Search,
-  MapPin, Truck, Star, Activity, Bell,
+  MapPin, Truck, Star, Activity, Bell, Loader2,
 } from "lucide-react";
-import { pickTemplate } from "@/lib/ridecheckers/reminderTemplates";
+import { pickTemplate, type ReminderTemplateKey } from "@/lib/ridecheckers/reminderTemplates";
+import { getRideCheckerEligibility } from "@/lib/ridecheckers/eligibility";
 import { RideCheckerProfileDrawer } from "@/components/ridecheckers/RideCheckerProfileDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -87,6 +88,10 @@ interface RideChecker {
   role: string;
   is_active: boolean;
   service_area: string | null;
+  rc_city: string | null;
+  rc_state: string | null;
+  rc_zip: string | null;
+  service_radius_miles: number | null;
   experience: string | null;
   created_at: string;
   approved_at: string | null;
@@ -111,6 +116,7 @@ interface RideChecker {
   guide_completed: boolean | null;
   guide_completed_at: string | null;
   verification_status: string | null;
+  agreement_status: string | null;
 }
 
 interface StageHistoryEntry {
@@ -463,6 +469,126 @@ function PipelineCard({
   );
 }
 
+// ─── Workforce Dashboard ─────────────────────────────────────────────────────
+
+const BLOCKER_DEFS: Array<{
+  key: ReminderTemplateKey;
+  label: string;
+  match: string;
+  Icon: (props: { className?: string }) => JSX.Element | null;
+  color: string;
+}> = [
+  { key: "location",   label: "Location Missing",    match: "Location missing",                   Icon: MapPin,   color: "text-red-600" },
+  { key: "background", label: "Background Check",     match: "Background check not passed",        Icon: Shield,   color: "text-purple-600" },
+  { key: "agreement",  label: "Agreement Unsigned",   match: "Contractor agreement not signed",    Icon: FileText, color: "text-amber-600" },
+  { key: "training",   label: "Training Incomplete",  match: "Training incomplete",                Icon: BookOpen, color: "text-blue-600" },
+];
+
+function WorkforceDashboard({
+  ridecheckers,
+  onRemindAll,
+  remindBatchLoading,
+}: {
+  ridecheckers: RideChecker[];
+  onRemindAll: (key: ReminderTemplateKey) => void;
+  remindBatchLoading: string | null;
+}) {
+  const active = ridecheckers.filter((rc) => {
+    const s = rc.workflow_stage ?? "";
+    return !["rejected", "suspended"].includes(s);
+  });
+
+  const eligibilityResults = active.map((rc) => getRideCheckerEligibility(rc as any));
+  const eligibleCount = eligibilityResults.filter((e) => e.dispatchEligible).length;
+  const blockedCount  = eligibilityResults.filter((e) => !e.dispatchEligible).length;
+  const readyForApproval = ridecheckers.filter((rc) => rc.workflow_stage === "ready_for_approval").length;
+
+  const blockerCounts: Record<string, number> = {};
+  for (const e of eligibilityResults) {
+    for (const reason of e.blockedReasons) {
+      blockerCounts[reason] = (blockerCounts[reason] || 0) + 1;
+    }
+  }
+  const maxCount = Math.max(1, ...BLOCKER_DEFS.map((b) => blockerCounts[b.match] || 0));
+
+  return (
+    <Card className="border-border">
+      <CardContent className="pt-4 pb-3 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">RideChecker Workforce</span>
+          </div>
+          <span className="text-xs text-muted-foreground">{ridecheckers.length} total applicants</span>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { label: "Total",               value: ridecheckers.length, color: "text-foreground" },
+            { label: "Dispatch Eligible",   value: eligibleCount,       color: "text-emerald-600" },
+            { label: "Blocked",             value: blockedCount,        color: "text-amber-600" },
+            { label: "Ready for Approval",  value: readyForApproval,    color: "text-blue-600" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="text-center rounded-md border bg-muted/30 py-2 px-1">
+              <p className={`text-xl font-bold ${color}`}>{value}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Blocker breakdown + Quick Actions */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            Top Blockers &amp; Quick Actions
+          </p>
+          {BLOCKER_DEFS.map(({ key, label, match, Icon, color }) => {
+            const count   = blockerCounts[match] || 0;
+            const barPct  = Math.round((count / maxCount) * 100);
+            const isLoading = remindBatchLoading === key;
+            return (
+              <div key={key} className="flex items-center gap-3">
+                {/* Blocker bar */}
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${color}`} />
+                  <span className="text-xs text-foreground truncate w-36 shrink-0">{label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${color.replace("text-", "bg-")} opacity-40`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground w-4 text-right shrink-0">{count}</span>
+                </div>
+                {/* Remind All button */}
+                <button
+                  onClick={() => count > 0 && !isLoading && onRemindAll(key)}
+                  disabled={isLoading || count === 0}
+                  className={cn(
+                    "flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border transition-colors shrink-0",
+                    count > 0
+                      ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                      : "border-border bg-muted/30 text-muted-foreground cursor-not-allowed",
+                    "disabled:opacity-50",
+                  )}
+                  data-testid={`button-remind-all-${key}`}
+                >
+                  {isLoading
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <Bell className="h-3 w-3" />
+                  }
+                  Remind All
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function RideCheckersAdminPage() {
@@ -497,6 +623,36 @@ export default function RideCheckersAdminPage() {
 
   // Reminder
   const [remindLoading, setRemindLoading] = useState<string | null>(null);
+  const [remindBatchLoading, setRemindBatchLoading] = useState<string | null>(null);
+
+  const handleRemindBatch = async (templateKey: ReminderTemplateKey) => {
+    setRemindBatchLoading(templateKey);
+    try {
+      const res = await fetch("/api/ops/ridecheckers/remind-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_key: templateKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: data.error || "Failed to send reminders", variant: "destructive" });
+      } else if (data.sent === 0) {
+        toast({
+          title: "Nothing to send",
+          description: data.message || `${data.skipped_dedup ?? 0} already sent recently, ${data.skipped_no_match ?? 0} no match.`,
+        });
+      } else {
+        toast({
+          title: `Reminders sent`,
+          description: `${data.sent} sent · ${data.skipped_dedup ?? 0} skipped (dedup) · ${data.skipped_no_contact ?? 0} no contact`,
+        });
+      }
+    } catch {
+      toast({ title: "Unexpected error", variant: "destructive" });
+    } finally {
+      setRemindBatchLoading(null);
+    }
+  };
   const [newStage, setNewStage] = useState("");
   const [stageNotes, setStageNotes] = useState("");
 
@@ -696,6 +852,15 @@ export default function RideCheckersAdminPage() {
           </div>
         )}
       </div>
+
+      {/* ── Workforce Dashboard ── */}
+      {!loading && ridecheckers.length > 0 && (
+        <WorkforceDashboard
+          ridecheckers={ridecheckers}
+          onRemindAll={handleRemindBatch}
+          remindBatchLoading={remindBatchLoading}
+        />
+      )}
 
       {/* ── Per-stage tally strip ── */}
       <div className="overflow-x-auto pb-1">

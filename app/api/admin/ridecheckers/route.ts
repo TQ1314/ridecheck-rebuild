@@ -47,14 +47,15 @@ const NOTIFY_STAGES = new Set([
 
 const PROFILE_FIELDS = `
   id, full_name, email, phone, role, is_active,
-  service_area, experience, created_at,
+  service_area, rc_city, rc_state, rc_zip, service_radius_miles,
+  experience, created_at,
   approved_at, approved_by, rejected_at, rejection_reason,
   rating, referral_code,
   workflow_stage, documents_complete, background_check_status,
   references_status, assessment_score, reviewer_notes,
   invite_sent_at, invite_accepted_at, suspended_at,
   ridechecker_rating, ridechecker_jobs_completed, ridechecker_quality_score,
-  training_sip4_completed, verification_status
+  training_sip4_completed, verification_status, agreement_status
 `.replace(/\n\s+/g, " ").trim();
 
 // ─────────────────────────────────────────────

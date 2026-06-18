@@ -53,6 +53,10 @@ interface RideCheckerSuggestion {
   email: string;
   phone: string | null;
   service_area: string | null;
+  rc_city?: string | null;
+  rc_state?: string | null;
+  rc_zip?: string | null;
+  service_radius_miles?: number | null;
   rating: number;
   ridechecker_score: number;
   active_jobs: number;
@@ -63,6 +67,7 @@ interface RideCheckerSuggestion {
   availability_updated_at: string | null;
   agreement_status?: string | null;
   current_agreement_version?: string | null;
+  last_active_at?: string | null;
 }
 
 interface RideCheckerAssignmentPanelProps {
@@ -919,54 +924,73 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
                 return (
                 <div
                   key={rc.id}
-                  className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50"
+                  className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/50"
                   data-testid={`item-broadcast-rc-${rc.id}`}
                 >
                   <Checkbox
                     checked={selectedBroadcast.has(rc.id)}
                     onCheckedChange={() => toggleBroadcastSelect(rc.id)}
+                    className="mt-0.5"
                     data-testid={`checkbox-broadcast-${rc.id}`}
                   />
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleBroadcastSelect(rc.id)}>
+                    {/* Row 1: name + eligibility */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${rc.is_available ? "bg-green-500" : "bg-gray-300"}`} title={rc.is_available ? "Available" : "Unavailable"} />
-                      <p className="text-xs font-medium truncate">{rc.full_name}</p>
+                      <span
+                        className={`h-2 w-2 rounded-full flex-shrink-0 ${rc.is_available ? "bg-green-500" : "bg-gray-300"}`}
+                        title={rc.is_available ? "Available" : "Unavailable"}
+                      />
+                      <p className="text-xs font-semibold truncate">{rc.full_name}</p>
+                      {!blockReason && (
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 leading-4">
+                          Eligible ✓
+                        </span>
+                      )}
                       {blockReason && (
                         <span className="text-[10px] font-semibold px-1 py-0 rounded bg-amber-100 text-amber-700 border border-amber-200 leading-4">
                           {blockReason}
                         </span>
                       )}
-                      {!blockReason && !rc.is_available && (
-                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-gray-100 text-gray-600 border border-gray-200 leading-4">
-                          Unavailable
-                        </span>
-                      )}
                       {rc.decline_count_30d >= 4 && (
-                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4" title="High decline rate in last 30 days">
+                        <span className="text-[10px] font-semibold px-1 py-0 rounded bg-red-100 text-red-700 border border-red-200 leading-4">
                           {rc.decline_count_30d} declines
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {rc.service_area || rc.email}
+                    {/* Row 2: location */}
+                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                      {rc.rc_city && rc.rc_state
+                        ? `${rc.rc_city}, ${rc.rc_state}${rc.service_radius_miles ? ` · ${rc.service_radius_miles} mi radius` : ""}`
+                        : rc.service_area || rc.email}
                     </p>
+                    {/* Row 3: jobs + last active */}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[11px] flex items-center gap-0.5 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                        <Briefcase className="h-2.5 w-2.5" />
+                        Jobs: {rc.active_jobs}/{rc.max_daily_jobs}
+                      </span>
+                      {rc.last_active_at && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · Last active: {formatRelative(rc.last_active_at)}
+                        </span>
+                      )}
+                      {!rc.last_active_at && (
+                        <span className="text-[11px] text-muted-foreground/60">· No activity yet</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-                    <span className="flex items-center gap-0.5">
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Star className="h-2.5 w-2.5" />
                       {rc.rating.toFixed(1)}
-                    </span>
-                    {rc.ridechecker_score > 0 && (
-                      <span className="text-[10px] font-bold px-1 py-0 rounded bg-green-50 text-green-700 border border-green-200 leading-4" title="RideCheck Score">
-                        {rc.ridechecker_score}pts
-                      </span>
-                    )}
-                    <span className={`flex items-center gap-0.5 ${rc.active_jobs >= rc.max_daily_jobs ? "text-red-500 font-medium" : ""}`}>
-                      <Briefcase className="h-2.5 w-2.5" />
-                      {rc.active_jobs}/{rc.max_daily_jobs}
-                    </span>
+                      {rc.ridechecker_score > 0 && (
+                        <span className="text-[10px] font-bold px-1 py-0 rounded bg-green-50 text-green-700 border border-green-200 leading-4">
+                          {rc.ridechecker_score}pts
+                        </span>
+                      )}
+                    </div>
                     <button
-                      className="ml-0.5 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       onClick={(e) => { e.stopPropagation(); setProfileDrawerRcId(rc.id); setProfileDrawerOpen(true); }}
                       title={`View ${rc.full_name}'s profile`}
                       data-testid={`button-view-profile-${rc.id}`}

@@ -53,6 +53,17 @@ CREATE TRIGGER trg_rrs_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
+-- ── rc_location_fields (migration 061) ───────────────────────────────────────
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS rc_city              TEXT,
+  ADD COLUMN IF NOT EXISTS rc_state             TEXT,
+  ADD COLUMN IF NOT EXISTS rc_zip               TEXT,
+  ADD COLUMN IF NOT EXISTS service_radius_miles INT DEFAULT 30;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_rc_state ON public.profiles(rc_state);
+CREATE INDEX IF NOT EXISTS idx_profiles_rc_zip   ON public.profiles(rc_zip);
+
+
 -- ── rc_reminder_log (migration 060) ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.rc_reminder_log (
   id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,

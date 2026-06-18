@@ -44,6 +44,11 @@ export interface EligibilityProfile {
   phone?: string | null;
   email?: string | null;
   service_area?: string | null;
+  // Structured location fields (migration 061)
+  rc_city?: string | null;
+  rc_state?: string | null;
+  rc_zip?: string | null;
+  service_radius_miles?: number | null;
 }
 
 export function getRideCheckerEligibility(profile: EligibilityProfile): RideCheckerEligibility {
@@ -108,10 +113,12 @@ export function getRideCheckerEligibility(profile: EligibilityProfile): RideChec
     },
     {
       key: "location",
-      label: "Service area provided",
-      status: profile.service_area ? "complete" : "missing",
-      detail: profile.service_area || "No service area set",
-      blocksDispatch: false,
+      label: "Location on file",
+      status: (profile.service_area || (profile.rc_city && profile.rc_state)) ? "complete" : "missing",
+      detail: profile.rc_city && profile.rc_state
+        ? `${profile.rc_city}, ${profile.rc_state}${profile.rc_zip ? ` ${profile.rc_zip}` : ""}${profile.service_radius_miles ? ` · ${profile.service_radius_miles} mi radius` : ""}`
+        : profile.service_area || "No location set — required for dispatch",
+      blocksDispatch: true,
     },
     {
       key: "id_verification",
@@ -179,8 +186,11 @@ export function getRideCheckerEligibility(profile: EligibilityProfile): RideChec
     },
   ];
 
+  const hasLocation = !!(profile.service_area || (profile.rc_city && profile.rc_state));
+
   const blockedReasons: string[] = [];
   if (!isActive)                            blockedReasons.push("Account not active");
+  if (!hasLocation)                         blockedReasons.push("Location missing");
   if (idStatus !== "complete")              blockedReasons.push("ID verification not approved");
   if (bgStatus !== "complete")              blockedReasons.push("Background check not passed");
   if (trainingStatus !== "complete")        blockedReasons.push("Training incomplete");
