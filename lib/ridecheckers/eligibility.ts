@@ -145,7 +145,7 @@ export function getRideCheckerEligibility(profile: EligibilityProfile): RideChec
             : profile.background_check_status === "pending" ? "In progress"
             : profile.background_check_status === "failed"  ? "Failed"
             : "Not ordered",
-      blocksDispatch: true,
+      blocksDispatch: false,
     },
     {
       key: "training",
@@ -192,7 +192,6 @@ export function getRideCheckerEligibility(profile: EligibilityProfile): RideChec
   if (!isActive)                            blockedReasons.push("Account not active");
   if (!hasLocation)                         blockedReasons.push("Location missing");
   if (idStatus !== "complete")              blockedReasons.push("ID verification not approved");
-  if (bgStatus !== "complete")              blockedReasons.push("Background check not passed");
   if (trainingStatus !== "complete")        blockedReasons.push("Training incomplete");
   if (agreementStatus !== "complete")       blockedReasons.push("Contractor agreement not signed");
   if (isTerminal) {
@@ -215,8 +214,6 @@ export function getRideCheckerEligibility(profile: EligibilityProfile): RideChec
     nextAction = "Send contractor agreement reminder";
   } else if (trainingStatus !== "complete") {
     nextAction = "Complete training modules";
-  } else if (bgStatus !== "complete") {
-    nextAction = bgStatus === "pending" ? "Confirm background check result" : "Order background check";
   } else if (idStatus !== "complete") {
     nextAction = idStatus === "pending" ? "Review submitted ID" : "Request ID verification";
   }
