@@ -64,6 +64,9 @@ interface OBDUploadedFile {
   fileName: string;
   fileType: "image" | "pdf" | "txt" | "csv";
   ai_extracted?: boolean;
+  extraction_confidence?: number;
+  ocr_quality?: string;
+  scanner_model?: string;
 }
 
 interface OBDDTCEntry {
@@ -72,6 +75,7 @@ interface OBDDTCEntry {
   code: string;
   description: string;
   status: string;
+  source?: "manual" | "ai_extracted";
 }
 
 interface FormData {
@@ -110,6 +114,8 @@ interface FormData {
   obd_uploaded_files: OBDUploadedFile[];
   obd_dtc_codes: OBDDTCEntry[];
   obd_scanner_brand: string;
+  obd_scanner_model: string;
+  obd_scanner_auto_detected: boolean;
   obd_notes: string;
   obd_emissions: string;
   obd_warning_lights: string[];
@@ -174,6 +180,8 @@ const EMPTY_FORM: FormData = {
   obd_uploaded_files: [],
   obd_dtc_codes: [],
   obd_scanner_brand: "",
+  obd_scanner_model: "",
+  obd_scanner_auto_detected: false,
   obd_notes: "",
   obd_emissions: "",
   obd_warning_lights: [],
@@ -266,6 +274,7 @@ export default function RideCheckerSubmitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [obdUploading, setObdUploading] = useState(false);
   const [obdExtractingIndices, setObdExtractingIndices] = useState<Set<number>>(new Set());
+  const [obdBrandPickerOpen, setObdBrandPickerOpen] = useState(false);
   const [assignment, setAssignment] = useState<AssignmentDetails | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [scanCodeInput, setScanCodeInput] = useState("");
@@ -433,6 +442,7 @@ export default function RideCheckerSubmitPage() {
         code:        "",
         description: "",
         status:      "Active",
+        source:      "manual",
       };
       const next = { ...prev, obd_dtc_codes: [...prev.obd_dtc_codes, entry] };
       saveDraft(next, currentStep);
@@ -525,33 +535,70 @@ export default function RideCheckerSubmitPage() {
         return;
       }
       const data = await res.json();
-      const newCodes: { system: string; code: string; status: string; description: string }[] = data.codes || [];
+      const confidence: number = data.confidence_score ?? 70;
+      const isLowConfidence = confidence < 60;
+      const codesFromExtraction: { system: string; code: string; status: string; description: string }[] = data.codes || [];
+
       setForm((prev) => {
-        const existingCodes = new Set(prev.obd_dtc_codes.map((c) => c.code.toUpperCase()));
-        const toAdd: OBDDTCEntry[] = newCodes
-          .filter((c) => c.code && !existingCodes.has(c.code.toUpperCase()))
-          .map((c) => ({
-            _key: `ex_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-            system: c.system || "Unknown",
-            code: c.code.toUpperCase(),
-            description: c.description || "",
-            status: c.status || "Unknown",
-          }));
+        // Mark the file with confidence + model info
         const updatedFiles = prev.obd_uploaded_files.map((f, i) =>
-          i === idx ? { ...f, ai_extracted: true } : f
+          i === idx ? {
+            ...f,
+            ai_extracted: true,
+            extraction_confidence: confidence,
+            ocr_quality: data.ocr_quality || undefined,
+            scanner_model: data.scanner_model || undefined,
+          } : f
         );
+
+        // Auto-detect scanner brand/model (only if not already set)
+        const detectedBrand = data.scanner_brand || "";
+        const detectedModel = data.scanner_model || "";
+        const shouldAutoDetect = !!detectedBrand && !prev.obd_scanner_auto_detected && !prev.obd_scanner_brand;
+
+        // Only add codes when confidence is sufficient
+        let updatedCodes = prev.obd_dtc_codes;
+        if (!isLowConfidence && codesFromExtraction.length > 0) {
+          const existingCodes = new Set(prev.obd_dtc_codes.map((c) => c.code.toUpperCase()));
+          const toAdd: OBDDTCEntry[] = codesFromExtraction
+            .filter((c) => c.code && !existingCodes.has(c.code.toUpperCase()))
+            .map((c) => ({
+              _key: `ex_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+              system: c.system || "Unknown",
+              code: c.code.toUpperCase(),
+              description: c.description || "",
+              status: c.status || "Unknown",
+              source: "ai_extracted" as const,
+            }));
+          updatedCodes = [...prev.obd_dtc_codes, ...toAdd];
+        }
+
         const next = {
           ...prev,
           obd_uploaded_files: updatedFiles,
-          obd_dtc_codes: [...prev.obd_dtc_codes, ...toAdd],
-          obd_scanner_brand: prev.obd_scanner_brand || data.scanner_brand || "",
+          obd_dtc_codes: updatedCodes,
+          obd_scanner_brand: shouldAutoDetect ? detectedBrand : prev.obd_scanner_brand,
+          obd_scanner_model: shouldAutoDetect ? detectedModel : prev.obd_scanner_model,
+          obd_scanner_auto_detected: shouldAutoDetect ? true : prev.obd_scanner_auto_detected,
           obd_emissions: prev.obd_emissions || data.emissions_status || "",
         };
         saveDraft(next, currentStep);
         return next;
       });
-      if (newCodes.length > 0) {
-        toast({ title: `Extracted ${newCodes.length} code${newCodes.length !== 1 ? "s" : ""}`, description: data.scanner_brand ? `Scanner detected: ${data.scanner_brand}` : undefined });
+
+      if (isLowConfidence) {
+        toast({
+          title: "Low OCR confidence — review required",
+          description: `Confidence: ${confidence}%. ${data.ocr_quality || ""}. Codes not added automatically.`,
+          variant: "destructive",
+        });
+      } else if (codesFromExtraction.length > 0) {
+        toast({
+          title: `${codesFromExtraction.length} code${codesFromExtraction.length !== 1 ? "s" : ""} extracted`,
+          description: data.scanner_brand
+            ? `Scanner: ${data.scanner_brand}${data.scanner_model ? " " + data.scanner_model : ""} · ${confidence}% confidence`
+            : `${confidence}% confidence`,
+        });
       } else {
         toast({ title: "No codes found in this file", description: "Add them manually below if needed." });
       }
@@ -679,13 +726,20 @@ export default function RideCheckerSubmitPage() {
         }
 
         if (form.obd_scanner_brand) obdModule.scanner_brand = form.obd_scanner_brand;
+        if (form.obd_scanner_model) obdModule.scanner_model = form.obd_scanner_model;
 
         if (form.obd_scan_performed === "yes") {
           // Uploaded files
           if (form.obd_uploaded_files.length > 0) {
-            obdModule.uploaded_files = form.obd_uploaded_files.map(({ url, fileName, fileType, ai_extracted }) => ({
-              url, fileName, fileType, reviewStatus: "approved_for_report", ai_extracted: ai_extracted ?? false,
-            }));
+            obdModule.uploaded_files = form.obd_uploaded_files.map(
+              ({ url, fileName, fileType, ai_extracted, extraction_confidence, ocr_quality, scanner_model }) => ({
+                url, fileName, fileType, reviewStatus: "approved_for_report",
+                ai_extracted: ai_extracted ?? false,
+                ...(extraction_confidence != null && { extraction_confidence }),
+                ...(ocr_quality && { ocr_quality }),
+                ...(scanner_model && { scanner_model }),
+              })
+            );
           }
 
           // DTC codes — filter out blank entries, strip _key
@@ -1162,27 +1216,51 @@ export default function RideCheckerSubmitPage() {
                 {/* Divider */}
                 <div className="border-t border-dashed" />
 
-                {/* ── Scanner brand ── */}
+                {/* ── Scanner brand — auto-detect first ── */}
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">Scanner / App Used</p>
-                  <p className="text-xs text-muted-foreground">Helps RideCheck read report formats automatically.</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {["Topdon", "Autel", "Launch", "BlueDriver", "FIXD", "ThinkCar", "INNOVA", "Other"].map((brand) => (
+                  {form.obd_scanner_auto_detected && form.obd_scanner_brand ? (
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[#22774F]/30 bg-[#22774F]/5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#22774F]">
+                          ✓ {form.obd_scanner_brand}{form.obd_scanner_model ? ` ${form.obd_scanner_model}` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Detected automatically from scan file</p>
+                      </div>
                       <button
-                        key={brand}
                         type="button"
-                        onClick={() => updateField("obd_scanner_brand", form.obd_scanner_brand === brand ? "" : brand)}
-                        data-testid={`button-obd-brand-${brand.toLowerCase()}`}
-                        className={`text-xs px-2 py-2 rounded-xl border font-medium transition-colors ${
-                          form.obd_scanner_brand === brand
-                            ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
-                            : "border-border bg-card text-foreground hover:bg-muted/50"
-                        }`}
+                        onClick={() => setObdBrandPickerOpen((o) => !o)}
+                        data-testid="button-obd-brand-change"
+                        className="text-xs text-muted-foreground underline underline-offset-2 shrink-0"
                       >
-                        {brand}
+                        {obdBrandPickerOpen ? "Cancel" : "Change"}
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Upload a scan file above — RideCheck will detect the scanner automatically.</p>
+                  )}
+                  {(!form.obd_scanner_auto_detected || obdBrandPickerOpen) && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {["Topdon", "Autel", "Launch", "BlueDriver", "FIXD", "ThinkCar", "INNOVA", "Other"].map((brand) => (
+                        <button
+                          key={brand}
+                          type="button"
+                          onClick={() => {
+                            updateField("obd_scanner_brand", form.obd_scanner_brand === brand ? "" : brand);
+                            if (form.obd_scanner_auto_detected) setObdBrandPickerOpen(false);
+                          }}
+                          data-testid={`button-obd-brand-${brand.toLowerCase()}`}
+                          className={`text-xs px-2 py-2 rounded-xl border font-medium transition-colors ${
+                            form.obd_scanner_brand === brand
+                              ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
+                              : "border-border bg-card text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* ── File upload ── */}
@@ -1252,11 +1330,25 @@ export default function RideCheckerSubmitPage() {
                               <Badge variant="outline" className="text-xs shrink-0">
                                 {f.fileType.toUpperCase()}
                               </Badge>
-                              {f.ai_extracted && (
+                              {f.ai_extracted && f.extraction_confidence != null ? (
+                                <Badge
+                                  className={`text-xs shrink-0 ${
+                                    f.extraction_confidence >= 80
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-700"
+                                      : f.extraction_confidence >= 60
+                                      ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700"
+                                      : "bg-red-50 text-red-700 border-red-300 dark:bg-red-950/30 dark:text-red-400 dark:border-red-700"
+                                  }`}
+                                  title={f.ocr_quality || undefined}
+                                >
+                                  {f.extraction_confidence >= 80 ? "✓" : f.extraction_confidence >= 60 ? "⚠" : "✗"}{" "}
+                                  {f.extraction_confidence}% confidence
+                                </Badge>
+                              ) : f.ai_extracted ? (
                                 <Badge className="text-xs bg-[#22774F]/10 text-[#22774F] border-[#22774F]/30 shrink-0">
                                   ✓ Extracted
                                 </Badge>
-                              )}
+                              ) : null}
                               <button
                                 onClick={() => removeOBDFile(i)}
                                 className="text-muted-foreground hover:text-destructive shrink-0"
@@ -1265,6 +1357,13 @@ export default function RideCheckerSubmitPage() {
                                 <X className="h-4 w-4" />
                               </button>
                             </div>
+                            {/* Low confidence warning */}
+                            {f.ai_extracted && f.extraction_confidence != null && f.extraction_confidence < 60 && (
+                              <div className="px-3 py-2 bg-red-50 dark:bg-red-950/20 border-t border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-400">
+                                <span className="font-semibold">Unable to confidently interpret scan.</span>{" "}
+                                {f.ocr_quality ? `${f.ocr_quality}. ` : ""}Codes were not added automatically — please enter them manually below or re-upload a clearer image.
+                              </div>
+                            )}
                             {canExtract && (
                               <button
                                 type="button"
@@ -1303,7 +1402,18 @@ export default function RideCheckerSubmitPage() {
                           data-testid={`item-obd-dtc-${i}`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code #{i + 1}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code #{i + 1}</span>
+                              {entry.source === "ai_extracted" ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+                                  <Sparkles className="h-2.5 w-2.5" /> AI
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                                  Manual
+                                </span>
+                              )}
+                            </div>
                             <button
                               onClick={() => removeOBDDTCCode(entry._key)}
                               className="text-muted-foreground hover:text-destructive"

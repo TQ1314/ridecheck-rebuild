@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
+const LOW_CONFIDENCE_THRESHOLD = 60;
+
 const EXTRACTION_PROMPT = `You are analyzing an OBD-II diagnostic scanner output — this may be a PDF report, a screenshot of a scanner display, or a photo of a scanner screen.
 
 Your task: extract all diagnostic information and return it as a single JSON object.
@@ -22,22 +24,38 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences. Use this
     }
   ],
   "scanner_brand": "Topdon",
+  "scanner_model": "Phoenix Nano",
   "warning_lights": ["check_engine"],
   "emissions_status": "not_ready",
-  "confidence": "high",
+  "confidence_score": 92,
+  "ocr_quality": "Excellent — all codes clearly readable",
   "notes": null
 }
 
-Rules:
+Field rules:
 - system: P-codes → "Powertrain", C-codes → "Chassis", B-codes → "Body", U-codes → "Network". If uncertain, use "Unknown".
-- status: use "Active", "Pending", "Stored", or "Unknown" — map from whatever the scanner calls them (Current→Active, History→Stored, etc.)
-- scanner_brand: detect from headers, logos, watermarks, or copyright text. Known brands: Topdon, Autel, Launch, BlueDriver, FIXD, ThinkCar, INNOVA, Bosch, Actron. Use null if not detectable.
-- warning_lights: only from this set — "check_engine", "abs", "airbag_srs", "battery", "oil_pressure", "brake", "tpms". Use an empty array if none visible.
-- emissions_status: "ready" if all monitors pass, "not_ready" if any monitor is incomplete or failing, "unknown" if not shown, null if not applicable.
-- confidence: "high" if codes are clearly readable, "medium" if partially obscured or inferred, "low" if very hard to read.
-- notes: brief string for anything relevant not captured above (e.g. "scan shows freeze frame data"), or null.
-- If no codes are present, return an empty "codes" array — do not invent codes.
+- status: "Active", "Pending", "Stored", or "Unknown". Map: Current→Active, History→Stored, Confirmed→Active.
+- scanner_brand: detect from headers, logos, watermarks, copyright. Known brands: Topdon, Autel, Launch, BlueDriver, FIXD, ThinkCar, INNOVA, Bosch, Actron. Use null if not detectable.
+- scanner_model: specific model name if visible (e.g. "Phoenix Nano", "MaxiCOM MK808"). Use null if not visible.
+- warning_lights: only from this set — "check_engine", "abs", "airbag_srs", "battery", "oil_pressure", "brake", "tpms". Empty array if none visible.
+- emissions_status: "ready" if all monitors pass, "not_ready" if any incomplete/failing, "unknown" if not shown, null if not applicable.
+- confidence_score: integer 0–100.
+  - 80–100: codes are fully legible with no ambiguity
+  - 60–79: most codes readable but some uncertainty exists
+  - 40–59: image is blurry, partial, or heavily compressed — codes may be inaccurate
+  - 0–39: content is too unclear to extract reliably
+- ocr_quality: short human-readable phrase, e.g. "Excellent", "Good", "Fair — image partially blurry", "Poor — low resolution image detected"
+- notes: any relevant observation not captured above (e.g. "freeze frame data present"), or null.
+- CRITICAL: Do NOT invent codes. If you cannot read a code with confidence, omit it. Empty "codes" array is correct when nothing is clearly readable.
 - Do NOT diagnose, recommend repairs, or recommend purchase decisions.`;
+
+function confidenceFromLabel(label: string): number {
+  if (label === "high") return 88;
+  if (label === "medium") return 70;
+  if (label === "low") return 42;
+  const n = parseInt(label, 10);
+  return isNaN(n) ? 70 : n;
+}
 
 function systemFromCode(code: string): string {
   const prefix = code.toUpperCase().charAt(0);
@@ -48,14 +66,7 @@ function systemFromCode(code: string): string {
        : "Unknown";
 }
 
-function parsePlainText(text: string): {
-  codes: { system: string; code: string; status: string; description: string }[];
-  scanner_brand: string | null;
-  warning_lights: string[];
-  emissions_status: string | null;
-  confidence: string;
-  notes: string | null;
-} {
+function parsePlainText(text: string): ExtractionResult {
   const codeRegex = /\b([PBCU][0-9A-F]{4})\b/gi;
   const found = new Set<string>();
   let match: RegExpExecArray | null;
@@ -78,7 +89,9 @@ function parsePlainText(text: string): {
 
   const brandRegex = /\b(topdon|autel|launch|bluedriver|fixd|thinkcar|innova|bosch|actron)\b/i;
   const brandMatch = text.match(brandRegex);
-  const scanner_brand = brandMatch ? brandMatch[1].charAt(0).toUpperCase() + brandMatch[1].slice(1).toLowerCase() : null;
+  const scanner_brand = brandMatch
+    ? brandMatch[1].charAt(0).toUpperCase() + brandMatch[1].slice(1).toLowerCase()
+    : null;
 
   const notReady = /not[\s_-]?ready|incomplete|failing/i.test(text);
   const ready = /\bready\b/i.test(text) && !notReady;
@@ -89,14 +102,28 @@ function parsePlainText(text: string): {
   if (/\babs\b/i.test(text)) warning_lights.push("abs");
   if (/airbag|srs/i.test(text)) warning_lights.push("airbag_srs");
 
-  return {
-    codes,
-    scanner_brand,
-    warning_lights,
-    emissions_status,
-    confidence: codes.length > 0 ? "medium" : "low",
-    notes: null,
-  };
+  const confidence_score = codes.length > 0 ? 95 : 75;
+  const ocr_quality = "Text export — direct parse, no OCR required";
+
+  return { codes, scanner_brand, scanner_model: null, warning_lights, emissions_status, confidence_score, ocr_quality, notes: null };
+}
+
+interface DtcCode {
+  system: string;
+  code: string;
+  status: string;
+  description: string;
+}
+
+interface ExtractionResult {
+  codes: DtcCode[];
+  scanner_brand: string | null;
+  scanner_model: string | null;
+  warning_lights: string[];
+  emissions_status: string | null;
+  confidence_score: number;
+  ocr_quality: string;
+  notes: string | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -134,56 +161,83 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not fetch file for extraction" }, { status: 400 });
     }
 
+    let result: ExtractionResult;
+
     if (isTxt || isCsv) {
       const text = await fileRes.text();
-      const result = parsePlainText(text);
-      return NextResponse.json({ ...result, method: "text_parse" });
-    }
-
-    const buffer = await fileRes.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-
-    let content: Anthropic.MessageParam["content"];
-    if (isPdf) {
-      content = [
-        {
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: base64 },
-        } as unknown as Anthropic.ContentBlockParam,
-        { type: "text", text: EXTRACTION_PROMPT },
-      ];
+      result = parsePlainText(text);
     } else {
-      const mimeType = (file_type?.startsWith("image/") ? file_type : "image/jpeg") as
-        | "image/jpeg"
-        | "image/png"
-        | "image/gif"
-        | "image/webp";
-      content = [
-        {
-          type: "image",
-          source: { type: "base64", media_type: mimeType, data: base64 },
-        },
-        { type: "text", text: EXTRACTION_PROMPT },
-      ];
+      const buffer = await fileRes.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+
+      let content: Anthropic.MessageParam["content"];
+      if (isPdf) {
+        content = [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: base64 },
+          } as unknown as Anthropic.ContentBlockParam,
+          { type: "text", text: EXTRACTION_PROMPT },
+        ];
+      } else {
+        const mimeType = (file_type?.startsWith("image/") ? file_type : "image/jpeg") as
+          | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+        content = [
+          { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } },
+          { type: "text", text: EXTRACTION_PROMPT },
+        ];
+      }
+
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-20250514",
+        max_tokens: 1024,
+        messages: [{ role: "user", content }],
+      });
+
+      const raw = msg.content.find((c) => c.type === "text")?.text || "{}";
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      }
+
+      const rawConfidence = parsed.confidence_score ?? parsed.confidence;
+      const confidence_score =
+        typeof rawConfidence === "number"
+          ? Math.round(Math.max(0, Math.min(100, rawConfidence)))
+          : typeof rawConfidence === "string"
+          ? confidenceFromLabel(rawConfidence)
+          : 70;
+
+      result = {
+        codes: (parsed.codes as DtcCode[]) || [],
+        scanner_brand: (parsed.scanner_brand as string) || null,
+        scanner_model: (parsed.scanner_model as string) || null,
+        warning_lights: (parsed.warning_lights as string[]) || [],
+        emissions_status: (parsed.emissions_status as string) || null,
+        confidence_score,
+        ocr_quality: (parsed.ocr_quality as string) || (confidence_score >= 80 ? "Good" : confidence_score >= 60 ? "Fair" : "Poor"),
+        notes: (parsed.notes as string) || null,
+      };
     }
 
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-20250514",
-      max_tokens: 1024,
-      messages: [{ role: "user", content }],
+    // If confidence is too low, return codes as low_confidence_codes and clear codes
+    // so the UI can warn the user without auto-populating
+    const isLowConfidence = result.confidence_score < LOW_CONFIDENCE_THRESHOLD;
+    return NextResponse.json({
+      codes: isLowConfidence ? [] : result.codes,
+      low_confidence_codes: isLowConfidence ? result.codes : [],
+      scanner_brand: result.scanner_brand,
+      scanner_model: result.scanner_model,
+      warning_lights: result.warning_lights,
+      emissions_status: result.emissions_status,
+      confidence_score: result.confidence_score,
+      ocr_quality: result.ocr_quality,
+      notes: result.notes,
+      method: isTxt || isCsv ? "text_parse" : isPdf ? "claude_pdf" : "claude_vision",
     });
-
-    const raw = msg.content.find((c) => c.type === "text")?.text || "{}";
-
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-    }
-
-    return NextResponse.json({ ...parsed, method: isPdf ? "claude_pdf" : "claude_vision" });
   } catch (err) {
     console.error("[obd/extract]", err);
     return NextResponse.json({ error: "Extraction failed" }, { status: 500 });

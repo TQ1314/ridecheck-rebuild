@@ -20,6 +20,9 @@ export interface OBDUploadedFile {
   fileType: "image" | "pdf" | "txt" | "csv";
   reviewStatus: "approved_for_report" | "needs_review" | "excluded_from_report";
   ai_extracted?: boolean;
+  extraction_confidence?: number;
+  ocr_quality?: string;
+  scanner_model?: string;
 }
 
 export interface OBDDTCCode {
@@ -27,6 +30,7 @@ export interface OBDDTCCode {
   code: string;
   description: string;
   status: string;
+  source?: "manual" | "ai_extracted";
 }
 
 export interface OBDModule {
