@@ -17,8 +17,9 @@ export interface RoadTestModule {
 export interface OBDUploadedFile {
   url: string;
   fileName: string;
-  fileType: "image" | "pdf";
+  fileType: "image" | "pdf" | "txt" | "csv";
   reviewStatus: "approved_for_report" | "needs_review" | "excluded_from_report";
+  ai_extracted?: boolean;
 }
 
 export interface OBDDTCCode {
@@ -30,6 +31,7 @@ export interface OBDDTCCode {
 
 export interface OBDModule {
   scan_performed: string;
+  scanner_brand?: string;
   uploaded_files?: OBDUploadedFile[];
   dtc_codes?: OBDDTCCode[];
   notes?: string;

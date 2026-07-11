@@ -107,6 +107,9 @@ function buildOBDSection(input: ReportInput): string {
     not_permitted: "Scan not permitted by seller",
   };
   lines.push(`Scan Status: ${statusLabels[obd.scan_performed] || obd.scan_performed}`);
+  if (obd.scanner_brand) {
+    lines.push(`Scanner Used: ${obd.scanner_brand}`);
+  }
 
   // Warning lights (always show if present)
   if (obd.warning_lights && obd.warning_lights.length > 0) {
@@ -144,10 +147,14 @@ function buildOBDSection(input: ReportInput): string {
     if (obd.uploaded_files && obd.uploaded_files.length > 0) {
       const imageCount = obd.uploaded_files.filter((f) => f.fileType === "image").length;
       const pdfCount   = obd.uploaded_files.filter((f) => f.fileType === "pdf").length;
+      const txtCount   = obd.uploaded_files.filter((f) => f.fileType === "txt" || f.fileType === "csv").length;
+      const aiCount    = obd.uploaded_files.filter((f) => f.ai_extracted).length;
       const parts: string[] = [];
       if (imageCount > 0) parts.push(`${imageCount} image${imageCount !== 1 ? "s" : ""}`);
       if (pdfCount   > 0) parts.push(`${pdfCount} PDF${pdfCount !== 1 ? "s" : ""}`);
-      lines.push(`Uploaded Diagnostic Evidence: ${parts.join(", ")} (${obd.uploaded_files.map((f) => f.fileName).join(", ")})`);
+      if (txtCount   > 0) parts.push(`${txtCount} text/CSV export${txtCount !== 1 ? "s" : ""}`);
+      const aiNote = aiCount > 0 ? ` — ${aiCount} file${aiCount !== 1 ? "s" : ""} AI-extracted` : "";
+      lines.push(`Uploaded Diagnostic Evidence: ${parts.join(", ")}${aiNote} (${obd.uploaded_files.map((f) => f.fileName).join(", ")})`);
     } else {
       lines.push("Uploaded Diagnostic Evidence: None uploaded");
     }

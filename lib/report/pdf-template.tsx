@@ -1728,6 +1728,7 @@ function OBDFieldScanSection({ obd }: { obd: OBDModule }) {
         <Text style={[s.obdScanLabel, { color: scanColor }]}>Scan Status</Text>
         <Text style={[s.obdScanValue, { color: scanColor }]}>
           {scanPerformedLabels[obd.scan_performed] || obd.scan_performed}
+          {obd.scanner_brand ? `  ·  ${obd.scanner_brand}` : ""}
         </Text>
         {scanPerformed && (
           <Text style={{ fontSize: 7.5, color: scanColor, marginTop: 2 }}>
@@ -1836,17 +1837,26 @@ function OBDFieldScanSection({ obd }: { obd: OBDModule }) {
         </View>
       )}
 
-      {pdfFiles.length > 0 && (
-        <View style={[s.obdNotesBox, { marginBottom: 0 }]} wrap={false}>
-          <Text style={s.obdNotesLabel}>Uploaded Diagnostic Files (PDF)</Text>
-          {pdfFiles.map((f, i) => (
-            <View key={i} style={s.obdFileRef}>
-              <Text style={s.obdFileIcon}>[PDF]</Text>
-              <Text style={s.obdFileName}>{f.fileName}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {(() => {
+        const docFiles = (obd.uploaded_files || []).filter(
+          (f) => f.fileType === "pdf" || f.fileType === "txt" || f.fileType === "csv"
+        );
+        if (docFiles.length === 0) return null;
+        return (
+          <View style={[s.obdNotesBox, { marginBottom: 0 }]} wrap={false}>
+            <Text style={s.obdNotesLabel}>Original Diagnostic Files (Preserved Evidence)</Text>
+            {docFiles.map((f, i) => (
+              <View key={i} style={s.obdFileRef}>
+                <Text style={s.obdFileIcon}>[{f.fileType.toUpperCase()}]</Text>
+                <Text style={s.obdFileName}>
+                  {f.fileName}
+                  {f.ai_extracted ? "  ✓ AI-extracted" : ""}
+                </Text>
+              </View>
+            ))}
+          </View>
+        );
+      })()}
     </View>
   );
 }

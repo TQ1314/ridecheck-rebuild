@@ -10,6 +10,7 @@ const ALLOWED_TYPES = [
   "image/jpeg", "image/jpg", "image/png",
   "image/webp", "image/heic", "image/heif",
   "application/pdf",
+  "text/plain", "text/csv", "application/csv",
 ];
 
 export async function POST(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     const mimeType = file.type || "image/jpeg";
     if (!ALLOWED_TYPES.includes(mimeType)) {
       return NextResponse.json(
-        { error: "Invalid file type. Use JPEG, PNG, WebP, HEIC, or PDF." },
+        { error: "Invalid file type. Use JPEG, PNG, WebP, HEIC, PDF, TXT, or CSV." },
         { status: 400 },
       );
     }

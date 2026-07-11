@@ -37,6 +37,7 @@ import {
   Upload,
   FileText,
   Shield,
+  Sparkles,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -61,7 +62,8 @@ interface AssignmentDetails {
 interface OBDUploadedFile {
   url: string;
   fileName: string;
-  fileType: "image" | "pdf";
+  fileType: "image" | "pdf" | "txt" | "csv";
+  ai_extracted?: boolean;
 }
 
 interface OBDDTCEntry {
@@ -107,6 +109,7 @@ interface FormData {
   obd_scan_performed: string;
   obd_uploaded_files: OBDUploadedFile[];
   obd_dtc_codes: OBDDTCEntry[];
+  obd_scanner_brand: string;
   obd_notes: string;
   obd_emissions: string;
   obd_warning_lights: string[];
@@ -170,6 +173,7 @@ const EMPTY_FORM: FormData = {
   obd_scan_performed: "",
   obd_uploaded_files: [],
   obd_dtc_codes: [],
+  obd_scanner_brand: "",
   obd_notes: "",
   obd_emissions: "",
   obd_warning_lights: [],
@@ -261,6 +265,7 @@ export default function RideCheckerSubmitPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [obdUploading, setObdUploading] = useState(false);
+  const [obdExtractingIndices, setObdExtractingIndices] = useState<Set<number>>(new Set());
   const [assignment, setAssignment] = useState<AssignmentDetails | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [scanCodeInput, setScanCodeInput] = useState("");
@@ -458,8 +463,14 @@ export default function RideCheckerSubmitPage() {
     if (!file) return;
     const isPDF   = file.type === "application/pdf";
     const isImage = file.type.startsWith("image/");
-    if (!isPDF && !isImage) {
-      toast({ title: "Only images and PDF files are supported", variant: "destructive" });
+    const isTxt   = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
+    const isCsv   = file.type === "text/csv" || file.type === "application/csv" || file.name.toLowerCase().endsWith(".csv");
+    if (!isPDF && !isImage && !isTxt && !isCsv) {
+      toast({ title: "Supported: images, PDF, TXT, CSV", variant: "destructive" });
+      return;
+    }
+    if (form.obd_uploaded_files.length >= 10) {
+      toast({ title: "Maximum 10 files allowed", variant: "destructive" });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -481,11 +492,8 @@ export default function RideCheckerSubmitPage() {
         return;
       }
       const { url } = await res.json();
-      const entry: OBDUploadedFile = {
-        url,
-        fileName: file.name,
-        fileType: isPDF ? "pdf" : "image",
-      };
+      const fileType: OBDUploadedFile["fileType"] = isPDF ? "pdf" : isTxt ? "txt" : isCsv ? "csv" : "image";
+      const entry: OBDUploadedFile = { url, fileName: file.name, fileType };
       setForm((prev) => {
         const next = { ...prev, obd_uploaded_files: [...prev.obd_uploaded_files, entry] };
         saveDraft(next, currentStep);
@@ -495,6 +503,66 @@ export default function RideCheckerSubmitPage() {
       toast({ title: "Upload failed", variant: "destructive" });
     } finally {
       setObdUploading(false);
+    }
+  };
+
+  const extractOBDCodes = async (idx: number) => {
+    const file = form.obd_uploaded_files[idx];
+    if (!file) return;
+    setObdExtractingIndices((prev) => new Set(prev).add(idx));
+    try {
+      const mimeGuess = file.fileType === "pdf" ? "application/pdf"
+        : file.fileType === "txt" ? "text/plain"
+        : file.fileType === "csv" ? "text/csv"
+        : "image/jpeg";
+      const res = await fetch("/api/ridechecker/obd/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_url: file.url, file_name: file.fileName, file_type: mimeGuess }),
+      });
+      if (!res.ok) {
+        toast({ title: "Extraction failed — you can enter codes manually", variant: "destructive" });
+        return;
+      }
+      const data = await res.json();
+      const newCodes: { system: string; code: string; status: string; description: string }[] = data.codes || [];
+      setForm((prev) => {
+        const existingCodes = new Set(prev.obd_dtc_codes.map((c) => c.code.toUpperCase()));
+        const toAdd: OBDDTCEntry[] = newCodes
+          .filter((c) => c.code && !existingCodes.has(c.code.toUpperCase()))
+          .map((c) => ({
+            _key: `ex_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            system: c.system || "Unknown",
+            code: c.code.toUpperCase(),
+            description: c.description || "",
+            status: c.status || "Unknown",
+          }));
+        const updatedFiles = prev.obd_uploaded_files.map((f, i) =>
+          i === idx ? { ...f, ai_extracted: true } : f
+        );
+        const next = {
+          ...prev,
+          obd_uploaded_files: updatedFiles,
+          obd_dtc_codes: [...prev.obd_dtc_codes, ...toAdd],
+          obd_scanner_brand: prev.obd_scanner_brand || data.scanner_brand || "",
+          obd_emissions: prev.obd_emissions || data.emissions_status || "",
+        };
+        saveDraft(next, currentStep);
+        return next;
+      });
+      if (newCodes.length > 0) {
+        toast({ title: `Extracted ${newCodes.length} code${newCodes.length !== 1 ? "s" : ""}`, description: data.scanner_brand ? `Scanner detected: ${data.scanner_brand}` : undefined });
+      } else {
+        toast({ title: "No codes found in this file", description: "Add them manually below if needed." });
+      }
+    } catch {
+      toast({ title: "Extraction failed", variant: "destructive" });
+    } finally {
+      setObdExtractingIndices((prev) => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
     }
   };
 
@@ -610,11 +678,13 @@ export default function RideCheckerSubmitPage() {
           }
         }
 
+        if (form.obd_scanner_brand) obdModule.scanner_brand = form.obd_scanner_brand;
+
         if (form.obd_scan_performed === "yes") {
           // Uploaded files
           if (form.obd_uploaded_files.length > 0) {
-            obdModule.uploaded_files = form.obd_uploaded_files.map(({ url, fileName, fileType }) => ({
-              url, fileName, fileType, reviewStatus: "approved_for_report",
+            obdModule.uploaded_files = form.obd_uploaded_files.map(({ url, fileName, fileType, ai_extracted }) => ({
+              url, fileName, fileType, reviewStatus: "approved_for_report", ai_extracted: ai_extracted ?? false,
             }));
           }
 
@@ -1092,69 +1162,129 @@ export default function RideCheckerSubmitPage() {
                 {/* Divider */}
                 <div className="border-t border-dashed" />
 
+                {/* ── Scanner brand ── */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Scanner / App Used</p>
+                  <p className="text-xs text-muted-foreground">Helps RideCheck read report formats automatically.</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Topdon", "Autel", "Launch", "BlueDriver", "FIXD", "ThinkCar", "INNOVA", "Other"].map((brand) => (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => updateField("obd_scanner_brand", form.obd_scanner_brand === brand ? "" : brand)}
+                        data-testid={`button-obd-brand-${brand.toLowerCase()}`}
+                        className={`text-xs px-2 py-2 rounded-xl border font-medium transition-colors ${
+                          form.obd_scanner_brand === brand
+                            ? "border-[#22774F] bg-[#22774F]/10 text-[#22774F]"
+                            : "border-border bg-card text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {brand}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* ── File upload ── */}
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold">Upload diagnostic evidence</p>
-                  <p className="text-xs text-muted-foreground">Screenshots, photos of scanner display, or exported PDF reports. Max 10 MB per file.</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">Upload OBD Report</p>
+                    <span className="text-xs text-muted-foreground">{form.obd_uploaded_files.length}/10 files</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Supported: PDF · PNG · JPG · TXT · CSV — max 10 MB per file. RideCheck will extract codes automatically.
+                  </p>
 
                   {/* Upload button */}
-                  <label
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-                      obdUploading
-                        ? "border-muted bg-muted/30 text-muted-foreground"
-                        : "border-[#22774F]/40 hover:border-[#22774F] hover:bg-[#22774F]/5 text-[#22774F]"
-                    }`}
-                    data-testid="label-obd-file-upload"
-                  >
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      className="sr-only"
-                      disabled={obdUploading}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleOBDFileUpload(file);
-                        e.target.value = "";
-                      }}
-                      data-testid="input-obd-file"
-                    />
-                    {obdUploading ? (
-                      <Loader2 className="h-5 w-5 animate-spin shrink-0" />
-                    ) : (
-                      <Upload className="h-5 w-5 shrink-0" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {obdUploading ? "Uploading…" : "Tap to upload image or PDF"}
-                    </span>
-                  </label>
+                  {form.obd_uploaded_files.length < 10 && (
+                    <label
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
+                        obdUploading
+                          ? "border-muted bg-muted/30 text-muted-foreground"
+                          : "border-[#22774F]/40 hover:border-[#22774F] hover:bg-[#22774F]/5 text-[#22774F]"
+                      }`}
+                      data-testid="label-obd-file-upload"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf,text/plain,text/csv,.txt,.csv"
+                        className="sr-only"
+                        disabled={obdUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOBDFileUpload(file);
+                          e.target.value = "";
+                        }}
+                        data-testid="input-obd-file"
+                      />
+                      {obdUploading ? (
+                        <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                      ) : (
+                        <Upload className="h-5 w-5 shrink-0" />
+                      )}
+                      <span className="text-sm font-medium">
+                        {obdUploading ? "Uploading…" : "Tap to upload scanner report"}
+                      </span>
+                    </label>
+                  )}
 
                   {/* Uploaded files list */}
                   {form.obd_uploaded_files.length > 0 && (
                     <div className="space-y-2">
-                      {form.obd_uploaded_files.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card"
-                          data-testid={`item-obd-file-${i}`}
-                        >
-                          {f.fileType === "pdf" ? (
-                            <FileText className="h-5 w-5 text-red-500 shrink-0" />
-                          ) : (
-                            <Camera className="h-5 w-5 text-blue-500 shrink-0" />
-                          )}
-                          <span className="flex-1 text-xs truncate text-foreground">{f.fileName}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {f.fileType.toUpperCase()}
-                          </Badge>
-                          <button
-                            onClick={() => removeOBDFile(i)}
-                            className="text-muted-foreground hover:text-destructive shrink-0"
-                            data-testid={`button-remove-obd-file-${i}`}
+                      {form.obd_uploaded_files.map((f, i) => {
+                        const isExtracting = obdExtractingIndices.has(i);
+                        const canExtract = !f.ai_extracted && !isExtracting;
+                        return (
+                          <div
+                            key={i}
+                            className="rounded-xl border bg-card overflow-hidden"
+                            data-testid={`item-obd-file-${i}`}
                           >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3 px-3 py-2.5">
+                              {f.fileType === "pdf" ? (
+                                <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                              ) : f.fileType === "txt" || f.fileType === "csv" ? (
+                                <FileText className="h-5 w-5 text-amber-500 shrink-0" />
+                              ) : (
+                                <Camera className="h-5 w-5 text-blue-500 shrink-0" />
+                              )}
+                              <span className="flex-1 text-xs truncate text-foreground">{f.fileName}</span>
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {f.fileType.toUpperCase()}
+                              </Badge>
+                              {f.ai_extracted && (
+                                <Badge className="text-xs bg-[#22774F]/10 text-[#22774F] border-[#22774F]/30 shrink-0">
+                                  ✓ Extracted
+                                </Badge>
+                              )}
+                              <button
+                                onClick={() => removeOBDFile(i)}
+                                className="text-muted-foreground hover:text-destructive shrink-0"
+                                data-testid={`button-remove-obd-file-${i}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            {canExtract && (
+                              <button
+                                type="button"
+                                onClick={() => extractOBDCodes(i)}
+                                data-testid={`button-extract-obd-${i}`}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#22774F]/5 border-t border-[#22774F]/15 text-xs font-medium text-[#22774F] hover:bg-[#22774F]/10 transition-colors"
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Extract codes with AI
+                              </button>
+                            )}
+                            {isExtracting && (
+                              <div className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-muted/30 border-t text-xs text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Reading scan…
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1162,7 +1292,7 @@ export default function RideCheckerSubmitPage() {
                 {/* ── DTC codes ── */}
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">Diagnostic Trouble Codes (DTC)</p>
-                  <p className="text-xs text-muted-foreground">Enter all codes shown by your scanner — active, pending, and stored.</p>
+                  <p className="text-xs text-muted-foreground">Codes extracted above appear here. Add any missing ones manually.</p>
 
                   {form.obd_dtc_codes.length > 0 && (
                     <div className="space-y-3">
