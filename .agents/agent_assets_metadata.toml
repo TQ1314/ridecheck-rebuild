@@ -12,3 +12,10 @@ id = "Co0COUYlBRqrF1o3GB_Zr"
 uri = "file://docs/ridechecker-training-guide.md"
 type = "text"
 title = "RideChecker Operations & Training Guide v1.0"
+
+[[outputs]]
+id = "BGZpxo6VNnjd6rnRPob13"
+uri = "file://RC-GRC-002%20%E2%80%94%20Asset%20&%20Data%20Inventory.xlsx"
+type = "table"
+title = "RC-GRC-002 — Asset & Data Inventory"
+description = "Read-only RideCheck asset and data inventory with 23 assets, required classifications, CIA ratings, dependencies, and a legend/method sheet."
