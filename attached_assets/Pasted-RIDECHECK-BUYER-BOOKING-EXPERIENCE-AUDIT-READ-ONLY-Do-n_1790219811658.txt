@@ -1,0 +1,404 @@
+RIDECHECK BUYER BOOKING EXPERIENCE AUDIT — READ ONLY
+
+Do not modify code, database schemas, migrations, UI, configuration, or data.
+
+OBJECTIVE
+
+Audit the CURRENT RideCheck buyer booking experience exactly as it exists today.
+
+We are preparing to simplify vehicle intake and eventually add AI-assisted autofill.
+
+Before building anything, determine:
+
+1. What RideCheck already collects
+2. Why each field exists
+3. Which fields are actually required by backend/business logic
+4. Which fields are duplicated
+5. Which information could be derived instead of asking the buyer
+6. Which information can be collected later from the seller or RideChecker
+7. Which fields create unnecessary buyer friction
+8. What existing listing/photo/VIN/extraction functionality already exists
+9. What must NOT be broken when simplifying the experience
+
+IMPORTANT PRODUCT PRINCIPLE
+
+RideCheck exists to help someone who found a used vehicle they may want to buy.
+
+The vehicle may come from:
+- Facebook Marketplace
+- OfferUp
+- Craigslist
+- Autotrader
+- Cars.com
+- another used-car website
+- dealership website
+- dealership lot
+- private seller
+- roadside / FOR SALE sign
+- auction
+- friend/referral
+- another source
+
+The buyer should NOT have to understand RideCheck's internal workflow.
+
+Long forms should not exist merely because the database has fields.
+
+Do not recommend collecting information from the buyer unless RideCheck actually needs the buyer to provide it at that stage.
+
+TARGET EXPERIENCE
+
+Conceptually, RideCheck should eventually be able to say:
+
+"Found a vehicle you want inspected?
+Send us whatever you have."
+
+Buyer can provide one or more of:
+
+- listing URL
+- screenshots
+- vehicle/listing photos
+- VIN
+- basic vehicle details
+- seller contact information
+
+RideCheck extracts/derives what it safely can.
+
+Buyer confirms the vehicle.
+
+RideCheck handles the rest through the existing payment, seller coordination, assignment, inspection and report workflow.
+
+Manual entry must remain available as fallback.
+
+AI/extraction failure must never prevent booking.
+
+--------------------------------------------------
+PART 1 — MAP CURRENT BUYER JOURNEY
+--------------------------------------------------
+
+Trace the actual production booking flow from:
+
+Book Inspection
+→ seller type
+→ discovery source
+→ listing platform
+→ booking type
+→ vehicle information
+→ seller information
+→ inspection location
+→ package selection
+→ buyer information
+→ checkout
+→ payment
+→ order creation
+
+Use the actual code/routes/components.
+
+Return every screen/step in order.
+
+For each step show:
+
+- fields displayed
+- required vs optional
+- validation
+- where data is stored
+- downstream code that uses it
+- whether buyer must manually enter it
+- whether the same information is requested elsewhere
+
+Do not infer.
+Report only what the code establishes.
+
+--------------------------------------------------
+PART 2 — FIELD-BY-FIELD NECESSITY AUDIT
+--------------------------------------------------
+
+Create a table for EVERY buyer-facing field:
+
+Field
+Screen
+Required?
+Database destination
+Used by
+Operational purpose
+Could be derived?
+Could be collected later?
+Duplicate?
+Recommendation
+
+Classify each field:
+
+KEEP — buyer genuinely needs to provide it now
+
+AUTOFILL — useful but should normally be extracted/derived
+
+OPTIONAL — helpful but shouldn't block booking
+
+LATER — seller/Ops/RideChecker can provide it later
+
+REMOVE — redundant/unnecessary
+
+CONDITIONAL — only needed for certain seller/source types
+
+Do NOT implement these recommendations yet.
+
+--------------------------------------------------
+PART 3 — SELLER TYPE VS DISCOVERY SOURCE
+--------------------------------------------------
+
+Audit the current implementation of:
+
+"Who is selling this vehicle?"
+
+and
+
+"Where did you find this vehicle?"
+
+Determine exactly how these values affect:
+
+- seller coordination
+- Facebook buyer bridge
+- dealership workflow
+- auction workflow
+- booking type
+- seller contact requirements
+- package selection
+- downstream Ops screens
+
+Check whether contradictory combinations are currently possible.
+
+Example:
+
+seller_type = private seller
+discovery_source = used car dealership
+
+Do not change behavior yet.
+
+Document the issue and recommend how defaults/validation could work without unnecessarily restricting legitimate cases.
+
+--------------------------------------------------
+PART 4 — VEHICLE INFORMATION
+--------------------------------------------------
+
+Audit current fields including:
+
+- year
+- make
+- model
+- trim
+- mileage
+- asking price
+- VIN
+- listing URL
+- listing platform
+- vehicle location
+- listing photos/screenshots
+
+Determine which already exist.
+
+Find every database column/API/schema/component associated with them.
+
+Determine whether package classification currently depends on:
+
+- mileage
+- price
+- year
+- make/model
+- vehicle class
+
+Explain exactly how.
+
+Do not break package/pricing logic in recommendations.
+
+--------------------------------------------------
+PART 5 — EXISTING EXTRACTION / AI CODE
+--------------------------------------------------
+
+Search repository thoroughly for previous attempts involving:
+
+- listing extraction
+- URL parsing
+- marketplace parsing
+- Facebook
+- OfferUp
+- Craigslist
+- Autotrader
+- Cars.com
+- VIN extraction
+- OCR
+- image analysis
+- screenshot extraction
+- OpenAI
+- Claude/Anthropic
+- vision
+- vehicle identification
+- listing metadata
+- structured data / JSON-LD
+
+For every relevant implementation report:
+
+- file
+- purpose
+- whether currently used
+- whether dead/legacy
+- dependencies
+- known fallback behavior
+- whether it should be reused, repaired, or retired
+
+We previously struggled with vehicle extraction.
+
+Do not assume the old architecture should be reused.
+
+We want to understand WHY it became unreliable.
+
+--------------------------------------------------
+PART 6 — CURRENT BUYER FRICTION
+--------------------------------------------------
+
+Identify unnecessary friction based on actual implementation.
+
+Look specifically for:
+
+- asking the buyer to type information already available elsewhere
+- asking the same information twice
+- required fields that don't need to be required
+- internal operational concepts exposed to customers
+- unnecessary branching
+- confusing seller/source choices
+- fields that could be collected after payment
+- long screens
+- package decisions buyers shouldn't have to understand
+- error states that prevent booking unnecessarily
+
+Estimate:
+
+Current number of:
+- screens/steps
+- buyer decisions
+- required fields
+- manually typed fields
+
+Do not invent UX problems.
+Tie each finding to current implementation.
+
+--------------------------------------------------
+PART 7 — MINIMUM VIABLE BUYER INPUT
+--------------------------------------------------
+
+Based ONLY on actual downstream requirements, determine the smallest amount of information RideCheck needs from a buyer to safely create/book an inspection.
+
+Separate:
+
+A. Needed before checkout
+B. Needed before seller outreach
+C. Needed before RideChecker assignment
+D. Needed before inspection
+E. Can be obtained during inspection
+
+This distinction is critical.
+
+Something required eventually does NOT automatically need to be collected during booking.
+
+--------------------------------------------------
+PART 8 — PROPOSE SIMPLIFIED FLOW
+--------------------------------------------------
+
+After completing the audit, propose a simplified buyer experience.
+
+Do not implement it.
+
+It should accommodate:
+
+ONLINE VEHICLE
+- paste listing URL
+- OR upload screenshots
+- OR manual entry
+
+DEALER LOT
+- dealer listing URL
+- OR window sticker/photo
+- OR manual entry
+
+ROADSIDE / FOR SALE SIGN
+- upload photo
+- OR basic manual details
+
+PRIVATE/OFFLINE
+- whatever vehicle information buyer has
+
+AUCTION
+- current inspection booking only
+- do NOT build future "Rent a RideChecker" functionality
+
+The future flow should degrade gracefully:
+
+AUTOFILL SUCCESS
+→ show extracted vehicle
+→ buyer confirms/edits
+
+PARTIAL AUTOFILL
+→ populate known fields
+→ ask only for truly necessary missing information
+
+AUTOFILL FAILURE
+→ manual fields
+→ booking continues
+
+NO LISTING
+→ manual/photo path
+→ booking continues
+
+--------------------------------------------------
+PART 9 — PROTECT EXISTING OPERATIONS
+--------------------------------------------------
+
+Any future simplification must preserve:
+
+- payment-first rule
+- seller coordination
+- seller type
+- discovery source
+- Facebook buyer bridge
+- dealership workflow
+- Compensation Panel
+- RideChecker assignment
+- inspection workflow
+- report generation
+- buyer communications
+- Communication Center
+- Stripe checkout
+- package pricing/classification
+
+Identify exactly where simplifying intake could accidentally break these systems.
+
+--------------------------------------------------
+FINAL OUTPUT
+--------------------------------------------------
+
+Return ONE concise report with:
+
+1. Current booking journey
+2. Current number of steps
+3. Current required fields
+4. Current manual-entry burden
+5. Field necessity matrix
+6. Redundant/unnecessary fields
+7. Fields that can be collected later
+8. Existing extraction/AI implementation found
+9. Why previous extraction approach is fragile, if determinable
+10. Existing components/code worth preserving
+11. Minimum buyer information actually required
+12. Proposed simplified buyer journey
+13. Expected reduction in buyer inputs
+14. Backend dependencies that must remain intact
+15. Risks before implementing AI autofill
+16. Recommended implementation sequence
+
+DO NOT IMPLEMENT ANYTHING.
+
+DO NOT CREATE MIGRATIONS.
+
+DO NOT DELETE LEGACY CODE.
+
+DO NOT REFACTOR.
+
+This is an evidence-gathering audit only.
