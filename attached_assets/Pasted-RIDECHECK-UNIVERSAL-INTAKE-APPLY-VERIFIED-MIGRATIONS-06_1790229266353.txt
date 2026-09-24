@@ -1,0 +1,80 @@
+RIDECHECK UNIVERSAL INTAKE — APPLY VERIFIED MIGRATIONS 062–064
+
+Target ONLY:
+Supabase project: RideCheck-v2
+Project ref: smwjnekinbepxrzuqegk
+
+We have completed the live read-only schema verification.
+
+Verified live state:
+
+public.orders exists.
+inspection_address exists as text.
+inspection_time_window exists as text.
+notes_to_inspector exists as text.
+preferred_language exists and is the buyer-preference field used by order creation.
+intake_provenance does NOT exist.
+listing_claimed_vin does NOT exist.
+booking-intake storage bucket does NOT exist.
+
+Therefore do not run migration 001 or modify the existing Buyer Arranged columns.
+
+Step 1 — Preflight
+
+Read and report the exact intended effects of:
+
+062_order_intake_provenance.sql
+063_order_listing_claimed_vin.sql
+064_booking_intake_bucket.sql
+
+Confirm that they contain no destructive operations affecting existing RideCheck data.
+
+Specifically verify that 064 creates/configures booking-intake as a private bucket with the intended file-size and MIME restrictions.
+
+Step 2 — Apply
+
+If and only if the files match those intended additive changes, apply only 062, 063, and 064 to:
+smwjnekinbepxrzuqegk
+
+Do not apply unrelated pending migrations.
+
+Do not alter, delete, truncate, or recreate existing tables.
+
+Do not modify existing order records.
+
+Step 3 — Post-migration verification
+
+After application, verify from the live database that:
+
+public.orders.intake_provenance exists with the intended type.
+public.orders.listing_claimed_vin exists with the intended type.
+Existing Buyer Arranged columns remain unchanged.
+preferred_language remains unchanged.
+booking-intake exists.
+booking-intake is private.
+its file-size limit matches the migration.
+its allowed MIME types match the migration.
+
+Also verify the storage policies created/required for the buyer-intake workflow. Report what identities/sessions can upload/read/delete intake images and confirm that the policies do not accidentally make intake images public.
+
+Step 4 — Regression/safety
+
+Run the existing focused Universal Intake tests plus:
+
+npm run check
+npm run build
+
+Do not redesign or refactor unrelated code.
+
+Final report
+
+Return:
+
+exact migrations applied,
+live schema before → after,
+bucket configuration,
+storage-policy verification,
+tests/check/build results,
+anything still requiring live verification.
+
+Explicitly state the Supabase project name and project ref modified.
