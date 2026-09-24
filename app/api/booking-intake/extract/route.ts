@@ -86,7 +86,7 @@ async function extractImages(sessionId: string, ids: string[]): Promise<IntakeFi
   if (!contents.length) return {};
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const prompt = `Extract only facts explicitly visible in these vehicle listing images. Never guess. Return strict JSON object with only these keys and optional per-key evidence keys: year,make,model,trim,mileage,asking_price,location_text,service_zip,vin,seller_name,seller_phone,discovery_source,platform_source. Use numbers for year/mileage/asking_price. Omit unknown fields.`;
-  const result = await client.messages.create({ model: "claude-3-5-haiku-latest", max_tokens: 900, system: "You extract literal vehicle listing facts. Never infer missing values.", messages: [{ role: "user", content: [...contents, { type: "text", text: prompt }] }] });
+  const result = await client.messages.create({ model: "claude-haiku-4-5-20251001", max_tokens: 900, system: "You extract literal vehicle listing facts. Never infer missing values.", messages: [{ role: "user", content: [...contents, { type: "text", text: prompt }] }] });
   const text = result.content.find((part) => part.type === "text")?.text ?? "";
   try { return validateExtracted(JSON.parse(text.replace(/^```json\s*|\s*```$/g, "")), "uploaded_image", ids.join(",")); } catch { return {}; }
 }

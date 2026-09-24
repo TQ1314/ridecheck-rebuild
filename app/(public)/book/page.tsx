@@ -39,6 +39,7 @@ import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
 import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { IntakeProposalCard } from "@/components/booking-intake/IntakeProposalCard";
 
 type IntakeField = {
   value: string | number | null;
@@ -49,22 +50,6 @@ type IntakeField = {
 
 type IntakeProposal = Record<string, IntakeField>;
 type ListingSource = "online_marketplace" | "dealership" | "roadside" | "auction" | "referral" | "offline" | "other";
-
-const INTAKE_LABELS: Record<string, string> = {
-  year: "Year",
-  make: "Make",
-  model: "Model",
-  trim: "Trim",
-  mileage: "Mileage",
-  asking_price: "Asking price",
-  location_text: "Vehicle location",
-  service_zip: "Service ZIP",
-  vin: "VIN",
-  seller_name: "Seller name",
-  seller_phone: "Seller phone",
-  discovery_source: "Discovery source",
-  platform_source: "Platform",
-};
 
 const DISCOVERY_SOURCE_ALIASES: Record<string, string> = {
   online: "online_marketplace",
@@ -593,30 +578,12 @@ function BookInner() {
                 <p className="text-xs text-muted-foreground">Manual entry is always available. Extraction is optional and never required to book.</p>
                 {intakeWarning && <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{intakeWarning}</p>}
                 {intakeProposal && (
-                  <Card className="bg-background" data-testid="card-intake-proposal">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">We found these details</CardTitle>
-                      <p className="text-xs text-muted-foreground">Review and confirm. Missing details stay unknown and can be entered below.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {Object.entries(intakeProposal).filter(([, field]) => field?.value != null && field.value !== "").map(([key, field]) => (
-                        <div className="flex justify-between gap-3 text-sm" key={key}>
-                          <span className="text-muted-foreground">{INTAKE_LABELS[key] || key}</span>
-                          <Input
-                            className="h-8 max-w-[62%] text-right"
-                            value={String(field.value)}
-                            onChange={(event) => updateIntakeProposalField(key, event.target.value)}
-                            aria-label={`Edit ${INTAKE_LABELS[key] || key}`}
-                            data-testid={`input-intake-proposal-${key}`}
-                          />
-                        </div>
-                      ))}
-                      <div className="flex gap-2 pt-2">
-                        <Button type="button" onClick={confirmIntakeProposal} data-testid="button-confirm-intake">Confirm and use these</Button>
-                        <Button type="button" variant="outline" onClick={() => setIntakeProposal(null)} data-testid="button-edit-intake">Edit manually</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <IntakeProposalCard
+                    proposal={intakeProposal}
+                    onChange={updateIntakeProposalField}
+                    onConfirm={confirmIntakeProposal}
+                    onManual={() => setIntakeProposal(null)}
+                  />
                 )}
               </CardContent>
             </Card>
