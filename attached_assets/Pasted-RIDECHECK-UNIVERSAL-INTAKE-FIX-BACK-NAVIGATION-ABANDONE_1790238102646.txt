@@ -1,0 +1,60 @@
+RIDECHECK UNIVERSAL INTAKE — FIX BACK-NAVIGATION / ABANDONED VEHICLE STATE
+
+A real buyer test revealed a state-management bug.
+
+Actual sequence:
+
+Buyer uploaded screenshots for a vehicle.
+AI extraction worked.
+Vehicle was located in Mount Prospect.
+Existing RideCheck service-area validation correctly rejected it because the current pilot covers Lake and McHenry Counties.
+Buyer navigated back to try a different vehicle.
+When attempting to upload screenshots for the new vehicle, the buyer could no longer successfully proceed with another upload and received the upload failure message.
+
+Diagnose this exact navigation/state sequence before changing code.
+
+Determine whether the previous vehicle's:
+
+uploaded image IDs
+intake session image count
+extraction proposal
+confirmed extraction values
+listing URL
+service ZIP/location
+upload quota
+or browser state
+
+remained associated with the booking after the buyer went back.
+
+The 5-image maximum must apply to the active vehicle intake, not prevent the buyer from replacing an abandoned/out-of-service-area vehicle.
+
+Expected behavior:
+
+If a buyer discovers that Vehicle A cannot be serviced and goes back to inspect Vehicle B, RideCheck must provide a clear way to replace/start over with the vehicle.
+
+Starting over with Vehicle B should:
+
+clear Vehicle A's unconfirmed extraction proposal
+clear Vehicle A's image references from the active intake
+clear Vehicle A's listing URL and vehicle-specific unconfirmed fields
+reset the active image counter
+preserve buyer/account/contact information that is not vehicle-specific
+never silently carry Vehicle A information into Vehicle B
+never overwrite information from another completed order
+
+Determine what should happen to the abandoned private storage objects. Do not introduce a large cleanup system yet; report whether they can safely be deleted during explicit replacement or left for the later retention cleanup.
+
+Also verify that simply using browser Back does not leave the intake in an inconsistent state.
+
+Do not change the Lake/McHenry service-area restriction. That rejection was correct.
+
+Do not change Anthropic, pricing, payment rules, Supabase architecture, or database schema.
+
+First return:
+
+exact root cause,
+which state persisted,
+why the second upload failed,
+smallest safe fix.
+
+Diagnosis only — no code changes yet.
