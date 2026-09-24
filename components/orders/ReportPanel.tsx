@@ -68,6 +68,10 @@ function reportStatusBadge(status: string | undefined) {
       return <Badge className="bg-orange-100 text-orange-800 border-orange-200 no-default-hover-elevate no-default-active-elevate">Revision Needed</Badge>;
     case "delivered":
       return <Badge className="bg-green-100 text-green-800 border-green-200 no-default-hover-elevate no-default-active-elevate">Delivered</Badge>;
+    case "delivery_failed":
+      return <Badge className="bg-red-100 text-red-800 border-red-200 no-default-hover-elevate no-default-active-elevate">Delivery Failed</Badge>;
+    case "delivery_blocked_missing_recipient":
+      return <Badge className="bg-amber-100 text-amber-800 border-amber-200 no-default-hover-elevate no-default-active-elevate">Recipient Missing</Badge>;
     default:
       return <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">No Report</Badge>;
   }
@@ -81,6 +85,8 @@ function genReportStatusBadge(status: string) {
       return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 no-default-hover-elevate no-default-active-elevate"><Clock className="h-3 w-3 mr-1" />Awaiting QA</Badge>;
     case "delivered":
       return <Badge className="bg-green-100 text-green-800 border-green-200 no-default-hover-elevate no-default-active-elevate"><CheckCircle2 className="h-3 w-3 mr-1" />Delivered</Badge>;
+    case "delivery_failed":
+      return <Badge className="bg-red-100 text-red-800 border-red-200 no-default-hover-elevate no-default-active-elevate"><AlertTriangle className="h-3 w-3 mr-1" />Delivery Failed</Badge>;
     case "superseded":
       return <Badge variant="outline" className="text-muted-foreground no-default-hover-elevate no-default-active-elevate">Superseded</Badge>;
     default:
@@ -138,6 +144,8 @@ export function ReportPanel({ order, onRefresh }: ReportPanelProps) {
   const qaStatus = genReport?.report_status ?? null;
   const isQaApproved =
     qaStatus === "qa_approved" ||
+    qaStatus === "delivery_failed" ||
+    qaStatus === "delivery_blocked_missing_recipient" ||
     qaStatus === "delivered" ||
     order.report_status === "approved" ||
     order.report_status === "generated" ||

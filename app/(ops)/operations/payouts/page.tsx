@@ -105,12 +105,30 @@ export default function OpsPayoutsPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   async function handleAction(payoutId: string, action: "approve" | "mark_paid" | "cancel") {
+    let payment_method: string | undefined;
+    let payment_reference: string | undefined;
+    let payment_evidence: string | undefined;
+    if (action === "mark_paid") {
+      payment_method = window.prompt("Payment method (e.g. Zelle, ACH, check):")?.trim() || undefined;
+      payment_reference = window.prompt("Transaction/check reference (or Cancel to enter an internal evidence note):")?.trim() || undefined;
+      if (!payment_method) {
+        toast({ title: "Payment method required", variant: "destructive" });
+        return;
+      }
+      if (!payment_reference) {
+        payment_evidence = window.prompt("Internal evidence note (required if no transaction reference):")?.trim() || undefined;
+      }
+      if (!payment_reference && !payment_evidence) {
+        toast({ title: "Payment reference or evidence required", variant: "destructive" });
+        return;
+      }
+    }
     setActioning(payoutId);
     try {
       const res = await fetch(`/api/ops/payouts/${payoutId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, payment_method, payment_reference, payment_evidence }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -164,12 +182,22 @@ export default function OpsPayoutsPage() {
   }
 
   async function handleBatchAction(batchId: string, action: "mark_completed" | "cancel") {
+    let payment_reference: string | undefined;
+    let payment_evidence: string | undefined;
+    if (action === "mark_completed") {
+      payment_reference = window.prompt("Batch payment reference (or Cancel to enter internal evidence):")?.trim() || undefined;
+      if (!payment_reference) payment_evidence = window.prompt("Internal batch payment evidence (required):")?.trim() || undefined;
+      if (!payment_reference && !payment_evidence) {
+        toast({ title: "Batch reference or evidence required", variant: "destructive" });
+        return;
+      }
+    }
     setActioning(batchId);
     try {
       const res = await fetch(`/api/ops/payout-batches/${batchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, payment_reference, payment_evidence }),
       });
       if (!res.ok) {
         toast({ title: "Action failed", variant: "destructive" });
@@ -230,8 +258,8 @@ export default function OpsPayoutsPage() {
             <Wallet className="h-5 w-5 text-primary" />
             Payout Management
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track, approve, and batch RideChecker payouts
+             <p className="text-sm text-muted-foreground mt-0.5">
+             Approve payouts, then record the manual transfer reference when paid
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,7 +285,7 @@ export default function OpsPayoutsPage() {
               <span className="text-xs">Pending</span>
             </div>
             <div className="text-2xl font-bold text-yellow-600">
-              ${summary?.pending ?? 0}
+              {(summary?.pending ?? 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">{summary?.pending_count ?? 0} payouts</p>
           </CardContent>
@@ -269,7 +297,7 @@ export default function OpsPayoutsPage() {
               <span className="text-xs">Approved</span>
             </div>
             <div className="text-2xl font-bold text-blue-600">
-              ${summary?.approved ?? 0}
+              {(summary?.approved ?? 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">{summary?.approved_count ?? 0} ready to pay</p>
           </CardContent>
@@ -281,7 +309,7 @@ export default function OpsPayoutsPage() {
               <span className="text-xs">Total Paid</span>
             </div>
             <div className="text-2xl font-bold text-green-600">
-              ${paidPayouts.reduce((s, p) => s + p.total_pay, 0)}
+              {paidPayouts.reduce((s, p) => s + p.total_pay, 0).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">{paidPayouts.length} payouts</p>
           </CardContent>
@@ -441,11 +469,11 @@ export default function OpsPayoutsPage() {
                             <ArrowRight className="h-3 w-3 opacity-60" />
                           </Link>
                         </td>
-                        <td className="px-3 py-2.5 text-right font-mono text-xs">${p.base_pay}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-xs">${p.base_pay.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-xs hidden md:table-cell">
-                          {p.bonus > 0 ? <span className="text-green-600">+${p.bonus}</span> : <span className="text-muted-foreground">—</span>}
+                          {p.bonus > 0 ? <span className="text-green-600">+${p.bonus.toFixed(2)}</span> : <span className="text-muted-foreground">—</span>}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary">${p.total_pay}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary">${p.total_pay.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-center">{statusBadge(p.status)}</td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground hidden lg:table-cell whitespace-nowrap">
                           {formatRelative(p.created_at)}
@@ -527,7 +555,7 @@ export default function OpsPayoutsPage() {
                       {b.notes && <p className="text-[11px] text-muted-foreground">{b.notes}</p>}
                     </td>
                     <td className="px-3 py-2.5 text-right text-xs">{b.payout_count}</td>
-                    <td className="px-3 py-2.5 text-right font-bold text-primary">${b.total_amount}</td>
+                    <td className="px-3 py-2.5 text-right font-bold text-primary">${b.total_amount.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-center">{batchStatusBadge(b.status)}</td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground hidden md:table-cell">
                       {formatRelative(b.created_at)}

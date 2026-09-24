@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
-import { hasSignedCurrentAgreement } from "@/lib/agreements/rccpa-v1-2026-06";
+import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +11,8 @@ const ACCEPTANCE_TIMEOUT_MINUTES = 15;
 
 const schema = z.object({
   ridechecker_id: z.string().uuid().nullable(),
+  override: z.boolean().optional(),
+  override_reason: z.string().trim().min(5).optional(),
 });
 
 export async function PATCH(
@@ -28,11 +30,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
-    const { ridechecker_id } = parsed.data;
+    const { ridechecker_id, override = false, override_reason } = parsed.data;
+    const canOverride = ["owner", "admin", "operations_lead", "ops_lead"].includes(actor.role);
+    if (override && (!canOverride || !override_reason)) {
+      return NextResponse.json({ error: "Authorized Ops Lead/Admin override requires an explicit reason." }, { status: 400 });
+    }
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, order_number, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved")
+      .select("id, order_id, order_number, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved, last_known_lat, last_known_lng")
       .eq("id", params.orderId)
       .single();
 
@@ -55,7 +61,7 @@ export async function PATCH(
         .select("id, total_offer, pay_status")
         .eq("order_id", params.orderId)
         .eq("is_current", true)
-        .in("pay_status", ["saved", "approved", "override_approved"])
+      .in("pay_status", ["saved", "override_approved"])
         .maybeSingle();
 
       // If the query errored, the compensation table likely hasn't been migrated yet.
@@ -83,31 +89,22 @@ export async function PATCH(
       // Fetch core profile fields — always-present columns only
       const { data: rc, error: rcErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, full_name, role")
+        .select("id, full_name, role, is_active, workflow_stage, availability_status, is_available, service_radius_miles, agreement_status, current_agreement_version")
         .eq("id", ridechecker_id)
         .single();
 
       if (rcErr || !rc) {
         return NextResponse.json({ error: "RideChecker not found" }, { status: 404 });
       }
-      if (!["ridechecker", "ridechecker_active", "owner", "developer"].includes(rc.role)) {
+      if (!["ridechecker", "ridechecker_active"].includes(rc.role)) {
         return NextResponse.json({ error: "User is not a RideChecker" }, { status: 400 });
       }
-
-      // Agreement gate — separate query so it degrades gracefully if migration 057
-      // hasn't been run yet (PostgREST returns an error for missing columns; we skip
-      // the gate rather than surfacing a confusing "RideChecker not found" 404).
-      const { data: rcAgreement, error: agreementFetchErr } = await supabaseAdmin
-        .from("profiles")
-        .select("agreement_status, current_agreement_version")
-        .eq("id", ridechecker_id)
-        .maybeSingle();
-
-      if (!agreementFetchErr && !hasSignedCurrentAgreement((rcAgreement ?? {}) as any)) {
-        return NextResponse.json(
-          { error: "This RideChecker has not signed the current contractor agreement. They must sign before receiving assignments." },
-          { status: 400 }
-        );
+      const eligibility = getRideCheckerAssignmentEligibility(rc as any, {
+        order: order as any,
+        radiusOverride: override && canOverride,
+      });
+      if (!eligibility.eligible) {
+        return NextResponse.json({ error: "RideChecker is not eligible for assignment.", blocked_reasons: eligibility.blockedReasons }, { status: 400 });
       }
 
       rcName = rc.full_name;
@@ -250,6 +247,7 @@ export async function PATCH(
           ridechecker_name: rcName,
           assignment_id: assignmentId,
           expires_at: ridechecker_id ? expiresAt : null,
+          eligibility_override: override ? { reason: override_reason, distance_miles: "radius" } : null,
         },
       }),
       writeAuditLog({
@@ -262,6 +260,7 @@ export async function PATCH(
           ridechecker_id: ridechecker_id ?? null,
           assignment_status: newOrderStatus,
           expires_at: ridechecker_id ? expiresAt : null,
+          eligibility_override_reason: override ? override_reason : null,
         },
       }),
     ]);

@@ -8,6 +8,7 @@
  *   - Account Status: Active (workflow_stage ∈ [approved, active])
  *   - Dispatch Eligibility: requires agreement signed + background clear + training complete
  */
+import { hasSignedCurrentAgreement } from "../agreements/rccpa-v1-2026-06";
 
 export type EligibilityStatus = "complete" | "pending" | "missing" | "failed";
 
@@ -28,6 +29,10 @@ export interface RideCheckerEligibility {
 }
 
 export interface EligibilityProfile {
+  id?: string;
+  role?: string | null;
+  availability_status?: string | null;
+  is_available?: boolean | null;
   workflow_stage?: string | null;
   is_active?: boolean | null;
   verification_status?: string | null;
@@ -36,6 +41,7 @@ export interface EligibilityProfile {
   guide_completed?: boolean | null;
   training_sip4_completed?: boolean | null;
   agreement_status?: string | null;
+  current_agreement_version?: string | null;
   ridechecker_jobs_completed?: number | null;
   created_at?: string;
   approved_at?: string | null;
@@ -49,6 +55,102 @@ export interface EligibilityProfile {
   rc_state?: string | null;
   rc_zip?: string | null;
   service_radius_miles?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  lat?: number | null;
+  lng?: number | null;
+  last_known_lat?: number | null;
+  last_known_lng?: number | null;
+}
+
+export interface AssignmentLocation {
+  latitude?: number | null;
+  longitude?: number | null;
+  lat?: number | null;
+  lng?: number | null;
+  last_known_lat?: number | null;
+  last_known_lng?: number | null;
+}
+
+export interface AssignmentEligibilityContext {
+  order?: AssignmentLocation | null;
+  /** An explicit Ops Lead/Admin override is evaluated by the caller. */
+  radiusOverride?: boolean;
+}
+
+export interface RideCheckerAssignmentEligibility {
+  eligible: boolean;
+  blockedReasons: string[];
+  distanceMiles: number | null;
+  radiusMiles: number | null;
+  agreementGateActive: boolean;
+}
+
+function coordinates(value: AssignmentLocation | null | undefined): [number, number] | null {
+  if (!value) return null;
+  const latitude = value.latitude ?? value.lat ?? value.last_known_lat;
+  const longitude = value.longitude ?? value.lng ?? value.last_known_lng;
+  return typeof latitude === "number" && typeof longitude === "number"
+    && Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? [latitude, longitude] : null;
+}
+
+function distanceInMiles(a: [number, number], b: [number, number]): number {
+  const radians = (n: number) => n * Math.PI / 180;
+  const dLat = radians(b[0] - a[0]);
+  const dLon = radians(b[1] - a[1]);
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(radians(a[0])) * Math.cos(radians(b[0])) * Math.sin(dLon / 2) ** 2;
+  return 3958.7613 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+/**
+ * Canonical server-side gate for receiving or accepting an assignment.
+ * Background checks are deliberately informational: current RideCheck policy
+ * does not make them a dispatch blocker.
+ */
+export function getRideCheckerAssignmentEligibility(
+  ridechecker: EligibilityProfile,
+  context: AssignmentEligibilityContext = {},
+): RideCheckerAssignmentEligibility {
+  const blockedReasons: string[] = [];
+  if (!["ridechecker", "ridechecker_active"].includes(ridechecker.role ?? "")) {
+    blockedReasons.push("Profile is not a RideChecker");
+  }
+  const active = ridechecker.is_active === true
+    && (!ridechecker.workflow_stage || ["approved", "active"].includes(ridechecker.workflow_stage));
+  if (!active) blockedReasons.push("RideChecker account is not active and approved");
+
+  const available = ridechecker.availability_status === "available"
+    || (ridechecker.availability_status == null && ridechecker.is_available === true);
+  if (!available) blockedReasons.push("RideChecker is not available");
+
+  const agreementGateActive = ridechecker.agreement_status !== undefined
+    || ridechecker.current_agreement_version !== undefined;
+  if (agreementGateActive && !hasSignedCurrentAgreement(ridechecker)) {
+    blockedReasons.push("Contractor agreement is not signed");
+  }
+
+  const rcLocation = coordinates(ridechecker);
+  const orderLocation = coordinates(context.order);
+  const radius = typeof ridechecker.service_radius_miles === "number"
+    && ridechecker.service_radius_miles > 0 ? ridechecker.service_radius_miles : null;
+  const distanceMiles = rcLocation && orderLocation ? distanceInMiles(rcLocation, orderLocation) : null;
+  if (radius !== null && !context.radiusOverride) {
+    if (distanceMiles === null) {
+      blockedReasons.push("Cannot verify service radius: RideChecker and order locations are required");
+    } else if (distanceMiles > radius) {
+      blockedReasons.push(`Assignment is outside the ${radius}-mile service radius`);
+    }
+  }
+
+  return {
+    eligible: blockedReasons.length === 0,
+    blockedReasons,
+    distanceMiles,
+    radiusMiles: radius,
+    agreementGateActive,
+  };
 }
 
 export function getRideCheckerEligibility(profile: EligibilityProfile): RideCheckerEligibility {

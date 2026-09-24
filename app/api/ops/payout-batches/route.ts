@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     // Validate payouts exist and are approved
     const { data: payouts, error: fetchErr } = await supabaseAdmin
       .from("ridechecker_payouts")
-      .select("id, status, total_pay")
+      .select("id, status, total_pay, payout_batch_id")
       .in("id", payout_ids);
 
     if (fetchErr || !payouts?.length) {
@@ -38,10 +38,17 @@ export async function POST(req: NextRequest) {
     }
 
     const nonApproved = payouts.filter((p) => p.status !== "approved");
+    const alreadyBatched = payouts.filter((p: any) => p.payout_batch_id);
     if (nonApproved.length > 0) {
       return NextResponse.json(
         { error: "All payouts must be approved before batching", non_approved: nonApproved.map((p) => p.id) },
         { status: 400 }
+      );
+    }
+    if (alreadyBatched.length > 0) {
+      return NextResponse.json(
+        { error: "One or more payouts are already assigned to a batch", already_batched: alreadyBatched.map((p: any) => p.id) },
+        { status: 409 },
       );
     }
 

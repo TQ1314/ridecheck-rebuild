@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { getStripe } from "@/lib/stripe/server";
+import { expectedStripeAmountCents, stripeObjectMatchesOrder, stripePaymentMatches } from "@/lib/payment/stripe-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function POST(
       .from("orders")
       .select(
         "id, payment_status, stripe_session_id, stripe_checkout_session_id, " +
-        "payment_intent_id, stripe_payment_intent_id, buyer_email, customer_email, booking_type"
+        "payment_intent_id, stripe_payment_intent_id, buyer_email, customer_email, booking_type, base_price, final_price"
       )
       .eq("id", params.orderId)
       .single() as unknown as Promise<{
@@ -45,6 +46,8 @@ export async function POST(
           buyer_email: string | null;
           customer_email: string | null;
           booking_type: string | null;
+          base_price: number | null;
+          final_price: number | null;
         } | null;
         error: any;
       }>);
@@ -87,11 +90,30 @@ export async function POST(
     let resolvedCheckoutSessionId: string | null = null;
     let checkedVia: string = "none";
     const checked: string[] = [];
+    let receivedAmountCents: number | null = null;
+    let receivedCurrency: string | null = null;
+    let stripeTaxCents = 0;
+    let bindingError: string | null = null;
+    const storedSessionId = order.stripe_checkout_session_id || order.stripe_session_id;
+    const storedIntentId = order.stripe_payment_intent_id || order.payment_intent_id;
+    const manualIdIsStored = manualStripeId === storedSessionId || manualStripeId === storedIntentId;
+
+    function verifyStripeBinding(metadata: Record<string, string> | null | undefined, stripeId: string) {
+      const metadataOrderId = metadata?.order_id?.trim();
+      if (!stripeObjectMatchesOrder({
+        metadataOrderId,
+        targetOrderId: params.orderId,
+        alreadyLinked: storedSessionId === stripeId || storedIntentId === stripeId,
+      })) {
+        bindingError = `Stripe object ${stripeId} belongs to a different order`;
+      }
+    }
 
     // Helper: check a checkout session
     async function trySession(sessionId: string): Promise<boolean> {
       try {
         const session = await stripe!.checkout.sessions.retrieve(sessionId);
+        verifyStripeBinding(session.metadata, session.id);
         checked.push(`session:${sessionId.slice(-8)}`);
         checkedVia = "session";
         resolvedCheckoutSessionId = session.id;
@@ -100,6 +122,9 @@ export async function POST(
           resolvedPaymentIntentId = typeof session.payment_intent === "string"
             ? session.payment_intent
             : (session.payment_intent as any)?.id ?? null;
+          receivedAmountCents = typeof session.amount_total === "number" ? session.amount_total : null;
+          receivedCurrency = session.currency?.toLowerCase() ?? null;
+          stripeTaxCents = session.total_details?.amount_tax ?? 0;
 
           console.log("[Sync Payment] Session confirms paid", {
             sessionId: sessionId.slice(-8),
@@ -126,11 +151,16 @@ export async function POST(
     async function tryPaymentIntent(piId: string): Promise<boolean> {
       try {
         const intent = await stripe!.paymentIntents.retrieve(piId);
+        verifyStripeBinding(intent.metadata, intent.id);
         checked.push(`pi:${piId.slice(-8)}`);
         checkedVia = "payment_intent";
 
         if (intent.status === "succeeded") {
           resolvedPaymentIntentId = intent.id;
+          receivedAmountCents = typeof intent.amount_received === "number"
+            ? intent.amount_received
+            : intent.amount;
+          receivedCurrency = intent.currency?.toLowerCase() ?? null;
           console.log("[Sync Payment] PaymentIntent confirms succeeded", {
             piId: piId.slice(-8),
             amount: intent.amount,
@@ -159,20 +189,29 @@ export async function POST(
       } else if (manualStripeId.startsWith("pi_")) {
         stripePaid = await tryPaymentIntent(manualStripeId);
       }
+      if (!manualIdIsStored && checked.length === 0 && !bindingError) {
+        bindingError = "Supplied Stripe ID could not be verified or linked to this order";
+      }
     }
 
     // 2. Try stored checkout session IDs (canonical column first, then legacy)
-    const storedSessionId = order.stripe_checkout_session_id || order.stripe_session_id;
     if (!stripePaid && storedSessionId && storedSessionId !== manualStripeId) {
       stripePaid = await trySession(storedSessionId);
     }
 
     // 3. Try stored payment intent IDs (canonical column first, then legacy)
-    const storedIntentId = order.stripe_payment_intent_id || order.payment_intent_id;
     if (!stripePaid && storedIntentId && storedIntentId !== manualStripeId) {
       stripePaid = await tryPaymentIntent(storedIntentId);
     }
 
+    if (bindingError) {
+      return NextResponse.json({
+        success: false,
+        synced: false,
+        error: bindingError,
+        message: "The Stripe payment is not linked unambiguously to this order. No payment status was changed.",
+      }, { status: 409 });
+    }
     if (!stripePaid) {
       const hasStripeData = checked.length > 0;
       console.log("[Sync Payment] Not paid — no Stripe confirmation", {
@@ -199,6 +238,68 @@ export async function POST(
         checked_ids: checked,
         suggest_manual: true,
       });
+    }
+
+    // Status alone is not sufficient: verify the Stripe amount and currency
+    // before changing the order. Order prices are dollars; Stripe is cents.
+    const orderAmountCents = Math.round(Number(order.final_price ?? order.base_price ?? 0) * 100);
+    const serviceFeeEnabled = process.env.ENABLE_SERVICE_FEE === "true";
+    const serviceFeeCents = serviceFeeEnabled
+      ? Number(process.env.STRIPE_SERVICE_FEE_CENTS || process.env.SERVICE_FEE_CENTS || 300)
+      : 0;
+    const expectedCurrency = (process.env.STRIPE_CURRENCY || "usd").toLowerCase();
+    // Checkout amount_total includes Stripe Tax. For a checkout session,
+    // Stripe's reported tax is added to the order subtotal and fee.
+    const expectedAmountCents = expectedStripeAmountCents({
+      orderPriceDollars: Number(order.final_price ?? order.base_price ?? 0),
+      serviceFeeCents,
+      stripeTaxCents,
+      includesTax: checkedVia === "session",
+    });
+    if (!stripePaymentMatches({
+      expectedAmountCents,
+      expectedCurrency,
+      receivedAmountCents,
+      receivedCurrency,
+    })) {
+      const details = {
+        expected_amount_cents: expectedAmountCents,
+        expected_currency: expectedCurrency,
+        received_amount_cents: receivedAmountCents,
+        received_currency: receivedCurrency,
+        stripe_tax_cents: stripeTaxCents,
+        service_fee_cents: serviceFeeCents,
+        checked_via: checkedVia,
+      };
+      console.error("[Sync Payment] Stripe amount/currency mismatch", { orderId: params.orderId, ...details });
+      await Promise.all([
+        supabaseAdmin.from("activity_log").insert({
+          order_id: params.orderId,
+          action: "payment_sync_mismatch",
+          details,
+        }),
+        writeAuditLog({
+          actorId: actor.userId,
+          actorEmail: actor.email,
+          actorRole: actor.role,
+          action: "order.payment_sync_mismatch",
+          resourceId: params.orderId,
+          newValue: details,
+        }),
+      ]);
+      return NextResponse.json({
+        success: false,
+        synced: false,
+        error: "Stripe payment amount or currency does not match this order.",
+        expected: { amount_cents: expectedAmountCents, amount: (expectedAmountCents / 100).toFixed(2), currency: expectedCurrency },
+        received: {
+          amount_cents: receivedAmountCents,
+          amount: receivedAmountCents === null ? null : (receivedAmountCents / 100).toFixed(2),
+          currency: receivedCurrency,
+        },
+        stripe_tax_cents: stripeTaxCents,
+        service_fee_cents: serviceFeeCents,
+      }, { status: 409 });
     }
 
     // ── Stripe confirms paid — update the order ──────────────────────────────

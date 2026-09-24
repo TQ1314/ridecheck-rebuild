@@ -72,7 +72,7 @@ export async function POST(
       .from("orders")
       .select(
         "payment_status, payment_required, payment_override_approved, " +
-        "vehicle_year, vehicle_make, vehicle_model, listing_source, preferred_date"
+        "vehicle_year, vehicle_make, vehicle_model, listing_source, preferred_date, order_number"
       )
       .eq("id", params.orderId)
       .single();

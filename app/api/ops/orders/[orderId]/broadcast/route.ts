@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
-import { hasSignedCurrentAgreement, CURRENT_AGREEMENT_VERSION } from "@/lib/agreements/rccpa-v1-2026-06";
+import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   ridechecker_ids: z.array(z.string().uuid()).min(1, "Select at least one RideChecker"),
   offered_pay: z.number().int().min(0),
+  override: z.boolean().optional(),
+  override_reason: z.string().trim().min(5).optional(),
 });
 
 export async function POST(
@@ -29,37 +32,43 @@ export async function POST(
       );
     }
 
-    const { ridechecker_ids, offered_pay } = parsed.data;
+    const { ridechecker_ids, offered_pay, override = false, override_reason } = parsed.data;
+    const canOverride = ["owner", "admin", "operations_lead", "ops_lead"].includes(actor.role);
+    if (override && (!canOverride || !override_reason)) {
+      return NextResponse.json({ error: "Authorized Ops Lead/Admin override requires an explicit reason." }, { status: 400 });
+    }
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id")
+      .select("id, order_id, last_known_lat, last_known_lng, payment_status, payment_required, payment_override_approved")
       .eq("id", params.orderId)
       .single();
 
     if (fetchErr || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+    if (!canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.assignment }, { status: 402 });
+    }
 
-    // Agreement gate — check all selected RideCheckers have signed the current agreement
     const { data: rcProfiles } = await supabaseAdmin
       .from("profiles")
-      .select("id, full_name, agreement_status, current_agreement_version")
+      .select("id, full_name, role, is_active, workflow_stage, availability_status, is_available, service_radius_miles, agreement_status, current_agreement_version")
       .in("id", ridechecker_ids);
 
-    const unsignedRcs = (rcProfiles ?? []).filter(
-      (rc) => !hasSignedCurrentAgreement(rc as any)
-    );
+    const ineligibleRcs = (rcProfiles ?? []).filter((rc) => !getRideCheckerAssignmentEligibility(rc as any, {
+      order: order as any, radiusOverride: override && canOverride,
+    }).eligible);
     const eligibleIds = ridechecker_ids.filter(
-      (id) => !unsignedRcs.some((u) => u.id === id)
+      (id) => !ineligibleRcs.some((u) => u.id === id)
     );
 
     if (eligibleIds.length === 0) {
-      const names = unsignedRcs.map((u) => u.full_name || u.id).join(", ");
+      const names = ineligibleRcs.map((u) => u.full_name || u.id).join(", ");
       return NextResponse.json(
         {
-          error: `None of the selected RideCheckers have signed the current contractor agreement (${CURRENT_AGREEMENT_VERSION}). Unsigned: ${names}`,
-          unsigned_ridecheckers: unsignedRcs.map((u) => ({ id: u.id, full_name: u.full_name })),
+          error: `None of the selected RideCheckers are eligible for dispatch: ${names}`,
+          ineligible_ridecheckers: ineligibleRcs.map((u) => ({ id: u.id, full_name: u.full_name })),
         },
         { status: 400 }
       );
@@ -107,7 +116,7 @@ export async function POST(
       const { data: rcs } = await supabaseAdmin
         .from("profiles")
         .select("id, email, full_name, phone")
-        .in("id", ridechecker_ids);
+        .in("id", eligibleIds);
 
       if (rcs && rcs.length > 0) {
         const { sendEmail } = await import("@/lib/notifications/email");
@@ -167,7 +176,7 @@ export async function POST(
         eventType: "job_broadcast_sent",
         actorId: actor.userId,
         actorEmail: actor.email,
-        details: { ridechecker_count: ridechecker_ids.length, offered_pay },
+        details: { ridechecker_count: eligibleIds.length, ridechecker_ids: eligibleIds, offered_pay, eligibility_override_reason: override ? override_reason : null },
       }),
       writeAuditLog({
         actorId: actor.userId,
@@ -175,11 +184,11 @@ export async function POST(
         actorRole: actor.role,
         action: "order.job_broadcast_sent",
         resourceId: params.orderId,
-        newValue: { ridechecker_ids, offered_pay },
+        newValue: { ridechecker_ids: eligibleIds, offered_pay, eligibility_override_reason: override ? override_reason : null },
       }),
     ]);
 
-    return NextResponse.json({ success: true, sent_to: ridechecker_ids.length });
+    return NextResponse.json({ success: true, sent_to: eligibleIds.length });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -164,7 +164,7 @@ export async function POST(
       }
 
       // 3. QA approval gate
-      const qaReadyStatuses = ["qa_approved", "delivered"];
+      const qaReadyStatuses = ["qa_approved", "delivery_failed", "delivery_blocked_missing_recipient", "delivered"];
       if (!qaReadyStatuses.includes(genReport.report_status)) {
         return NextResponse.json(
           {
@@ -222,9 +222,27 @@ export async function POST(
     }
 
     const buyerEmail = (order as any).buyer_email || order.customer_email;
+    if (!buyerEmail) {
+      const failureStatus = "delivery_blocked_missing_recipient";
+      if (genReport?.id) await supabaseAdmin.from("generated_reports").update({
+        report_status: failureStatus, updated_at: new Date().toISOString(),
+      }).eq("id", genReport.id);
+      await supabaseAdmin.from("orders").update({
+        report_status: failureStatus, updated_at: new Date().toISOString(),
+      }).eq("id", order.id);
+      await supabaseAdmin.from("report_delivery_events").insert({
+        order_id: order.id, report_id: genReport?.id ?? null, channel: "email",
+        status: "failed", delivered_by: actor.userId,
+        notes: "No buyer email on file — delivery blocked",
+      });
+      return NextResponse.json({
+        error: "Delivery blocked: no buyer email is available for this order.",
+        status: failureStatus, retryable: false,
+      }, { status: 400 });
+    }
 
-    if (buyerEmail) {
-      try {
+    let providerMessageId: string | null = null;
+    try {
         const { sendEmail }         = await import("@/lib/email/resend");
         const { brandedEmailLayout } = await import("@/lib/email/templates/brandedEmailLayout");
         const vehicleLabel    = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
@@ -266,7 +284,7 @@ ${!reportUrl
 }`;
 
         const { buildReplyTo } = await import("@/lib/notifications/replyToAddress");
-        await sendEmail({
+        const deliveryResult = await sendEmail({
           to:      buyerEmail,
           subject: `Your RideCheck Intelligence Report is Ready — ${vehicleLabel}`,
           replyTo: buildReplyTo((order as any).order_number ?? null),
@@ -282,10 +300,36 @@ ${!reportUrl
               "If you received this in error, please contact us.",
           }),
         });
+        // sendEmail intentionally supports a development console fallback for
+        // other callers. It is not buyer access and must never complete this
+        // delivery workflow.
+        if (!deliveryResult.success || deliveryResult.dev) {
+          throw new Error(
+            deliveryResult.dev
+              ? "Email delivery provider is not configured"
+              : "Email provider rejected the delivery",
+          );
+        }
+        providerMessageId = deliveryResult.messageId ?? null;
       } catch (emailErr) {
         console.error("Failed to send delivery email:", emailErr);
+        const failureStatus = "delivery_failed";
+        if (genReport?.id) await supabaseAdmin.from("generated_reports").update({
+          report_status: failureStatus, updated_at: new Date().toISOString(),
+        }).eq("id", genReport.id);
+        await supabaseAdmin.from("orders").update({
+          report_status: failureStatus, updated_at: new Date().toISOString(),
+        }).eq("id", order.id);
+        await supabaseAdmin.from("report_delivery_events").insert({
+          order_id: order.id, report_id: genReport?.id ?? null, recipient_email: buyerEmail,
+          channel: "email", status: "failed", delivered_by: actor.userId,
+          notes: emailErr instanceof Error ? emailErr.message : "Email provider error",
+        });
+        return NextResponse.json({
+          error: "Buyer delivery failed at the email provider. Retry Delivery is available.",
+          status: failureStatus, retryable: true,
+        }, { status: 502 });
       }
-    }
 
     const now = new Date().toISOString();
 
@@ -327,10 +371,10 @@ ${!reportUrl
         report_id:      genReport?.id ?? null,
         recipient_email: buyerEmail ?? null,
         channel:        "email",
-        status:         buyerEmail ? "sent" : "no_recipient",
+        status:         "sent",
         delivered_by:   actor.userId,
         delivered_at:   now,
-        notes:          buyerEmail ? null : "No buyer email on file — email not sent",
+        provider_message_id: providerMessageId,
       });
 
     await Promise.all([

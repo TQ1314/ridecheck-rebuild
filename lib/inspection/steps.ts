@@ -472,6 +472,12 @@ export interface StepData {
   close_photo_url?: string | null;
   completed?: boolean;
   completed_at?: string | null;
+  /**
+   * Structured OBD payload is kept on the wizard step while editing. The
+   * inspection_steps table predates this field, so the API serializes it in
+   * the OBD note and restores it when a session is resumed.
+   */
+  obd_module?: Record<string, unknown> | null;
 }
 
 export const ISSUE_TYPES = [

@@ -218,7 +218,8 @@ export async function POST(req: NextRequest) {
         .neq("status", "cancelled");
 
       for (const p of (payouts ?? []) as any[]) {
-        const pay = Number(p.total_pay ?? 0) / 100;
+        // Payout persistence is whole dollars (Stripe amounts are cents).
+        const pay = Number(p.total_pay ?? 0);
         rcPayOwed += pay;
         if (p.status === "paid") rcPayPaid += pay;
       }

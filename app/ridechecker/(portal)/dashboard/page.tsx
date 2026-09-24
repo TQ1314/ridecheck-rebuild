@@ -1383,7 +1383,7 @@ function ActiveJobCard({
               </Button>
             )}
             {assignment.status === "in_progress" && (
-              <Link href={`/ridechecker/jobs/${assignment.id}/submit`}>
+              <Link href={`/ridechecker/jobs/${assignment.id}/inspect`}>
                 <Button size="sm" variant="outline" data-testid={`button-continue-${assignment.id}`}>
                   <Upload className="h-3.5 w-3.5 mr-1" />
                   Continue

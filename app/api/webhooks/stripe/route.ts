@@ -103,6 +103,7 @@ async function markOrderPaid(
   paymentIntentId: string | null,
   customerEmail?: string | null,
   checkoutSessionId?: string | null,
+  eventDetails?: { eventId: string; amount: number | null; currency: string | null },
 ) {
   console.log("[Stripe Webhook] markOrderPaid — looking up order", {
     orderId,
@@ -199,10 +200,14 @@ async function markOrderPaid(
     }
   }
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: updatedRows, error: updateError } = await supabaseAdmin
     .from("orders")
     .update(updatePayload)
-    .eq("id", orderId);
+    .eq("id", orderId)
+    // The read above is advisory; this conditional write prevents two
+    // concurrent Stripe deliveries from both applying payment effects.
+    .neq("payment_status", "paid")
+    .select("id");
 
   if (updateError) {
     console.error("[Stripe Webhook] markOrderPaid — DB update failed", {
@@ -211,6 +216,10 @@ async function markOrderPaid(
       errorMessage: updateError.message,
     });
     return { skipped: false, error: updateError.message };
+  }
+  if (!updatedRows || updatedRows.length === 0) {
+    console.log("[Stripe Webhook] markOrderPaid — concurrent delivery already applied payment", { orderId });
+    return { skipped: true };
   }
 
   console.log("[Stripe Webhook] markOrderPaid — order updated successfully", {
@@ -230,6 +239,10 @@ async function markOrderPaid(
       ops_status_set:            nextOpsStatus,
       booking_type:              existingOrder.booking_type,
       customer_id_backfilled:    !existingOrder.customer_id && !!updatePayload.customer_id,
+      stripe_event_id:           eventDetails?.eventId ?? null,
+      processed_at:              now,
+      amount_received:           eventDetails?.amount ?? null,
+      currency:                  eventDetails?.currency ?? null,
     },
   });
 
@@ -338,10 +351,23 @@ export async function POST(req: NextRequest) {
         sessionId: session.id,
         metadata: session.metadata,
       });
-      return NextResponse.json({ received: true });
+      // Do not acknowledge a payment event that we cannot reconcile. Stripe
+      // will retry this response and Ops can use the event payload to repair
+      // the metadata/link rather than silently losing a successful payment.
+      return NextResponse.json({ error: "Payment event is missing order_id metadata" }, { status: 422 });
     }
 
-    await markOrderPaid(orderId, paymentIntentId, customerEmail, session.id);
+    if (session.payment_status !== "paid") {
+      return NextResponse.json({ received: true, ignored: "session is not paid" });
+    }
+    const result = await markOrderPaid(orderId, paymentIntentId, customerEmail, session.id, {
+      eventId: event.id,
+      amount: typeof session.amount_total === "number" ? session.amount_total : null,
+      currency: session.currency ?? null,
+    });
+    if (result.error) {
+      return NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 });
+    }
   }
 
   // ── payment_intent.succeeded ─────────────────────────────────────────────
@@ -358,12 +384,20 @@ export async function POST(req: NextRequest) {
 
     if (orderId) {
       // No checkoutSessionId available from PI events — pass null
-      await markOrderPaid(orderId, intent.id, customerEmail, null);
+      const result = await markOrderPaid(orderId, intent.id, customerEmail, null, {
+        eventId: event.id,
+        amount: typeof intent.amount_received === "number" ? intent.amount_received : intent.amount ?? null,
+        currency: intent.currency ?? null,
+      });
+      if (result.error) {
+        return NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 });
+      }
     } else {
       console.warn("[Stripe Webhook] payment_intent.succeeded — no order_id in intent metadata; cannot update order", {
         intentId: intent.id,
         metadata: intent.metadata,
       });
+      return NextResponse.json({ error: "Payment event is missing order_id metadata" }, { status: 422 });
     }
   }
 
@@ -379,25 +413,38 @@ export async function POST(req: NextRequest) {
     });
 
     if (orderId) {
-      const { data: order } = await supabaseAdmin
+      const { data: order, error: orderLookupError } = await supabaseAdmin
         .from("orders")
         .select("payment_status")
         .eq("id", orderId)
         .single();
+      if (orderLookupError) {
+        console.error("[Stripe Webhook] payment failure order lookup failed", orderLookupError);
+        return NextResponse.json({ error: "Payment status could not be reconciled; retrying" }, { status: 500 });
+      }
 
       if (order && order.payment_status !== "paid") {
-        await supabaseAdmin
+        const { error: failedUpdateError } = await supabaseAdmin
           .from("orders")
           .update({
             payment_status: "failed",
             updated_at: new Date().toISOString(),
           })
           .eq("id", orderId);
+        if (failedUpdateError) {
+          console.error("[Stripe Webhook] payment failure status could not be persisted", failedUpdateError);
+          return NextResponse.json({ error: "Payment status could not be persisted; retrying" }, { status: 500 });
+        }
 
         console.log("[Stripe Webhook] payment_intent.payment_failed — order marked failed", { orderId });
       } else if (order?.payment_status === "paid") {
         console.log("[Stripe Webhook] payment_intent.payment_failed — ignoring, order already paid", { orderId });
       }
+    } else {
+      console.warn("[Stripe Webhook] payment_intent.payment_failed — missing order_id metadata", {
+        intentId: intent.id,
+      });
+      return NextResponse.json({ error: "Payment event is missing order_id metadata" }, { status: 422 });
     }
   }
 

@@ -161,12 +161,17 @@ export function PayPanel({ order, onRefresh, userRole }: PayPanelProps) {
     }
     setCreating(true);
     try {
+      // Compensation Panel owns the accepted offer. PayPanel is payout-only
+      // and must never create a lower replacement from its legacy calculator.
+      const offerRes = await fetch(`/api/ops/orders/${order.id}/compensation`);
+      const offerData = offerRes.ok ? await offerRes.json() : null;
+      const acceptedOffer = offerData?.current?.total_offer;
       const res = await fetch(`/api/ops/orders/${order.id}/payout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          base_pay: basePay + boost,
-          bonus:    bonusTotal,
+          base_pay: acceptedOffer > 0 ? acceptedOffer : basePay + boost,
+          bonus:    acceptedOffer > 0 ? 0 : bonusTotal,
           bonus_breakdown: Object.keys(bonusBreakdown).length > 0 ? bonusBreakdown : undefined,
         }),
       });
@@ -323,21 +328,9 @@ export function PayPanel({ order, onRefresh, userRole }: PayPanelProps) {
           </div>
         </div>
 
-        {/* ── Save pay ──────────────────────────────────── */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full gap-2"
-          onClick={handleSavePay}
-          disabled={saving}
-          data-testid="button-save-pay"
-        >
-          {saving ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving…</>
-          ) : (
-            <><Save className="h-3.5 w-3.5" />Save to Order</>
-          )}
-        </Button>
+         <p className="text-xs rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+           The Compensation Panel is the authoritative pre-assignment offer. This legacy panel is payout-only; create payout uses the saved offer.
+         </p>
 
         <Separator />
 

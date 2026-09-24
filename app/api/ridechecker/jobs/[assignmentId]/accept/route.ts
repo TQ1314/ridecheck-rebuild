@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { writeOrderEvent } from "@/lib/rbac";
 import { emitScoreEvent } from "@/lib/ridechecker/scorecard";
 import { sendPreferred, sendDirect } from "@/lib/notifications/send-preferred";
-import { hasSignedCurrentAgreement } from "@/lib/agreements/rccpa-v1-2026-06";
+import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
 import {
   sellerTrustConfirmationHtml,
   sellerTrustConfirmationSms,
@@ -31,32 +31,12 @@ export async function POST(
     // Core profile fetch — always-present columns only
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("role, full_name, email")
+      .select("role, full_name, email, is_active, workflow_stage, availability_status, is_available, service_radius_miles, agreement_status, current_agreement_version")
       .eq("id", session.user.id)
       .maybeSingle();
 
     if (!profile || !["ridechecker", "ridechecker_active", "owner"].includes(profile.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Agreement gate — separate query so it degrades gracefully if migration 057
-    // hasn't been run yet (PostgREST errors on missing columns; we skip the gate
-    // rather than returning a confusing 403 Forbidden).
-    const { data: profileAgreement, error: agreementFetchErr } = await supabaseAdmin
-      .from("profiles")
-      .select("agreement_status, current_agreement_version")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (!agreementFetchErr && !hasSignedCurrentAgreement((profileAgreement ?? {}) as any)) {
-      return NextResponse.json(
-        {
-          error: "You must sign the current RideCheck Contractor Agreement before accepting assignments.",
-          agreement_required: true,
-          redirect: "/ridechecker/agreement",
-        },
-        { status: 403 }
-      );
     }
 
     const { data: assignment, error: fetchError } = await supabaseAdmin
@@ -68,6 +48,39 @@ export async function POST(
 
     if (fetchError || !assignment) {
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    }
+
+    const { data: orderForEligibility } = await supabaseAdmin
+      .from("orders")
+      .select("last_known_lat, last_known_lng")
+      .eq("id", assignment.order_id)
+      .maybeSingle();
+    // Override continuity is carried by the existing order event written when
+    // Ops dispatched the offer; no assignment column or migration is needed.
+    const { data: dispatchEvents, error: dispatchEventError } = await supabaseAdmin
+      .from("order_events")
+      .select("details")
+      .eq("order_id", assignment.order_id)
+      .eq("event_type", "ridechecker_assigned")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    // Bind the override to this exact assignment. A previous override for the
+    // same RideChecker/order must not authorize a later, unrelated dispatch.
+    const radiusOverride = !dispatchEventError && (dispatchEvents ?? []).some((event: any) =>
+      event.details?.assignment_id === assignment.id
+      && event.details?.ridechecker_id === session.user.id
+      && !!event.details?.eligibility_override?.reason
+    );
+    const eligibility = getRideCheckerAssignmentEligibility(profile as any, {
+      order: orderForEligibility as any,
+      radiusOverride,
+    });
+    if (!eligibility.eligible) {
+      return NextResponse.json({
+        error: "You are not currently eligible to accept this assignment.",
+        blocked_reasons: eligibility.blockedReasons,
+        agreement_required: eligibility.blockedReasons.some((r) => r.includes("agreement")),
+      }, { status: 403 });
     }
 
     const acceptableStatuses = ["awaiting_acceptance", "assigned"];

@@ -16,13 +16,14 @@ export async function PATCH(
 
   const { assignmentId } = params;
   const body = await req.json().catch(() => ({}));
-  const { step_key, answer, severity, note, wide_photo_url, close_photo_url } = body as {
+  const { step_key, answer, severity, note, wide_photo_url, close_photo_url, obd_module } = body as {
     step_key?: string;
     answer?: string;
     severity?: string;
     note?: string;
     wide_photo_url?: string;
     close_photo_url?: string;
+    obd_module?: Record<string, unknown> | null;
   };
 
   if (!step_key) {
@@ -60,11 +61,18 @@ export async function PATCH(
     note: note ?? null,
     wide_photo_url: wide_photo_url ?? null,
     close_photo_url: close_photo_url ?? null,
+    obd_module: obd_module ?? null,
   };
 
   const completed = isStepComplete(stepDef, stepData);
   const now = new Date().toISOString();
 
+  // Keep structured OBD data backward-compatible with the existing wizard
+  // schema. The marker is deliberately machine-readable and is unpacked on
+  // session load/submission; the human note remains available to Ops.
+  const persistedNote = obd_module !== undefined
+    ? `${note ?? ""}\n[RIDECHECK_OBD_MODULE]${JSON.stringify(obd_module)}[/RIDECHECK_OBD_MODULE]`
+    : note;
   const upsertPayload: Record<string, unknown> = {
     session_id: session.id,
     assignment_id: assignmentId,
@@ -74,7 +82,7 @@ export async function PATCH(
     updated_at: now,
     ...(answer !== undefined ? { answer } : {}),
     ...(severity !== undefined ? { severity } : {}),
-    ...(note !== undefined ? { note } : {}),
+    ...(note !== undefined || obd_module !== undefined ? { note: persistedNote } : {}),
     ...(wide_photo_url !== undefined ? { wide_photo_url } : {}),
     ...(close_photo_url !== undefined ? { close_photo_url } : {}),
     ...(completed ? { completed_at: now } : {}),

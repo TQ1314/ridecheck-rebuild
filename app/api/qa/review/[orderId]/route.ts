@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { createEarningForOrder } from "@/lib/utils/earnings-trigger";
 import { z } from "zod";
+import { applyQaDecision } from "@/lib/report/qa-approval";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,8 @@ export async function GET(
       events: events || [],
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const status = err?.message === "Report not found" ? 404 : 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
 
@@ -72,47 +74,19 @@ export async function PATCH(
       );
     }
 
-    const { data: order, error: fetchError } = await supabaseAdmin
-      .from("orders")
-      .select("id, order_id, report_status, qa_status")
-      .eq("order_id", params.orderId)
-      .maybeSingle();
-
-    if (fetchError || !order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
-
-    const updates: Record<string, any> = {
-      qa_status: parsed.data.qa_status,
-      qa_reviewed_by: actor.userId,
-      qa_reviewed_at: new Date().toISOString(),
-    };
-
-    if (parsed.data.qa_notes !== undefined) {
-      updates.qa_notes = parsed.data.qa_notes;
-    }
-
-    if (parsed.data.qa_status === "approved") {
-      updates.report_status = "approved";
-    } else if (parsed.data.qa_status === "revision_needed") {
-      updates.report_status = "revision_needed";
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from("orders")
-      .update(updates)
-      .eq("id", order.id);
-
-    if (updateError) {
-      return NextResponse.json({ error: "Failed to update QA review" }, { status: 500 });
-    }
+    const { order } = await applyQaDecision({
+      orderId: params.orderId,
+      decision: parsed.data.qa_status,
+      actorId: actor.userId,
+      notes: parsed.data.qa_notes,
+    });
 
     await supabaseAdmin.from("order_events").insert({
       order_id: order.id,
       event_type: "qa_review",
       description: `QA ${parsed.data.qa_status === "approved" ? "approved" : "requested revision"}: ${parsed.data.qa_notes || "No notes"}`,
       performed_by: actor.userId,
-      metadata: { qa_status: parsed.data.qa_status },
+      metadata: { qa_status: parsed.data.qa_status, canonical: true },
     });
 
     await writeAuditLog({
@@ -122,7 +96,7 @@ export async function PATCH(
       action: `qa.${parsed.data.qa_status}`,
       resourceId: order.order_id,
       oldValue: { qa_status: order.qa_status, report_status: order.report_status },
-      newValue: updates,
+      newValue: { qa_status: parsed.data.qa_status, report_status: parsed.data.qa_status === "approved" ? "approved" : "revision_needed" },
     });
 
     if (parsed.data.qa_status === "approved") {

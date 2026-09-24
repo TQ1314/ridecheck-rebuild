@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   action: z.enum(["approve", "mark_paid", "cancel"]),
   notes:  z.string().optional(),
+  payment_method: z.string().trim().min(1).optional(),
+  payment_reference: z.string().trim().min(1).optional(),
+  payment_evidence: z.string().trim().min(1).optional(),
 });
 
 export async function PATCH(
@@ -25,13 +28,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const { action, notes } = parsed.data;
+    const { action, notes, payment_method, payment_reference, payment_evidence } = parsed.data;
     const now = new Date().toISOString();
 
     // Fetch current payout
     const { data: payout, error: fetchErr } = await supabaseAdmin
       .from("ridechecker_payouts")
-      .select("id, status, total_pay, ridechecker_id")
+      .select("id, status, total_pay, ridechecker_id, payment_method, payment_reference, paid_at, paid_by, payout_batch_id")
       .eq("id", params.payoutId)
       .single();
 
@@ -45,6 +48,12 @@ export async function PATCH(
     }
     if (action === "mark_paid" && payout.status !== "approved") {
       return NextResponse.json({ error: "Only approved payouts can be marked paid" }, { status: 400 });
+    }
+    if (action === "mark_paid" && (!payment_method || (!payment_reference && !payment_evidence))) {
+      return NextResponse.json(
+        { error: "Manual payment requires a payment method and a transaction reference or internal evidence note." },
+        { status: 400 },
+      );
     }
     if (action === "cancel" && payout.status === "paid") {
       return NextResponse.json({ error: "Paid payouts cannot be cancelled" }, { status: 400 });
@@ -61,6 +70,8 @@ export async function PATCH(
       updates.status  = "paid";
       updates.paid_at = now;
       updates.paid_by = actor.userId;
+      updates.payment_method = payment_method;
+      updates.payment_reference = payment_reference ?? `INTERNAL_EVIDENCE: ${payment_evidence}`;
     } else if (action === "cancel") {
       updates.status = "cancelled";
     }

@@ -233,6 +233,26 @@ export async function POST(
       return NextResponse.json({ error: "Failed to update assignment status" }, { status: 500 });
     }
 
+    // Submission is the explicit handoff to Ops. Keep the order out of an
+    // ambiguous in-progress state while leaving report generation manual and
+    // payment-gated.
+    const { error: orderStatusError } = await supabaseAdmin
+      .from("orders")
+      .update({ assignment_status: "report_pending" })
+      .eq("id", assignment.order_id);
+    if (orderStatusError) {
+      console.error("[submit assignment order status]", orderStatusError);
+      return NextResponse.json({ error: "Submission saved but report handoff failed" }, { status: 500 });
+    }
+    await supabaseAdmin.from("ridechecker_job_status_log").insert({
+      assignment_id: assignment.id,
+      order_id: assignment.order_id,
+      ridechecker_id: session.user.id,
+      old_status: "in_progress",
+      new_status: "submitted",
+      notes: "Legacy submission form completed; inspection is ready for Ops report generation.",
+    });
+
     // Stage 1 scoring — fire and forget
     const stage1: ScoreEventType[] = ["submitted_inspection"];
     const hasAllPhotos =

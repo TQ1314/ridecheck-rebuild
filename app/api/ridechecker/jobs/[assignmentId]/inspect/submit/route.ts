@@ -60,23 +60,40 @@ export async function POST(
 
   const now = new Date().toISOString();
 
-  // ── 1. Mark session submitted ─────────────────────────────────────────────
-  const { error: sessionErr } = await supabaseAdmin
-    .from("ridecheck_inspection_sessions")
-    .update({ status: "submitted", submitted_at: now, updated_at: now })
-    .eq("id", session.id);
-
-  if (sessionErr) {
-    console.error("[inspect submit session]", sessionErr);
-    return NextResponse.json({ error: "Failed to submit session" }, { status: 500 });
-  }
-
-  // ── 2. Write backward-compat ridechecker_raw_submissions record ───────────
+  // Persist the report's source record before closing the inspection session.
+  // A failure here must not leave a submitted session with no report input.
   const vinStep   = stepMap.get("vin_dashboard");
   const odoStep   = stepMap.get("odometer");
   const engineStep = stepMap.get("engine_bay_overview");
   const underStep = stepMap.get("underbody_front");
   const summaryStep = stepMap.get("field_summary");
+  const obdStep = stepMap.get("obd_scan");
+  const obdMarker = obdStep?.note?.match(/\[RIDECHECK_OBD_MODULE\]([\s\S]*?)\[\/RIDECHECK_OBD_MODULE\]/);
+  let obdModule: Record<string, unknown> | null = null;
+  if (obdMarker) {
+    try {
+      const parsed = JSON.parse(obdMarker[1]);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obdModule = parsed;
+    } catch { /* malformed optional structured data is not report data */ }
+  }
+  const wizardPhotos = [obdStep?.wide_photo_url, obdStep?.close_photo_url]
+    .filter((url): url is string => Boolean(url))
+    .map((url, index) => ({
+      url,
+      fileName: `guided-obd-${index + 1}.jpg`,
+      fileType: "image",
+      reviewStatus: "approved_for_report",
+      source_label: "manual",
+    }));
+  if (obdModule || wizardPhotos.length > 0) {
+    // Photos remain report-addressable even when no structured scanner result
+    // was available; explicitly label that state rather than inventing codes.
+    obdModule ??= { scan_performed: "not_available" };
+    const existingFiles = Array.isArray(obdModule.uploaded_files)
+      ? obdModule.uploaded_files
+      : [];
+    obdModule.uploaded_files = [...existingFiles, ...wizardPhotos];
+  }
 
   const concerns = [...stepMap.values()].filter((s) => s.answer === "concern");
   const notAccessible = [...stepMap.values()].filter((s) => s.answer === "not_accessible");
@@ -84,7 +101,7 @@ export async function POST(
   const mechanicalNote = [
     stepMap.get("fluids_leaks")?.note,
     stepMap.get("oil_dipstick")?.note,
-    stepMap.get("obd_scan")?.note,
+    obdStep?.note?.replace(/\[RIDECHECK_OBD_MODULE\][\s\S]*?\[\/RIDECHECK_OBD_MODULE\]/, "").trim(),
     stepMap.get("obd_readiness")?.note,
   ].filter(Boolean).join("; ") || "See wizard submission";
 
@@ -92,8 +109,18 @@ export async function POST(
     ? concerns.map((s) => `[${s.step_key}] ${s.note ?? "Concern flagged"}`).join(" | ")
     : "No immediate concerns flagged";
 
-  try {
-    await supabaseAdmin.from("ridechecker_raw_submissions").insert({
+  const { data: existingRaw, error: lookupError } = await supabaseAdmin
+    .from("ridechecker_raw_submissions")
+    .select("id")
+    .eq("assignment_id", assignmentId)
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lookupError) {
+    console.error("[inspect submit raw lookup]", lookupError);
+    return NextResponse.json({ error: "Could not verify report input" }, { status: 500 });
+  }
+  const rawSubmission = {
       assignment_id: assignmentId,
       order_id: session.order_id,
       ridechecker_id: session.ridechecker_id,
@@ -111,17 +138,25 @@ export async function POST(
       ].filter(Boolean).join("; ") || "See wizard submission",
       interior_condition: stepMap.get("interior_driver")?.note ?? "See wizard submission",
       mechanical_issues: mechanicalNote,
+      obd_module: obdModule,
       test_drive_notes: "Wizard submission — see inspection steps",
       immediate_concerns: immediateNote,
       submitted_at: now,
       extra_photos: [...stepMap.values()]
         .flatMap((s) => [s.wide_photo_url, s.close_photo_url])
         .filter(Boolean) as string[],
-    });
-  } catch (err) { console.error("[raw_submissions fallback]", err); }
+    };
+  const rawWrite = existingRaw
+    ? supabaseAdmin.from("ridechecker_raw_submissions").update(rawSubmission).eq("id", existingRaw.id)
+    : supabaseAdmin.from("ridechecker_raw_submissions").insert(rawSubmission);
+  const { error: rawError } = await rawWrite;
+  if (rawError) {
+    console.error("[inspect submit raw]", rawError);
+    return NextResponse.json({ error: "Failed to save report input; inspection remains open" }, { status: 500 });
+  }
 
-  // ── 3. Update assignment status ───────────────────────────────────────────
-  await supabaseAdmin
+  // ── Update assignment and order before closing the session ───────────────
+  const { error: assignmentError } = await supabaseAdmin
     .from("ridechecker_job_assignments")
     .update({
       status: "submitted",
@@ -129,12 +164,28 @@ export async function POST(
       last_status_update_at: now,
     })
     .eq("id", assignmentId);
+  if (assignmentError) {
+    console.error("[inspect submit assignment]", assignmentError);
+    return NextResponse.json({ error: "Failed to update assignment; retry submission" }, { status: 500 });
+  }
 
-  // ── 4. Update order assignment_status ─────────────────────────────────────
-  await supabaseAdmin
+  const { error: orderError } = await supabaseAdmin
     .from("orders")
     .update({ assignment_status: "report_pending" })
     .eq("id", session.order_id);
+  if (orderError) {
+    console.error("[inspect submit order]", orderError);
+    return NextResponse.json({ error: "Failed to update order; retry submission" }, { status: 500 });
+  }
+
+  const { error: sessionErr } = await supabaseAdmin
+    .from("ridecheck_inspection_sessions")
+    .update({ status: "submitted", submitted_at: now, updated_at: now })
+    .eq("id", session.id);
+  if (sessionErr) {
+    console.error("[inspect submit session]", sessionErr);
+    return NextResponse.json({ error: "Failed to close inspection; retry submission" }, { status: 500 });
+  }
 
   // ── 5. Log status change ──────────────────────────────────────────────────
   try {

@@ -46,11 +46,41 @@ export async function POST(
     const total_pay = base_pay + bonus;
     const now = new Date().toISOString();
 
-    // Upsert — one payout per order (unique constraint on order_id)
-    const { data: payout, error: upsertErr } = await supabaseAdmin
+    // The Compensation Panel is authoritative for the accepted pre-assignment
+    // offer. Legacy PayPanel values cannot silently replace it.
+    const { data: offer } = await supabaseAdmin
+      .from("rc_compensation_offers")
+      .select("total_offer, pay_status")
+      .eq("order_id", params.orderId)
+      .eq("is_current", true)
+      .maybeSingle();
+    if (offer && offer.total_offer > 0 && total_pay < offer.total_offer) {
+      return NextResponse.json(
+        { error: `Payout cannot be below the accepted Compensation Panel offer of $${offer.total_offer}.` },
+        { status: 409 },
+      );
+    }
+
+    // Never let a create/retry operation destroy an approved or paid ledger
+    // record. Recalculation is only safe while pending.
+    const { data: existing } = await supabaseAdmin
       .from("ridechecker_payouts")
-      .upsert(
-        {
+      .select("id, status")
+      .eq("order_id", params.orderId)
+      .maybeSingle();
+    if (existing && existing.status !== "pending") {
+      await writeAuditLog({
+        actorId: actor.userId, actorEmail: actor.email, actorRole: actor.role,
+        action: "order.payout_overwrite_blocked", resourceId: params.orderId,
+        newValue: { existing_status: existing.status, attempted: { base_pay, bonus, total_pay } },
+      });
+      return NextResponse.json(
+        { error: `Payout is already ${existing.status}; protected records cannot be overwritten.` },
+        { status: 409 },
+      );
+    }
+
+    const payoutValues = {
           ridechecker_id:  order.assigned_ridechecker_id,
           order_id:        params.orderId,
           base_pay,
@@ -59,17 +89,50 @@ export async function POST(
           total_pay,
           status:          "pending",
           notes:           notes ?? null,
-          payout_batch_id: null,
-          approved_at:     null,
-          approved_by:     null,
-          paid_at:         null,
-          paid_by:         null,
           updated_at:      now,
-        },
-        { onConflict: "order_id" }
-      )
-      .select()
-      .single();
+    };
+
+    // Conditional update closes the read-then-upsert race: an approval that
+    // lands after the initial read cannot be overwritten by this recalculation.
+    let payout: any = null;
+    let upsertErr: any = null;
+    if (existing) {
+      const result = await supabaseAdmin
+        .from("ridechecker_payouts")
+        .update(payoutValues)
+        .eq("id", existing.id)
+        .eq("status", "pending")
+        .select()
+        .maybeSingle();
+      payout = result.data;
+      upsertErr = result.error;
+      if (!upsertErr && !payout) {
+        return NextResponse.json(
+          { error: "Payout changed state while being recalculated; retry after review." },
+          { status: 409 },
+        );
+      }
+    } else {
+      const result = await supabaseAdmin
+        .from("ridechecker_payouts")
+        .insert(payoutValues)
+        .select()
+        .maybeSingle();
+      payout = result.data;
+      upsertErr = result.error;
+      // A concurrent insert wins the unique order constraint. Never retry
+      // with an upsert because that could overwrite its newly protected state.
+      if (upsertErr) {
+        const { data: raced } = await supabaseAdmin
+          .from("ridechecker_payouts")
+          .select("status")
+          .eq("order_id", params.orderId)
+          .maybeSingle();
+        if (raced && raced.status !== "pending") {
+          return NextResponse.json({ error: `Payout is already ${raced.status}; protected records cannot be overwritten.` }, { status: 409 });
+        }
+      }
+    }
 
     if (upsertErr) {
       console.error("[payout create error]", upsertErr);

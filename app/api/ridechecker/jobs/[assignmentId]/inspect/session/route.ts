@@ -50,9 +50,26 @@ export async function GET(
     .eq("session_id", session.id)
     .order("created_at", { ascending: true });
 
+  const restoredSteps = (steps ?? []).map((step) => {
+    const match = typeof step.note === "string"
+      ? step.note.match(/\[RIDECHECK_OBD_MODULE\]([\s\S]*?)\[\/RIDECHECK_OBD_MODULE\]/)
+      : null;
+    if (!match) return step;
+    try {
+      return {
+        ...step,
+        // Do not expose the compatibility marker as a human note in the UI.
+        note: step.note.replace(/\[RIDECHECK_OBD_MODULE\][\s\S]*?\[\/RIDECHECK_OBD_MODULE\]/, "").trim(),
+        obd_module: JSON.parse(match[1]),
+      };
+    } catch {
+      return step;
+    }
+  });
+
   return NextResponse.json({
     session,
-    steps: steps ?? [],
+    steps: restoredSteps,
     assignment: { id: assignment.id, status: assignment.status, order_id: assignment.order_id },
   });
 }

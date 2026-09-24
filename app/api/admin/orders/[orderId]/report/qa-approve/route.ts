@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
+import { applyQaDecision } from "@/lib/report/qa-approval";
 
 export const dynamic = "force-dynamic";
 
@@ -47,95 +48,17 @@ export async function POST(
 
     const now = new Date().toISOString();
 
-    if (report_id) {
-      // Approve a specific row — validate order binding first
-      const { data: genReport } = await supabaseAdmin
-        .from("generated_reports")
-        .select("id, order_id, report_status")
-        .eq("id", report_id)
-        .single();
-
-      if (!genReport) {
-        return NextResponse.json({ error: "Report not found" }, { status: 404 });
-      }
-
-      if (genReport.order_id !== params.orderId) {
-        // Security violation
-        await writeAuditLog({
-          actorId:    actor.userId,
-          actorEmail: actor.email,
-          actorRole:  actor.role,
-          action:     "security.report_qa_order_mismatch",
-          resourceId: params.orderId,
-          newValue:   { attempted_report_id: report_id, report_order_id: genReport.order_id },
-        });
-        return NextResponse.json(
-          { error: "Report does not belong to this order. QA approval blocked." },
-          { status: 403 }
-        );
-      }
-
-      const { error: updateErr } = await supabaseAdmin
-        .from("generated_reports")
-        .update({
-          report_status:  "qa_approved",
-          qa_approved_by: actor.userId,
-          qa_approved_at: now,
-          qa_notes:       notes ?? null,
-          updated_at:     now,
-        })
-        .eq("id", report_id);
-
-      if (updateErr) {
-        return NextResponse.json({ error: "Failed to update generated report" }, { status: 500 });
-      }
-    } else {
-      // No report_id — find and approve the latest qa_pending row for this order
-      const { data: latestReport } = await supabaseAdmin
-        .from("generated_reports")
-        .select("id, report_status")
-        .eq("order_id", params.orderId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!latestReport) {
-        // No generated_reports row — this is a legacy order; just approve via orders table
-        console.warn(`[qa-approve] No generated_reports for order ${params.orderId} — approving via orders table only`);
-      } else {
-        const { error: updateErr } = await supabaseAdmin
-          .from("generated_reports")
-          .update({
-            report_status:  "qa_approved",
-            qa_approved_by: actor.userId,
-            qa_approved_at: now,
-            qa_notes:       notes ?? null,
-            updated_at:     now,
-          })
-          .eq("id", latestReport.id);
-
-        if (updateErr) {
-          return NextResponse.json({ error: "Failed to update generated report" }, { status: 500 });
-        }
-      }
-    }
-
-    // Always update orders.report_status = 'approved'
-    const { error: orderUpdateErr } = await supabaseAdmin
-      .from("orders")
-      .update({
-        report_status: "approved",
-        updated_at:    now,
-      })
-      .eq("id", params.orderId);
-
-    if (orderUpdateErr) {
-      console.error("[qa-approve] order update error:", orderUpdateErr);
-    }
+    const approval = await applyQaDecision({
+      orderId: params.orderId,
+      decision: "approved",
+      actorId: actor.userId,
+      notes,
+      reportId: report_id,
+    });
 
     const details = {
       qa_approved_by: actor.userId,
-      report_id:      report_id ?? null,
+      report_id:      approval.report?.id ?? report_id ?? null,
       notes:          notes ?? null,
     };
 
@@ -160,6 +83,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const status = err?.message === "Report not found" ? 404 : 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }

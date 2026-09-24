@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
 
 export const dynamic = "force-dynamic";
 
 // Layered selects: each tier falls back if columns are missing
 const LOC_COLS       = "rc_city, rc_state, rc_zip, service_radius_miles";
-const FULL_SELECT    = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_available, availability_updated_at, availability_status, suspended_until, agreement_status, current_agreement_version`;
-const SCORE_SELECT   = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version`;
-const MINIMAL_SELECT = `id, full_name, email, phone, service_area, ${LOC_COLS}, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, agreement_status, current_agreement_version`;
+const FULL_SELECT    = `id, full_name, email, phone, role, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_active, workflow_stage, is_available, availability_updated_at, availability_status, suspended_until, agreement_status, current_agreement_version`;
+const SCORE_SELECT   = `id, full_name, email, phone, role, service_area, ${LOC_COLS}, ridechecker_rating, ridechecker_score, referral_code, ridechecker_max_daily_jobs, is_active, workflow_stage, agreement_status, current_agreement_version`;
+const MINIMAL_SELECT = `id, full_name, email, phone, role, service_area, ${LOC_COLS}, ridechecker_rating, referral_code, ridechecker_max_daily_jobs, is_active, workflow_stage, agreement_status, current_agreement_version`;
 
 async function fetchProfiles(select: string) {
   return supabaseAdmin
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const serviceArea = searchParams.get("area") || "";
+  const orderId = searchParams.get("order_id");
 
   let activeRidecheckers: any[] = [];
   let availabilityColumnsPresent = true;
@@ -57,6 +59,18 @@ export async function GET(req: NextRequest) {
     console.error("[suggest ridecheckers error]", e1);
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
+
+  let orderForEligibility: any = null;
+  if (orderId) {
+    const { data } = await supabaseAdmin.from("orders")
+      .select("last_known_lat, last_known_lng").eq("id", orderId).maybeSingle();
+    orderForEligibility = data;
+  }
+  // Suggestions must use the same fail-closed gate as assignment. Callers
+  // should provide order_id so a configured radius can be measured.
+  activeRidecheckers = activeRidecheckers.filter((rc) =>
+    getRideCheckerAssignmentEligibility(rc, { order: orderForEligibility }).eligible
+  );
 
   if (activeRidecheckers.length === 0) {
     return NextResponse.json({ suggestions: [] });

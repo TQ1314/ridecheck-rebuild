@@ -200,6 +200,7 @@ export default function InspectWizardPage() {
         if (data.note          !== undefined) payload.note           = data.note;
         if (data.wide_photo_url  !== undefined) payload.wide_photo_url  = data.wide_photo_url;
         if (data.close_photo_url !== undefined) payload.close_photo_url = data.close_photo_url;
+        if (data.obd_module !== undefined) payload.obd_module = data.obd_module;
 
         await fetch(`/api/ridechecker/jobs/${assignmentId}/inspect/step`, {
           method: "PATCH",
@@ -309,7 +310,7 @@ export default function InspectWizardPage() {
       </div>
       <h1 className="text-2xl font-bold">Inspection Submitted</h1>
       <p className="text-muted-foreground max-w-sm">
-        Great work! The RideCheck team will review your findings before anything is sent to the buyer.
+        Inspection submitted — Ops can now review the preserved inspection and generate the report. Nothing is sent to the buyer until payment and QA requirements are satisfied.
       </p>
       <Button className="h-14 px-10 text-base font-semibold text-white" style={{ background: RC_GREEN }}
         onClick={() => router.push("/ridechecker/dashboard")}>
@@ -1114,6 +1115,7 @@ function StepContent({
   const answer    = data?.answer ?? null;
   const needsNote = answer === "concern" || answer === "not_accessible";
   const isSummary = step.key === "field_summary";
+  const isObd = step.section === "OBD / Diagnostic";
 
   return (
     <div className="space-y-5">
@@ -1167,6 +1169,13 @@ function StepContent({
             required
           />
         </div>
+      )}
+
+      {isObd && (
+        <ObdStructuredFields
+          value={data?.obd_module ?? null}
+          onChange={(obd_module) => onUpdate({ obd_module })}
+        />
       )}
 
       {/* Assessment buttons */}
@@ -1272,6 +1281,49 @@ function StepContent({
           <p className="text-sm font-semibold text-green-700 dark:text-green-400">Step complete — tap Next to continue</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function ObdStructuredFields({
+  value, onChange,
+}: {
+  value: Record<string, unknown> | null;
+  onChange: (value: Record<string, unknown> | null) => void;
+}) {
+  const [text, setText] = useState(value ? JSON.stringify(value, null, 2) : "");
+  const [invalid, setInvalid] = useState(false);
+  useEffect(() => {
+    setText(value ? JSON.stringify(value, null, 2) : "");
+  }, [value]);
+
+  return (
+    <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/20 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-200">Structured OBD record</p>
+        <p className="text-xs text-cyan-800 dark:text-cyan-300 mt-1">
+          Preserve the scanner source and every code category. Enter valid JSON; do not guess unavailable values.
+        </p>
+      </div>
+      <Textarea
+        value={text}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(next);
+          if (!next.trim()) { setInvalid(false); onChange(null); return; }
+          try {
+            const parsed = JSON.parse(next) as Record<string, unknown>;
+            if (!parsed || Array.isArray(parsed)) throw new Error("object required");
+            setInvalid(false);
+            onChange(parsed);
+          } catch { setInvalid(true); }
+        }}
+        rows={9}
+        className="font-mono text-xs bg-background"
+        placeholder={'{\n  "scan_performed": "yes",\n  "scanner_brand": "BlueDriver",\n  "scanner_model": "LMDIAG",\n  "source_label": "manual",\n  "active_dtcs": [],\n  "pending_dtcs": [],\n  "permanent_dtcs": [],\n  "readiness_monitors": {},\n  "mil_status": "off",\n  "freeze_frame": null,\n  "extraction_confidence": 1,\n  "ocr_quality": "not_applicable"\n}'}
+        data-testid="textarea-obd-structured"
+      />
+      {invalid && <p className="text-xs text-red-600">Enter valid JSON before continuing.</p>}
     </div>
   );
 }

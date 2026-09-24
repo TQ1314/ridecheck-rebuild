@@ -7,7 +7,7 @@ import type { Order, ActivityLogEntry } from "@/types/orders";
 import { OrderDetailPanel } from "@/components/orders/OrderDetailPanel";
 import { BuyerRetentionBanner } from "@/components/orders/BuyerRetentionBanner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import Link from "next/link";
 
 export default function OrderDetailPage() {
@@ -17,6 +17,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -34,6 +35,10 @@ export default function OrderDetailPage() {
 
       if (orderData) {
         setOrder(orderData);
+        if (orderData.report_status === "delivered") {
+          const reportResponse = await fetch(`/api/buyer/orders/${orderId}/report`);
+          if (reportResponse.ok) setReportUrl((await reportResponse.json()).url);
+        }
 
         const { data: activityData } = await supabase
           .from("activity_log")
@@ -79,6 +84,13 @@ export default function OrderDetailPage() {
         </Button>
       </Link>
       <BuyerRetentionBanner order={order} />
+      {reportUrl && (
+        <a href={reportUrl} target="_blank" rel="noopener noreferrer">
+          <Button className="gap-2" data-testid="button-buyer-report">
+            <FileText className="h-4 w-4" /> View Your RideCheck Report
+          </Button>
+        </a>
+      )}
       <OrderDetailPanel order={order} activities={activities} />
     </div>
   );

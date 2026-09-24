@@ -107,7 +107,9 @@ export async function GET(req: NextRequest) {
         .neq("status", "cancelled");
 
       for (const p of (payouts ?? []) as any[]) {
-        const pay = Number(p.total_pay ?? 0) / 100;
+        // ridechecker_payouts and rc_compensation_offers are legacy whole-dollar
+        // persistence; only Stripe fields below are cents.
+        const pay = Number(p.total_pay ?? 0);
         rcPayOwed += pay;
         if (p.status === "paid") rcPayPaid += pay;
         rcPayCount++;

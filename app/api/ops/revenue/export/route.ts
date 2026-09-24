@@ -131,7 +131,8 @@ export async function GET(req: NextRequest) {
         payoutByOrderId.set(p.order_id, {
           ...p,
           ridechecker_name: rcNameById.get(p.ridechecker_id) ?? "",
-          total_pay_dollars: Number(p.total_pay ?? 0) / 100,
+          // ridechecker_payouts stores whole dollars; Stripe amounts below are cents.
+          total_pay_dollars: Number(p.total_pay ?? 0),
         });
       }
     }

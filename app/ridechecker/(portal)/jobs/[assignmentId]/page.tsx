@@ -362,7 +362,7 @@ export default function JobDetailPage() {
       const res = await fetch(`/api/ridechecker/jobs/${assignmentId}/start`, { method: "POST" });
       if (res.ok) {
         toast({ title: "Inspection started!" });
-        router.push(`/ridechecker/jobs/${assignmentId}/submit`);
+        router.push(`/ridechecker/jobs/${assignmentId}/inspect`);
       } else {
         const d = await res.json();
         toast({ title: d.error || "Failed to start", variant: "destructive" });
@@ -417,7 +417,7 @@ export default function JobDetailPage() {
         setShowEscalate(false);
         setEscalateNote("");
         if (newStatus === "inspection_started") {
-          router.push(`/ridechecker/jobs/${assignmentId}/submit`);
+          router.push(`/ridechecker/jobs/${assignmentId}/inspect`);
         }
       } else {
         const d = await res.json();
@@ -1062,7 +1062,7 @@ export default function JobDetailPage() {
               <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
                 <Button variant="outline" className="w-full h-9 text-xs" data-testid="button-go-submit-early">
                   <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
-                  Use old submission form
+                  Legacy submission form (deprecated)
                 </Button>
               </Link>
             </div>
@@ -1083,7 +1083,7 @@ export default function JobDetailPage() {
               <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
                 <Button variant="outline" className="w-full h-10 text-sm" data-testid="button-go-submit-pending">
                   <ClipboardList className="h-4 w-4 mr-2" />
-                  Go to Submission Form
+                  Legacy submission form (deprecated)
                 </Button>
               </Link>
             </div>
@@ -1105,7 +1105,7 @@ export default function JobDetailPage() {
               <Link href={`/ridechecker/jobs/${assignmentId}/submit`}>
                 <Button variant="outline" className="w-full h-9 text-xs" data-testid="button-go-to-submit">
                   <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
-                  Use old submission form
+                  Legacy submission form (deprecated)
                 </Button>
               </Link>
             </div>
