@@ -40,6 +40,7 @@ import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { IntakeProposalCard } from "@/components/booking-intake/IntakeProposalCard";
+import { clearVehicleAttempt } from "@/lib/booking-intake/resetVehicle";
 
 type IntakeField = {
   value: string | number | null;
@@ -139,14 +140,25 @@ function BookInner() {
   const [intakeUrl, setIntakeUrl] = useState("");
   const [intakeImageIds, setIntakeImageIds] = useState<string[]>([]);
   const [intakeImageNames, setIntakeImageNames] = useState<string[]>([]);
+  const [intakeSessionCount, setIntakeSessionCount] = useState<number | null>(null);
+  const [intakeSessionStatusError, setIntakeSessionStatusError] = useState(false);
   const [intakeProposal, setIntakeProposal] = useState<IntakeProposal | null>(null);
   const [intakeOriginalProposal, setIntakeOriginalProposal] = useState<IntakeProposal | null>(null);
   const [intakeProvenance, setIntakeProvenance] = useState<Record<string, unknown>>({});
   const [intakeWarning, setIntakeWarning] = useState("");
   const [intakeBusy, setIntakeBusy] = useState(false);
   const intakeFileRef = useRef<HTMLInputElement>(null);
+  const classificationVersion = useRef(0);
 
   const [showWhyModal, setShowWhyModal] = useState(false);
+  const imageCount = Math.max(intakeSessionCount ?? 0, intakeImageIds.length);
+  const previousSessionImages = imageCount > 0 && intakeImageIds.length === 0;
+  const hasVehicleAttempt = imageCount > 0 || intakeSessionStatusError || !!(
+    intakeUrl || listingUrl || vehicleYear || vehicleMake || vehicleModel ||
+    vehicleLocation || serviceZip || vehicleVin || sellerName || sellerPhone ||
+    vehicleDescription || vehicleMileage || vehiclePrice || intakeProposal ||
+    Object.keys(intakeProvenance).length
+  );
 
   const isBuyerArranged = bookingType === "buyer_arranged";
 
@@ -156,11 +168,30 @@ function BookInner() {
   const finalPrice = isSelfArrange ? Math.max(0, basePrice - 10) : basePrice;
 
   useEffect(() => {
+    let active = true;
+    fetch("/api/booking-intake/session")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Intake status unavailable");
+        return response.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        setIntakeSessionCount(data.imageCount);
+        setIntakeSessionStatusError(false);
+      })
+      .catch(() => {
+        if (active) setIntakeSessionStatusError(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (!vehicleMake || !vehicleModel || !vehicleYear) {
       setClassification(null);
       return;
     }
     let cancelled = false;
+    const version = classificationVersion.current;
     const timer = setTimeout(() => {
       fetch("/api/classify-vehicle", {
         method: "POST",
@@ -175,7 +206,7 @@ function BookInner() {
       })
         .then((r) => r.json())
         .then((data) => {
-          if (cancelled) return;
+          if (cancelled || version !== classificationVersion.current) return;
           setClassification({
             packageTier: data.tier || "standard",
             basePrice: data.price || TIER_PRICES.standard,
@@ -185,7 +216,7 @@ function BookInner() {
           });
         })
         .catch(() => {
-          if (!cancelled) setClassification(null);
+          if (!cancelled && version === classificationVersion.current) setClassification(null);
         });
     }, 400);
     return () => {
@@ -207,7 +238,7 @@ function BookInner() {
 
   const handleIntakeUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const selected = Array.from(files).slice(0, 5 - intakeImageIds.length);
+    const selected = Array.from(files).slice(0, 5 - imageCount);
     if (!selected.length) {
       setIntakeWarning("You can upload up to 5 images.");
       return;
@@ -218,16 +249,49 @@ function BookInner() {
     setIntakeWarning("");
     try {
       const response = await fetch("/api/booking-intake/upload", { method: "POST", body: form });
-      if (!response.ok) throw new Error("Upload unavailable");
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error || "Upload unavailable");
+      }
       const data = await response.json();
       const images = Array.isArray(data.images) ? data.images : [];
       setIntakeImageIds((current) => [...current, ...images.map((image: { id: string }) => image.id)]);
       setIntakeImageNames((current) => [...current, ...images.map((image: { name: string }) => image.name)]);
-    } catch {
-      setIntakeWarning("We couldn't upload those images. You can continue with the listing link or manual entry.");
+      setIntakeSessionCount((current) => Math.max(current ?? 0, intakeImageIds.length) + images.length);
+    } catch (error) {
+      setIntakeWarning(error instanceof Error && error.message === "This intake has reached its image limit."
+        ? "This intake has reached its image limit. Start over with another vehicle to upload new screenshots."
+        : "We couldn't upload those images. You can continue with the listing link or manual entry.");
     } finally {
       setIntakeBusy(false);
       if (intakeFileRef.current) intakeFileRef.current.value = "";
+    }
+  };
+
+  const handleVehicleReset = async () => {
+    setIntakeBusy(true);
+    try {
+      const response = await fetch("/api/booking-intake/session", { method: "POST" });
+      if (!response.ok) throw new Error("Unable to start a new intake");
+      classificationVersion.current += 1;
+      clearVehicleAttempt({
+        setSellerType, setListingSource, setBookingType, setPlatformSource,
+        setVehicleSeenLocation, setVehicleYear, setVehicleMake, setVehicleModel,
+        setVehicleTrim, setVehicleVin, setVehicleDescription, setVehicleMileage,
+        setVehiclePrice, setListingUrl, setVehicleLocation, setSellerName,
+        setSellerPhone, setPreferredDate, setInspectionAddress, setInspectionTimeWindow,
+        setNotesToInspector, setServiceZip, setZipStatus, setClassification,
+        setIntakeUrl, setIntakeImageIds, setIntakeImageNames, setIntakeProposal,
+        setIntakeOriginalProposal, setIntakeProvenance, setIntakeWarning,
+        setShowWhyModal, setStep,
+      });
+      setIntakeSessionCount(0);
+      setIntakeSessionStatusError(false);
+      if (intakeFileRef.current) intakeFileRef.current.value = "";
+    } catch {
+      setIntakeWarning("We couldn't start a new vehicle intake. Please try again; your current details are unchanged.");
+    } finally {
+      setIntakeBusy(false);
     }
   };
 
@@ -563,18 +627,33 @@ function BookInner() {
                     onChange={(event) => handleIntakeUpload(event.target.files)}
                     data-testid="input-intake-images"
                   />
-                  <Button type="button" variant="outline" onClick={() => intakeFileRef.current?.click()} disabled={intakeBusy || intakeImageIds.length >= 5} data-testid="button-intake-upload">
-                    <Upload className="mr-2 h-4 w-4" /> Upload screenshots or photos
+                  <Button type="button" variant="outline" onClick={() => intakeFileRef.current?.click()} disabled={intakeBusy || intakeSessionCount === null || intakeSessionStatusError || previousSessionImages || imageCount >= 5} data-testid="button-intake-upload">
+                    <Upload className="mr-2 h-4 w-4" /> Upload screenshots or photos · Up to 5
                   </Button>
-                  {intakeImageNames.length > 0 && (
-                    <span className="text-xs text-muted-foreground">{intakeImageNames.length} image{intakeImageNames.length === 1 ? "" : "s"} ready</span>
-                  )}
+                  <span className="text-xs text-muted-foreground" data-testid="text-intake-image-count">
+                    {imageCount} of 5 images added{imageCount >= 5 ? " · Maximum reached" : ""}
+                  </span>
                   {intakeImageIds.length > 0 && (
                     <Button type="button" onClick={handleIntakeExtract} disabled={intakeBusy} data-testid="button-intake-images">
                       {intakeBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Read what&apos;s visible
                     </Button>
                   )}
                 </div>
+                {previousSessionImages && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300" role="status">
+                    Previous screenshots are still associated with this intake. Start over with another vehicle to upload new screenshots.
+                  </p>
+                )}
+                {intakeSessionStatusError && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300" role="status">
+                    We couldn&apos;t check previous uploads. Start over with another vehicle before uploading new screenshots.
+                  </p>
+                )}
+                {hasVehicleAttempt && (
+                  <Button type="button" variant="outline" onClick={handleVehicleReset} disabled={intakeBusy || loading || (intakeSessionCount === null && !intakeSessionStatusError)} data-testid="button-reset-vehicle">
+                    Start over with another vehicle
+                  </Button>
+                )}
                 <p className="text-xs text-muted-foreground">Manual entry is always available. Extraction is optional and never required to book.</p>
                 {intakeWarning && <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{intakeWarning}</p>}
                 {intakeProposal && (
@@ -944,10 +1023,15 @@ function BookInner() {
                   </p>
                 )}
                 {zipStatus === "invalid" && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1.5" data-testid="text-zip-invalid">
-                    <XCircle className="h-4 w-4" />
-                    Not available yet — we&apos;re launching in phases (Lake → McHenry → Cook)
-                  </p>
+                  <div className="mt-1.5 space-y-2" data-testid="text-zip-invalid">
+                    <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                      <XCircle className="h-4 w-4" />
+                      RideCheck does not currently service this vehicle location. We currently serve Lake and McHenry Counties, IL.
+                    </p>
+                    <Button type="button" variant="outline" onClick={handleVehicleReset} disabled={intakeBusy || loading || (intakeSessionCount === null && !intakeSessionStatusError)} data-testid="button-reset-vehicle-service-area">
+                      Start over with another vehicle
+                    </Button>
+                  </div>
                 )}
               </div>
               <div>

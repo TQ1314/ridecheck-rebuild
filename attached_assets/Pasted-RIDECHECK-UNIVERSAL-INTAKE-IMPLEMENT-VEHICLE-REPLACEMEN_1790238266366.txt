@@ -1,0 +1,131 @@
+RIDECHECK UNIVERSAL INTAKE — IMPLEMENT VEHICLE REPLACEMENT + RESET INTAKE SESSION
+
+The read-only diagnosis confirmed the upload failure is caused by the 5-image quota being tied to the existing 24-hour intake session rather than the active vehicle attempt.
+
+Implement the smallest safe fix.
+
+1. Add “Start over with another vehicle”
+
+Provide a clearly visible action when appropriate, especially after:
+
+service-area rejection
+an extracted vehicle has been confirmed
+the buyer wants to abandon the current vehicle and inspect another one.
+
+Use buyer-facing wording:
+
+Start over with another vehicle
+
+Do NOT make ordinary Back destructive.
+
+2. Reset vehicle-specific state
+
+When the buyer explicitly chooses this action, clear the active vehicle attempt:
+
+uploaded image references/names
+extraction proposal
+listing URL
+year
+make
+model
+trim
+listing-claimed VIN
+mileage
+asking price
+vehicle location
+service ZIP
+discovery/platform source where vehicle-specific
+seller information associated with that vehicle
+classification/package result derived from that vehicle
+intake provenance for that vehicle
+other vehicle-specific unconfirmed/confirmed values
+
+Preserve buyer/account/contact information that is not specific to Vehicle A.
+
+Review the existing form state carefully rather than creating a second parallel state model.
+
+3. Start a genuinely new intake session
+
+Clearing React/page state alone is insufficient.
+
+Generate a new signed intake session so Vehicle B begins with:
+
+0 of 5 images
+
+The previous session's uploaded files must no longer count against Vehicle B's image quota.
+
+Do not weaken session validation or storage isolation.
+
+4. Do not delete abandoned images yet
+
+Leave the previous private storage objects untouched for now.
+
+We will address retention/abandoned-upload cleanup separately after the core workflow is validated.
+
+Do not introduce a large cleanup subsystem in this change.
+
+5. Improve service-area rejection UX
+
+Preserve the existing Lake/McHenry service-area enforcement.
+
+When a vehicle is outside the current service area, don't present it merely as a generic error.
+
+Clearly explain that RideCheck does not currently service that vehicle location and provide:
+
+Start over with another vehicle
+
+Do not expand the service area.
+
+6. Add image-limit visibility
+
+Since the actual limit is already 5 images, expose it to the buyer:
+
+Upload screenshots or photos · Up to 5
+
+Show:
+
+3 of 5 images added
+
+At the limit:
+
+5 of 5 images added · Maximum reached
+
+Do not allow an additional selection to fail with only a generic upload error.
+
+Preserve the existing 5 MiB per-file and 25 MiB session limits.
+
+7. Preserve working architecture
+
+Do not change:
+
+Anthropic model/provider
+AI extraction contract
+Supabase project/schema
+private bucket architecture
+server-authoritative classification/pricing
+payment-first rules
+Lake/McHenry service area
+completed orders
+
+Do not add a database migration unless absolutely required; this fix should primarily concern intake/session and UI state.
+
+8. Tests
+
+Add focused tests proving:
+
+Vehicle A can upload images.
+Vehicle A can be rejected for unsupported service area.
+ordinary Back does NOT destroy Vehicle A.
+“Start over with another vehicle” clears Vehicle A vehicle-specific state.
+buyer/contact state is preserved where applicable.
+a new signed intake session is created.
+Vehicle B starts at 0/5 images.
+Vehicle A images don't count against Vehicle B.
+stale Vehicle A fields cannot be submitted as Vehicle B.
+existing manual-entry fallback still works.
+
+Run focused tests, npm run check, and npm run build.
+
+Do not deploy production.
+
+Return files changed, tests/results, and explain how the new intake session is created without exposing signing secrets.
