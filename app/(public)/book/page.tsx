@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info, HelpCircle, Monitor, Building2, Navigation } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Shield, Globe, MapPin, CheckCircle2, XCircle, Car, Info, HelpCircle, Monitor, Building2, Navigation, Link as LinkIcon, Upload, Loader2 } from "lucide-react";
 import {
   PACKAGE_INFO,
   PRICING,
@@ -39,6 +39,59 @@ import { getServiceAreaFromZip } from "@/lib/geo/resolveCounty";
 import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+
+type IntakeField = {
+  value: string | number | null;
+  source_type?: string;
+  source_reference?: string;
+  evidence?: string;
+};
+
+type IntakeProposal = Record<string, IntakeField>;
+type ListingSource = "online_marketplace" | "dealership" | "roadside" | "auction" | "referral" | "offline" | "other";
+
+const INTAKE_LABELS: Record<string, string> = {
+  year: "Year",
+  make: "Make",
+  model: "Model",
+  trim: "Trim",
+  mileage: "Mileage",
+  asking_price: "Asking price",
+  location_text: "Vehicle location",
+  service_zip: "Service ZIP",
+  vin: "VIN",
+  seller_name: "Seller name",
+  seller_phone: "Seller phone",
+  discovery_source: "Discovery source",
+  platform_source: "Platform",
+};
+
+const DISCOVERY_SOURCE_ALIASES: Record<string, string> = {
+  online: "online_marketplace",
+  marketplace: "online_marketplace",
+  "online marketplace": "online_marketplace",
+  dealer: "dealership",
+  dealership: "dealership",
+  "dealer lot": "dealership",
+  roadside: "roadside",
+  "for sale sign": "roadside",
+  auction: "auction",
+  "auction listing": "auction",
+  referral: "referral",
+  friend: "referral",
+  offline: "offline",
+  private: "offline",
+  other: "other",
+};
+
+function normalizeDiscoverySource(value: unknown): ListingSource | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, " ");
+  const mapped = DISCOVERY_SOURCE_ALIASES[normalized] || normalized.replace(/\s+/g, "_");
+  return ["online_marketplace", "dealership", "roadside", "auction", "referral", "offline", "other"].includes(mapped)
+    ? mapped as ListingSource
+    : null;
+}
 
 export default function BookPage() {
   return (
@@ -68,7 +121,6 @@ function BookInner() {
     t("booking.step.review", lang),
   ];
 
-  type ListingSource = "online_marketplace" | "dealership" | "roadside";
   type SellerType = "private_party" | "dealership" | "auction" | "other";
   const [sellerType, setSellerType] = useState<SellerType>("private_party");
   const [listingSource, setListingSource] = useState<ListingSource>("online_marketplace");
@@ -78,6 +130,8 @@ function BookInner() {
   const [vehicleYear, setVehicleYear] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleTrim, setVehicleTrim] = useState("");
+  const [vehicleVin, setVehicleVin] = useState("");
   const [vehicleDescription, setVehicleDescription] = useState("");
   const [vehicleMileage, setVehicleMileage] = useState("");
   const [vehiclePrice, setVehiclePrice] = useState("");
@@ -97,6 +151,15 @@ function BookInner() {
   const [zipStatus, setZipStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
   const [classification, setClassification] = useState<ClassificationResult | null>(null);
+  const [intakeUrl, setIntakeUrl] = useState("");
+  const [intakeImageIds, setIntakeImageIds] = useState<string[]>([]);
+  const [intakeImageNames, setIntakeImageNames] = useState<string[]>([]);
+  const [intakeProposal, setIntakeProposal] = useState<IntakeProposal | null>(null);
+  const [intakeOriginalProposal, setIntakeOriginalProposal] = useState<IntakeProposal | null>(null);
+  const [intakeProvenance, setIntakeProvenance] = useState<Record<string, unknown>>({});
+  const [intakeWarning, setIntakeWarning] = useState("");
+  const [intakeBusy, setIntakeBusy] = useState(false);
+  const intakeFileRef = useRef<HTMLInputElement>(null);
 
   const [showWhyModal, setShowWhyModal] = useState(false);
 
@@ -157,6 +220,123 @@ function BookInner() {
     }
   };
 
+  const handleIntakeUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const selected = Array.from(files).slice(0, 5 - intakeImageIds.length);
+    if (!selected.length) {
+      setIntakeWarning("You can upload up to 5 images.");
+      return;
+    }
+    const form = new FormData();
+    selected.forEach((file) => form.append("files", file));
+    setIntakeBusy(true);
+    setIntakeWarning("");
+    try {
+      const response = await fetch("/api/booking-intake/upload", { method: "POST", body: form });
+      if (!response.ok) throw new Error("Upload unavailable");
+      const data = await response.json();
+      const images = Array.isArray(data.images) ? data.images : [];
+      setIntakeImageIds((current) => [...current, ...images.map((image: { id: string }) => image.id)]);
+      setIntakeImageNames((current) => [...current, ...images.map((image: { name: string }) => image.name)]);
+    } catch {
+      setIntakeWarning("We couldn't upload those images. You can continue with the listing link or manual entry.");
+    } finally {
+      setIntakeBusy(false);
+      if (intakeFileRef.current) intakeFileRef.current.value = "";
+    }
+  };
+
+  const handleIntakeExtract = async () => {
+    if (!intakeUrl.trim() && !intakeImageIds.length) {
+      setIntakeWarning("Add a listing link or at least one image first.");
+      return;
+    }
+    setIntakeBusy(true);
+    setIntakeWarning("");
+    setIntakeProposal(null);
+    try {
+      const response = await fetch("/api/booking-intake/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(intakeUrl.trim() ? { url: intakeUrl.trim() } : {}),
+          ...(intakeImageIds.length ? { imageIds: intakeImageIds } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error("Extraction unavailable");
+      const data = await response.json();
+      const fields = data?.fields && typeof data.fields === "object" ? data.fields : {};
+      setIntakeProposal(fields as IntakeProposal);
+      setIntakeOriginalProposal(fields as IntakeProposal);
+      setIntakeWarning(data.warning || (!Object.keys(fields).length
+        ? "We couldn't read enough details yet. Continue with manual entry."
+        : ""));
+    } catch {
+      setIntakeWarning("We couldn't read all the details from this listing. Upload a screenshot or enter the missing information.");
+    } finally {
+      setIntakeBusy(false);
+    }
+  };
+
+  const confirmIntakeProposal = () => {
+    if (!intakeProposal) return;
+    const value = (key: string) => intakeProposal[key]?.value;
+    if (value("year") != null) setVehicleYear(String(value("year")));
+    if (value("make") != null) setVehicleMake(String(value("make")));
+    if (value("model") != null) setVehicleModel(String(value("model")));
+    if (value("trim") != null) setVehicleTrim(String(value("trim")));
+    if (value("vin") != null) setVehicleVin(String(value("vin")));
+    if (value("mileage") != null) setVehicleMileage(String(value("mileage")));
+    if (value("asking_price") != null) setVehiclePrice(String(value("asking_price")));
+    if (value("location_text") != null) setVehicleLocation(String(value("location_text")));
+    if (value("service_zip") != null) handleZipChange(String(value("service_zip")));
+    if (value("seller_name") != null) setSellerName(String(value("seller_name")));
+    if (value("seller_phone") != null) setSellerPhone(String(value("seller_phone")));
+    if (value("platform_source") != null) setPlatformSource(String(value("platform_source")));
+    if (value("discovery_source") != null) {
+      const normalizedSource = normalizeDiscoverySource(value("discovery_source"));
+      if (normalizedSource) setListingSource(normalizedSource);
+    }
+    setListingUrl((current) => current || intakeUrl.trim());
+    setIntakeProvenance(compactProvenance);
+    setIntakeProposal(null);
+  };
+
+  const compactProvenance = Object.fromEntries(
+    Object.entries(intakeOriginalProposal || {}).map(([key, field]) => [
+      key,
+      {
+        proposal: field.value,
+        // Keep the source bounded and self-contained for the existing order
+        // create contract; do not persist unbounded URLs or model output.
+        source: [field.source_type || "unknown", field.source_reference || ""].join(":").slice(0, 120),
+        ...(field.evidence ? { evidence: field.evidence.slice(0, 500) } : {}),
+        buyer_final: null,
+      },
+    ]),
+  );
+
+  const finalIntakeValues: Record<string, string | null> = {
+    year: vehicleYear || null,
+    make: vehicleMake || null,
+    model: vehicleModel || null,
+    trim: vehicleTrim || null,
+    mileage: vehicleMileage || null,
+    asking_price: vehiclePrice || null,
+    location_text: vehicleLocation || null,
+    service_zip: serviceZip || null,
+    vin: vehicleVin || null,
+    seller_name: sellerName || null,
+    seller_phone: sellerPhone || null,
+    platform_source: platformSource || null,
+  };
+
+  const updateIntakeProposalField = (key: string, nextValue: string) => {
+    setIntakeProposal((current) => current
+      ? { ...current, [key]: { ...current[key], value: nextValue || null } }
+      : current);
+  };
+
   const canProceed = () => {
     if (step === 0)
       return (
@@ -191,6 +371,8 @@ function BookInner() {
         vehicle_year: parseInt(vehicleYear),
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
+        vehicle_trim: vehicleTrim || null,
+        vin: vehicleVin || null,
         vehicle_description: vehicleDescription || null,
         listing_url: listingUrl || null,
         vehicle_location: vehicleLocation,
@@ -210,6 +392,14 @@ function BookInner() {
         service_zip: serviceZip,
         vehicle_mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
         vehicle_price: vehiclePrice ? parseFloat(vehiclePrice) : null,
+        ...(Object.keys(intakeProvenance).length
+          ? {
+              intake_provenance: Object.fromEntries(Object.entries(intakeProvenance).map(([key, field]) => [
+                key,
+                { ...(field as Record<string, unknown>), buyer_final: finalIntakeValues[key] ?? null },
+              ])),
+            }
+          : {}),
       };
 
       if (isBuyerArranged) {
@@ -360,6 +550,76 @@ function BookInner() {
 
         {step === 0 && (
           <div className="space-y-6">
+            <Card className="border-primary/30 bg-primary/[0.03]" data-testid="card-universal-intake">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Found a vehicle you want inspected?</CardTitle>
+                <p className="text-sm text-muted-foreground">Send us what you have. We&apos;ll suggest details for you to confirm, or you can enter everything manually below.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={intakeUrl}
+                    onChange={(event) => { setIntakeUrl(event.target.value); setListingUrl(event.target.value); }}
+                    placeholder="Paste a listing link (Facebook, OfferUp, dealer site, and more)"
+                    aria-label="Listing link"
+                    data-testid="input-intake-url"
+                  />
+                  <Button type="button" variant="outline" onClick={handleIntakeExtract} disabled={intakeBusy || !intakeUrl.trim()} data-testid="button-intake-link">
+                    <LinkIcon className="mr-2 h-4 w-4" /> Use link
+                  </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={intakeFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => handleIntakeUpload(event.target.files)}
+                    data-testid="input-intake-images"
+                  />
+                  <Button type="button" variant="outline" onClick={() => intakeFileRef.current?.click()} disabled={intakeBusy || intakeImageIds.length >= 5} data-testid="button-intake-upload">
+                    <Upload className="mr-2 h-4 w-4" /> Upload screenshots or photos
+                  </Button>
+                  {intakeImageNames.length > 0 && (
+                    <span className="text-xs text-muted-foreground">{intakeImageNames.length} image{intakeImageNames.length === 1 ? "" : "s"} ready</span>
+                  )}
+                  {intakeImageIds.length > 0 && (
+                    <Button type="button" onClick={handleIntakeExtract} disabled={intakeBusy} data-testid="button-intake-images">
+                      {intakeBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Read what&apos;s visible
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Manual entry is always available. Extraction is optional and never required to book.</p>
+                {intakeWarning && <p className="text-sm text-amber-700 dark:text-amber-300" role="status">{intakeWarning}</p>}
+                {intakeProposal && (
+                  <Card className="bg-background" data-testid="card-intake-proposal">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">We found these details</CardTitle>
+                      <p className="text-xs text-muted-foreground">Review and confirm. Missing details stay unknown and can be entered below.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(intakeProposal).filter(([, field]) => field?.value != null && field.value !== "").map(([key, field]) => (
+                        <div className="flex justify-between gap-3 text-sm" key={key}>
+                          <span className="text-muted-foreground">{INTAKE_LABELS[key] || key}</span>
+                          <Input
+                            className="h-8 max-w-[62%] text-right"
+                            value={String(field.value)}
+                            onChange={(event) => updateIntakeProposalField(key, event.target.value)}
+                            aria-label={`Edit ${INTAKE_LABELS[key] || key}`}
+                            data-testid={`input-intake-proposal-${key}`}
+                          />
+                        </div>
+                      ))}
+                      <div className="flex gap-2 pt-2">
+                        <Button type="button" onClick={confirmIntakeProposal} data-testid="button-confirm-intake">Confirm and use these</Button>
+                        <Button type="button" variant="outline" onClick={() => setIntakeProposal(null)} data-testid="button-edit-intake">Edit manually</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </CardContent>
+            </Card>
             {/* ── Who is selling? ── */}
             <div>
               <Label className="text-base font-semibold mb-1 block">Who is selling this vehicle? *</Label>
@@ -412,6 +672,30 @@ function BookInner() {
                     label: t("booking.source.roadside", lang),
                     desc: t("booking.source.roadside.desc", lang),
                   },
+                  {
+                    value: "auction" as ListingSource,
+                    icon: <span className="text-lg">🔨</span>,
+                    label: "Auction",
+                    desc: "Auction listing or sale",
+                  },
+                  {
+                    value: "referral" as ListingSource,
+                    icon: <span className="text-lg">🤝</span>,
+                    label: "Referral",
+                    desc: "Friend, family, or referral",
+                  },
+                  {
+                    value: "offline" as ListingSource,
+                    icon: <span className="text-lg">📍</span>,
+                    label: "Private / offline",
+                    desc: "No online listing",
+                  },
+                  {
+                    value: "other" as ListingSource,
+                    icon: <span className="text-lg">❓</span>,
+                    label: "Other",
+                    desc: "Somewhere else",
+                  },
                 ] as { value: ListingSource; icon: React.ReactNode; label: string; desc: string }[]).map((src) => (
                   <Card
                     key={src.value}
@@ -449,7 +733,7 @@ function BookInner() {
 
               {listingSource && (() => {
                 const opts: { value: string; label: string }[] =
-                  listingSource === "online_marketplace"
+                      listingSource === "online_marketplace"
                     ? [
                         { value: "facebook_marketplace", label: "Facebook Marketplace" },
                         { value: "craigslist", label: "Craigslist" },
@@ -468,9 +752,13 @@ function BookInner() {
                           { value: "walked_in", label: t("booking.platform.walkedIn", lang) },
                           { value: "other", label: t("booking.platform.otherShort", lang) },
                         ]
-                      : [
+                    : listingSource === "roadside"
+                      ? [
                           { value: "roadside_sign", label: t("booking.platform.roadsideSign", lang) },
                           { value: "other", label: t("booking.platform.otherShort", lang) },
+                        ]
+                      : [
+                          { value: "other", label: "Other / not listed" },
                         ];
 
                 return (
@@ -480,7 +768,9 @@ function BookInner() {
                         ? t("booking.platform.online.label", lang)
                         : listingSource === "dealership"
                           ? t("booking.platform.dealership.label", lang)
-                          : t("booking.platform.roadside.label", lang)}
+                          : listingSource === "roadside"
+                            ? t("booking.platform.roadside.label", lang)
+                            : "Where did you find it?"}
                     </Label>
                     <Select
                       value={platformSource}
@@ -593,6 +883,16 @@ function BookInner() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  <Label htmlFor="trim">Trim (if known)</Label>
+                  <Input id="trim" placeholder="LE, XLE, Sport..." value={vehicleTrim} onChange={(e) => setVehicleTrim(e.target.value)} data-testid="input-trim" />
+                </div>
+                <div>
+                  <Label htmlFor="vin">VIN (if known)</Label>
+                  <Input id="vin" placeholder="17-character VIN" maxLength={17} value={vehicleVin} onChange={(e) => setVehicleVin(e.target.value.toUpperCase())} data-testid="input-vin" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <Label htmlFor="mileage">Mileage</Label>
                   <Input
                     id="mileage"
@@ -695,7 +995,7 @@ function BookInner() {
                   data-testid="input-description"
                 />
               </div>
-              {listingSource === "online_marketplace" && (
+              {["online_marketplace", "dealership", "auction", "other"].includes(listingSource) && (
                 <div>
                   <Label htmlFor="listing">
                     {t("booking.listingUrl", lang)}
@@ -705,7 +1005,7 @@ function BookInner() {
                     type="url"
                     placeholder="https://..."
                     value={listingUrl}
-                    onChange={(e) => setListingUrl(e.target.value)}
+                    onChange={(e) => { setListingUrl(e.target.value); setIntakeUrl(e.target.value); }}
                     data-testid="input-listing-url"
                   />
                 </div>
@@ -1009,7 +1309,13 @@ function BookInner() {
                     ? t("booking.review.vehicleFound.dealership", lang)
                     : listingSource === "roadside"
                       ? t("booking.review.vehicleFound.roadside", lang)
-                      : t("booking.review.vehicleFound.online", lang)}
+                      : listingSource === "auction"
+                        ? "Auction"
+                        : listingSource === "referral"
+                          ? "Referral"
+                          : listingSource === "offline"
+                            ? "Private / offline"
+                            : t("booking.review.vehicleFound.online", lang)}
                 </span>
               </div>
               {platformSource && (
@@ -1041,9 +1347,15 @@ function BookInner() {
                   {t("booking.step.vehicle", lang)}
                 </span>
                 <span>
-                  {vehicleYear} {vehicleMake} {vehicleModel}
+                  {vehicleYear} {vehicleMake} {vehicleModel}{vehicleTrim ? ` · ${vehicleTrim}` : ""}
                 </span>
               </div>
+              {vehicleVin && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">VIN</span>
+                  <span className="font-mono text-xs">{vehicleVin}</span>
+                </div>
+              )}
               {vehicleMileage && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Mileage</span>
@@ -1062,6 +1374,30 @@ function BookInner() {
                 </span>
                 <span>{vehicleLocation}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Service ZIP</span>
+                <span>{serviceZip}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Seller type</span>
+                <span className="capitalize">{sellerType.replace("_", " ")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Discovery source</span>
+                <span className="capitalize">{listingSource.replace("_", " ")}{platformSource ? ` · ${platformSource.replace(/_/g, " ")}` : ""}</span>
+              </div>
+              {listingUrl && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Listing URL</span>
+                  <span className="truncate max-w-[65%]" title={listingUrl}>{listingUrl}</span>
+                </div>
+              )}
+              {sellerName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Seller</span>
+                  <span>{sellerName}{sellerPhone ? ` · ${sellerPhone}` : ""}</span>
+                </div>
+              )}
               {isBuyerArranged && inspectionAddress && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
@@ -1076,6 +1412,12 @@ function BookInner() {
                     {t("booking.inspectionTimeWindow", lang)}
                   </span>
                   <span>{inspectionTimeWindow}</span>
+                </div>
+              )}
+              {isBuyerArranged && notesToInspector && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Inspector notes</span>
+                  <span className="text-right max-w-[60%]">{notesToInspector}</span>
                 </div>
               )}
               <div className="flex justify-between">

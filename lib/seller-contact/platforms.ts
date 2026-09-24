@@ -1,4 +1,4 @@
-export type SellerPlatform = 'facebook' | 'craigslist' | 'dealer' | 'other';
+export type SellerPlatform = 'facebook' | 'craigslist' | 'offerup' | 'dealer' | 'other';
 
 export type ContactChannel =
   | 'fb_message'
@@ -10,6 +10,7 @@ export type ContactChannel =
 const ALLOWED_CHANNELS: Record<SellerPlatform, ContactChannel[]> = {
   facebook: ['fb_message', 'call', 'sms', 'email'],
   craigslist: ['email', 'sms', 'call'],
+  offerup: ['buyer_message', 'call', 'sms', 'email'],
   dealer: ['call', 'email', 'sms'],
   other: ['call', 'email', 'sms'],
 };
@@ -18,22 +19,23 @@ export function detectSellerPlatform(listingUrl?: string | null): SellerPlatform
   if (!listingUrl) return 'other';
   try {
     const hostname = new URL(listingUrl).hostname.toLowerCase();
+    const matches = (domain: string) => hostname === domain || hostname.endsWith(`.${domain}`);
     if (
-      hostname.includes('facebook.com') ||
-      hostname.includes('fb.com') ||
-      hostname.includes('marketplace')
+      matches('facebook.com') ||
+      matches('fb.com')
     ) {
       return 'facebook';
     }
-    if (hostname.includes('craigslist.org')) {
+    if (matches('craigslist.org')) {
       return 'craigslist';
     }
+    if (matches('offerup.com')) return 'offerup';
     if (
-      hostname.includes('cargurus.com') ||
-      hostname.includes('autotrader.com') ||
-      hostname.includes('cars.com') ||
-      hostname.includes('carfax.com') ||
-      hostname.includes('truecar.com')
+      matches('cargurus.com') ||
+      matches('autotrader.com') ||
+      matches('cars.com') ||
+      matches('carfax.com') ||
+      matches('truecar.com')
     ) {
       return 'dealer';
     }

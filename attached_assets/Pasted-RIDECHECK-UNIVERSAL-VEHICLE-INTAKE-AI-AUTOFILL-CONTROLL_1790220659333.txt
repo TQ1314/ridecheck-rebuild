@@ -1,0 +1,969 @@
+RIDECHECK UNIVERSAL VEHICLE INTAKE + AI AUTOFILL
+CONTROLLED IMPLEMENTATION — IMPROVE THE EXISTING BUYER BOOKING FLOW
+
+OBJECTIVE
+
+Improve RideCheck's EXISTING buyer booking experience so a buyer can give RideCheck whatever vehicle information they already have and RideCheck does as much of the data entry work as safely possible.
+
+Core buyer experience:
+
+“Found a vehicle? Send us what you have.”
+
+A buyer should be able to start with:
+
+1. a vehicle listing URL
+2. listing screenshots/photos
+3. dealer window sticker / vehicle information photo
+4. roadside FOR SALE sign / vehicle photo
+5. manual vehicle details
+
+RideCheck should extract available information, show the buyer what was found, allow confirmation/correction, and then populate the EXISTING booking fields.
+
+This is NOT a new booking system.
+
+Do not rebuild:
+
+- order creation
+- server-authoritative package classification
+- pricing
+- Stripe checkout/payment
+- seller coordination
+- Facebook buyer bridge
+- Communication Center
+- RideChecker compensation
+- dispatch
+- inspection
+- QA
+- reports
+- payouts
+
+Extend the current booking flow safely.
+
+The existing booking audit established:
+
+- current booking has 3 wizard screens
+- normal Concierge flow has 7 required typed fields
+- package classification is already server-authoritative
+- listing URLs are currently stored but not parsed for vehicle data
+- no existing buyer-facing screenshot/photo intake exists
+- existing RC photo upload is NOT appropriate for buyer intake
+- Buyer Arranged currently sends some fields that are not persisted
+- seller type and discovery source are distinct concepts
+- mileage and asking price can affect classification
+- vehicle location and service ZIP serve different purposes
+
+Preserve those realities.
+
+════════════════════════════════════
+NON-NEGOTIABLE PRODUCT PRINCIPLE
+════════════════════════════════════
+
+DO NOT turn this into a longer AI form.
+
+The purpose of AI is to REMOVE buyer work.
+
+The desired experience is:
+
+Buyer gives RideCheck what they have
+→ RideCheck extracts what it can
+→ RideCheck shows what it found
+→ buyer confirms/corrects
+→ RideCheck asks only for missing information actually required
+→ existing booking/payment flow continues
+
+Never make the buyer fill the same information twice.
+
+Never require AI extraction to complete a booking.
+
+Manual entry must always remain available.
+
+Extraction failure must NEVER block booking.
+
+Unknown information must remain UNKNOWN.
+
+Never invent:
+
+- trim
+- mileage
+- price
+- VIN
+- location
+- seller type
+- seller contact information
+- vehicle specifications
+
+Do not use model knowledge to fill missing listing facts.
+
+════════════════════════════════════
+PART 1 — PRESERVE THE EXISTING ARCHITECTURE
+════════════════════════════════════
+
+Before modifying anything, inspect:
+
+app/(public)/book/page.tsx
+
+app/api/orders/create/route.ts
+
+lib/vehicleClassification.server.ts
+
+lib/utils/pricing.ts
+
+lib/seller-contact/platforms.ts
+
+and all existing booking/order schemas used by this flow.
+
+Identify the current canonical:
+
+- form state
+- order creation API
+- classification function
+- pricing function
+- service ZIP validation
+- seller type values
+- listing/discovery source values
+- booking type values
+
+Extend these.
+
+DO NOT create:
+
+- a second booking wizard
+- a second order-creation endpoint
+- a second pricing engine
+- a second vehicle classification engine
+- duplicate seller/source fields
+- another payment workflow
+
+════════════════════════════════════
+PART 2 — FIX EXISTING BUYER ARRANGED DATA LOSS FIRST
+════════════════════════════════════
+
+The audit found that Buyer Arranged currently collects:
+
+- inspection address
+- inspection time window
+- inspector notes
+
+but these values are accepted/sent and not persisted by the current order creation path.
+
+Fix this BEFORE adding AI intake.
+
+Inspect the existing order schema first.
+
+If appropriate existing columns already exist:
+use them.
+
+If they do not exist:
+add the smallest safe additive migration necessary.
+
+Persist:
+
+inspection_address
+inspection_time_window
+inspector_notes
+
+or use existing canonical equivalents if present.
+
+Do not duplicate existing fields.
+
+Verify:
+
+Buyer enters Buyer Arranged details
+→ order created
+→ Ops can retrieve those exact details.
+
+Also inspect preferred language because the audit found that it is sent but may not currently be persisted.
+
+If RideCheck promises to retain the buyer's communication language preference and a canonical field already exists, persist it appropriately.
+
+Do not create unnecessary duplicate language fields.
+
+════════════════════════════════════
+PART 3 — NEW “SEND US WHAT YOU HAVE” ENTRY
+════════════════════════════════════
+
+Improve the beginning of the EXISTING Vehicle step.
+
+Present a simple entry experience such as:
+
+Found a vehicle you want RideCheck to inspect?
+
+Send us what you have.
+
+PRIMARY OPTIONS:
+
+[ Paste Listing Link ]
+
+[ Upload Screenshots or Photos ]
+
+[ Enter Details Manually ]
+
+Supporting copy:
+
+“Facebook Marketplace, OfferUp, Craigslist, dealer websites, Autotrader, Cars.com, roadside vehicles, private sellers and more.”
+
+Do not make these separate workflows.
+
+They are simply different ways to populate the SAME booking state.
+
+The buyer may use more than one source.
+
+Example:
+
+paste listing URL
++
+upload screenshots
+
+should be allowed.
+
+Manual entry must always be visible or immediately accessible.
+
+════════════════════════════════════
+PART 4 — UNIVERSAL SOURCE SUPPORT
+════════════════════════════════════
+
+RideCheck is not a Facebook inspection service.
+
+It inspects vehicles offered for sale regardless of where they were discovered.
+
+Support the existing discovery/source model while allowing intake from:
+
+- Facebook Marketplace
+- OfferUp
+- Craigslist
+- Autotrader
+- Cars.com
+- dealer website
+- dealership lot
+- other used-car websites
+- private/offline listing
+- roadside / FOR SALE sign
+- auction listing
+- referral
+- other
+
+Do not build a separate extractor for every marketplace.
+
+Use one universal intake architecture.
+
+Discovery source means:
+
+WHERE THE BUYER FOUND THE VEHICLE.
+
+Seller type means:
+
+WHO IS SELLING THE VEHICLE.
+
+Keep those concepts separate.
+
+Examples:
+
+Facebook Marketplace + private seller
+
+Cars.com + dealership
+
+dealer lot + dealership
+
+roadside sign + private seller
+
+auction listing + auction
+
+Do not hard-code impossible combinations unless the existing business workflow truly prohibits them.
+
+You may suggest sensible defaults.
+
+Example:
+
+dealer lot → suggest dealership
+
+roadside sign → suggest private seller
+
+But the buyer must be able to correct the suggestion.
+
+════════════════════════════════════
+PART 5 — LISTING URL HANDLING
+════════════════════════════════════
+
+When a buyer provides a listing URL:
+
+1. validate URL safely
+2. identify platform/domain when possible
+3. preserve the original listing URL
+4. attempt extraction only through permitted/reliable mechanisms
+
+DO NOT:
+
+- bypass authentication
+- scrape protected Facebook content
+- circumvent anti-bot controls
+- require Facebook login credentials
+- automate Facebook Messenger
+- defeat marketplace protections
+
+Where public page metadata or structured data is safely accessible, it may be used.
+
+If listing content cannot be reliably accessed:
+
+show:
+
+“We couldn't read all the vehicle details from this listing. Upload a screenshot or enter the missing information.”
+
+Then continue normally.
+
+Do not treat URL extraction failure as booking failure.
+
+Update the existing platform detector where appropriate so commonly supported sources such as OfferUp can be recognized.
+
+Do not rely on broad unsafe hostname substring matching when a proper hostname comparison can be used.
+
+════════════════════════════════════
+PART 6 — BUYER-SAFE IMAGE UPLOAD
+════════════════════════════════════
+
+Create a buyer-specific upload mechanism for booking intake.
+
+DO NOT reuse the RideChecker inspection photo endpoint if its authorization/storage semantics are specific to inspectors.
+
+Accept common image formats suitable for:
+
+- listing screenshots
+- dealer window stickers
+- VIN plates/labels when buyer chooses
+- FOR SALE signs
+- vehicle information sheets
+- vehicle photos containing visible sale information
+
+Implement:
+
+- file type validation
+- file size limit
+- safe object naming
+- private storage
+- temporary/intake lifecycle where appropriate
+- authenticated or order/session-scoped access
+- no public unrestricted bucket URLs
+
+Do not expose uploaded buyer material publicly.
+
+Support multiple images.
+
+Reasonable initial limit:
+up to approximately 5 images per intake unless existing infrastructure suggests a safer limit.
+
+════════════════════════════════════
+PART 7 — AI EXTRACTION SERVICE
+════════════════════════════════════
+
+Implement a bounded vehicle-listing extraction service.
+
+Use the currently configured AI infrastructure if it safely supports image input + structured output.
+
+If OpenAI is already configured and appropriate, use the current Responses API with a vision-capable model appropriate for structured extraction.
+
+Prefer a cost-conscious model suitable for extraction rather than automatically using the most expensive model.
+
+If another production AI provider is already canonical in RideCheck and provides equivalent reliable image + structured extraction, do not introduce unnecessary provider duplication.
+
+The extractor is a FORM-FILLING ASSISTANT.
+
+It is NOT the authoritative vehicle database.
+
+Return structured data.
+
+Target fields:
+
+{
+  year,
+  make,
+  model,
+  trim,
+  mileage,
+  asking_price,
+  location_text,
+  service_zip,
+  vin,
+  seller_name,
+  seller_phone,
+  discovery_source,
+  platform_source
+}
+
+For EACH extracted field, preserve provenance.
+
+Example internal structure:
+
+{
+  "mileage": {
+    "value": 172000,
+    "source_type": "uploaded_image",
+    "source_reference": "...",
+    "evidence": "172K miles"
+  }
+}
+
+Evidence should be concise.
+
+Do not require a fake universal confidence percentage.
+
+If confidence is useful internally, it may be recorded, but provenance/evidence is more important.
+
+STRICT EXTRACTION RULE:
+
+Only return a value when it is explicitly supported by the supplied material.
+
+If unavailable:
+
+null
+
+Never infer missing listing facts from general automotive knowledge.
+
+Example:
+
+If image says:
+
+2013 Mercedes-Benz S 550
+172K miles
+$11,000
+Hoffman Estates
+
+valid extraction:
+
+year = 2013
+make = Mercedes-Benz
+model = S 550
+mileage = 172000
+asking_price = 11000
+location_text = Hoffman Estates
+
+If trim or VIN is not visible:
+
+trim = null
+vin = null
+
+DO NOT guess.
+
+════════════════════════════════════
+PART 8 — PROVENANCE MODEL
+════════════════════════════════════
+
+Preserve the difference between:
+
+A. BUYER/LISTING CLAIM
+
+B. BUYER CONFIRMATION
+
+C. RIDECHECK VERIFIED INFORMATION
+
+Do not overwrite these concepts silently.
+
+For booking intake, each autofilled field should be able to indicate:
+
+- extracted value
+- source
+- buyer confirmed/corrected value
+
+Example:
+
+Mileage:
+Listing extracted: 172,000
+Buyer confirmed: 172,000
+
+Later during inspection:
+
+Observed odometer: 173,214
+
+Those are different pieces of evidence.
+
+Do not allow later RideChecker evidence to erase what the listing originally represented.
+
+This will eventually support report comparisons such as:
+
+Listing mileage vs observed mileage.
+
+However:
+
+DO NOT build the full Vehicle Intelligence/report comparison system in this session.
+
+Only preserve enough provenance so it can be used later.
+
+Use the smallest sensible schema/storage implementation.
+
+Do not create a large speculative data model.
+
+════════════════════════════════════
+PART 9 — BUYER CONFIRMATION EXPERIENCE
+════════════════════════════════════
+
+After extraction, show a compact confirmation card.
+
+Example:
+
+WE FOUND THIS VEHICLE
+
+2013 Mercedes-Benz S 550 4MATIC
+
+172,000 miles
+$11,000
+Hoffman Estates, IL
+
+Found on:
+Facebook Marketplace
+
+[ Confirm Vehicle ]
+
+[ Edit Details ]
+
+Clearly mark missing information.
+
+Example:
+
+VIN
+Not provided — RideCheck can verify this later.
+
+Do not present unknown fields as errors unless they are genuinely required before booking/payment.
+
+The buyer should be able to correct every extracted field.
+
+After correction:
+
+re-run existing server-authoritative classification/pricing.
+
+AI must NEVER directly determine the final package price.
+
+════════════════════════════════════
+PART 10 — REQUIRED INFORMATION LOGIC
+════════════════════════════════════
+
+Do not preserve a field as manually required merely because the old form required typing it.
+
+The requirement is that RideCheck has a valid value when operationally necessary.
+
+For example:
+
+Year:
+AI populated + buyer confirmed
+→ do not ask buyer to type year again.
+
+Make:
+same.
+
+Model:
+same.
+
+Vehicle location:
+if reliable location was extracted and buyer confirms
+→ use it.
+
+Service ZIP:
+derive only when location evidence is sufficiently precise and the derivation is deterministic/reliable.
+
+Because service ZIP controls pilot availability:
+buyer must be shown/confirm it before the booking is accepted.
+
+If location is only:
+
+“Chicago area”
+
+do NOT invent a ZIP.
+
+Ask for ZIP.
+
+════════════════════════════════════
+PART 11 — MILEAGE AND ASKING PRICE SAFETY
+════════════════════════════════════
+
+The existing server classification uses vehicle characteristics including mileage and asking price.
+
+Therefore:
+
+AI-populated mileage/price must be buyer-confirmed before they affect final checkout pricing.
+
+Missing mileage or price must remain null.
+
+Do not use:
+
+0
+unknown-as-zero
+placeholder values
+
+to manipulate classification.
+
+Do not interpret missing mileage or price as evidence that a vehicle qualifies for a cheaper package.
+
+Whenever buyer correction changes:
+
+- year
+- make
+- model
+- mileage
+- asking price
+
+recalculate package/price using the EXISTING server classification logic.
+
+Display changed pricing clearly before checkout.
+
+════════════════════════════════════
+PART 12 — SELLER INFORMATION
+════════════════════════════════════
+
+Do not turn seller information into a universal booking blocker.
+
+Normal Concierge booking should continue allowing seller contact details to be collected later where operationally appropriate.
+
+If seller name/phone is visibly available in submitted material:
+
+autofill it.
+
+Let buyer confirm/correct.
+
+If unavailable:
+
+do not force it merely for order creation unless the selected booking method genuinely requires it.
+
+Preserve:
+
+- seller coordination
+- SellerContactPanel
+- Facebook buyer bridge
+- seller attempt history
+- Communication Center
+
+No seller outreach before payment or authorized override.
+
+════════════════════════════════════
+PART 13 — VIN BEHAVIOR
+════════════════════════════════════
+
+VIN is useful but should not become an unnecessary universal booking blocker.
+
+If visible in uploaded material:
+
+extract it.
+
+If provided:
+
+validate format reasonably.
+
+Where current NHTSA VIN decoding infrastructure can safely verify identity, reuse it.
+
+But:
+
+listing extraction ≠ VIN verification.
+
+The UI should distinguish:
+
+Listing-provided VIN
+
+from
+
+RideCheck-verified VIN.
+
+If no VIN is available during booking:
+
+allow booking to continue where current operations permit.
+
+RideChecker can capture/verify VIN during inspection.
+
+════════════════════════════════════
+PART 14 — REVIEW SCREEN IMPROVEMENT
+════════════════════════════════════
+
+The audit found that the existing Review screen omits some information the buyer entered.
+
+Improve the existing Review step.
+
+Show the important booking facts before order creation/payment:
+
+- vehicle year/make/model/trim when known
+- mileage when known
+- asking price when known
+- vehicle location
+- service ZIP
+- seller type
+- discovery source/platform
+- listing URL when supplied
+- seller contact when supplied
+- booking method
+- buyer contact
+- preferred date when supplied
+- Buyer Arranged details when applicable
+- final package
+- final price
+
+Do not make the review screen enormous.
+
+Use compact grouped sections with Edit actions.
+
+════════════════════════════════════
+PART 15 — PAYMENT-FIRST RULE REMAINS UNCHANGED
+════════════════════════════════════
+
+This implementation must not weaken the stabilized payment gates.
+
+No payment or authorized payment override means:
+
+- no seller outreach
+- no RideChecker assignment
+- no inspection
+- no report generation
+- no report delivery
+
+AI extraction occurs BEFORE payment only to simplify booking.
+
+It does not authorize downstream operations.
+
+Stripe remains authoritative.
+
+════════════════════════════════════
+PART 16 — DO NOT BUILD VEHICLE INTELLIGENCE YET
+════════════════════════════════════
+
+This implementation is intake/autofill only.
+
+DO NOT yet build:
+
+- model reliability scores
+- “known issues” generated from AI memory
+- Edmunds-style reviews
+- repair-cost predictions
+- purchase recommendations
+- vehicle quality scores
+- AI buy/don't-buy conclusions
+- total-cost-of-ownership predictions
+- auction accompaniment / Rent a RideChecker
+- Carfax replacement
+- AutoCheck replacement
+
+Those are separate future phases.
+
+This phase establishes reliable vehicle identity/intake and provenance.
+
+════════════════════════════════════
+PART 17 — ERROR / FALLBACK EXPERIENCE
+════════════════════════════════════
+
+Test these cases.
+
+CASE A
+Good screenshot with complete vehicle information.
+
+Expected:
+fields populate
+buyer confirms
+booking continues.
+
+CASE B
+Screenshot contains only:
+2015 Toyota Camry
+$8,900
+
+Expected:
+extract only those facts.
+Ask buyer for operationally required missing information.
+
+CASE C
+Facebook URL cannot be accessed.
+
+Expected:
+friendly fallback:
+“We couldn't read all the details from this listing. Upload screenshots or enter them manually.”
+
+No crash.
+No blocked booking.
+
+CASE D
+Roadside vehicle photo with FOR SALE sign.
+
+Expected:
+extract only visible information.
+Manual fallback for the rest.
+
+CASE E
+Dealer window sticker.
+
+Expected:
+extract supported identity/details.
+Buyer confirms.
+
+CASE F
+AI returns malformed response.
+
+Expected:
+fail safely to manual entry.
+No order corruption.
+
+CASE G
+AI says one price but buyer corrects it.
+
+Expected:
+server recalculates classification/price before checkout.
+
+CASE H
+No AI API credential.
+
+Expected:
+manual booking still works.
+
+AI must be an enhancement, never a dependency.
+
+════════════════════════════════════
+PART 18 — SECURITY / PRIVACY
+════════════════════════════════════
+
+Do not log complete sensitive image contents unnecessarily.
+
+Do not expose:
+
+- API keys
+- private storage URLs
+- buyer private contact
+- seller private contact
+
+to unauthorized users.
+
+Buyer-uploaded materials must not be accessible by unrelated buyers.
+
+RideCheckers must not gain buyer private contact information through this feature.
+
+Use existing authorization patterns.
+
+If temporary uploaded files can safely be removed after extraction/order attachment according to existing retention practices, document the lifecycle.
+
+Do not invent a retention policy silently.
+
+════════════════════════════════════
+PART 19 — TESTING
+════════════════════════════════════
+
+Add focused tests without deleting existing coverage.
+
+Test:
+
+1. Existing fully manual booking still works.
+
+2. URL-only intake falls back safely when content cannot be read.
+
+3. Screenshot extraction populates supported fields.
+
+4. Missing extraction values remain null.
+
+5. Extractor never invents unsupported trim/VIN/mileage/price.
+
+6. Buyer correction replaces proposed value in booking state.
+
+7. Server classification remains authoritative.
+
+8. Price recalculates after mileage/price/vehicle correction.
+
+9. Service ZIP validation still works.
+
+10. Seller type and discovery source remain independent.
+
+11. Buyer Arranged address/time/notes persist.
+
+12. Concierge does not suddenly require seller phone.
+
+13. Payment-first gates remain intact.
+
+14. Existing seller coordination remains intact.
+
+15. Existing Facebook buyer bridge remains intact.
+
+16. Existing Compensation Panel/assignment workflow remains intact.
+
+17. Manual booking works when AI provider is unavailable.
+
+18. Buyer uploads cannot be retrieved by unrelated users.
+
+Run:
+
+npm run check
+npm run build
+
+Both must pass.
+
+════════════════════════════════════
+PART 20 — CONTROLLED IMPLEMENTATION RULES
+════════════════════════════════════
+
+Before changing schema:
+
+inspect current schema.
+
+Before adding a migration:
+
+confirm equivalent fields/tables do not already exist.
+
+Do not duplicate existing migrations.
+
+Do not rename broad existing business fields unnecessarily.
+
+Do not perform destructive migrations.
+
+Do not modify historical orders.
+
+Do not change compensation rates.
+
+Do not change package prices unless required to fix an existing verified bug.
+
+Do not change Stripe behavior beyond preserving current integration.
+
+Do not redesign Ops.
+
+Do not redesign inspection.
+
+Do not redesign reports.
+
+Do not add unrelated features.
+
+If an external AI credential/provider setup prevents live extraction testing:
+
+implement graceful fallback,
+complete all unrelated work,
+and report the external dependency.
+
+════════════════════════════════════
+FINAL DELIVERY REPORT
+════════════════════════════════════
+
+At completion return ONE consolidated report containing:
+
+1. Existing booking architecture preserved
+2. Buyer Arranged persistence fix
+3. Files changed
+4. Migrations added, if any
+5. Universal intake UI implemented
+6. Supported intake types
+7. Buyer upload security model
+8. AI provider/model actually used
+9. Structured extraction schema
+10. Provenance storage approach
+11. URL extraction behavior
+12. Screenshot/photo extraction behavior
+13. Manual fallback behavior
+14. Seller type/source behavior
+15. VIN handling
+16. Classification/pricing protection
+17. Review screen improvements
+18. Tests added/results
+19. TypeScript/check result
+20. Production build result
+21. External configuration still required
+22. Anything not completed
+23. Any regression or production risk discovered
+
+IMPORTANT:
+
+Do not declare this complete merely because the UI renders.
+
+Prove that:
+
+uploaded/listing information
+→ extracted booking data
+→ buyer confirmation
+→ existing server classification
+→ correct order creation
+
+works without breaking the existing manual path.
+
+Do not fabricate successful AI testing if the required API credential or external service is unavailable.

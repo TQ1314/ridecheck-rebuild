@@ -396,6 +396,22 @@ export default function OpsOrderDetailPage() {
   const paymentAuthorized = canProceedWithRideCheck(order);
   const vehicle    = [order.vehicle_year, order.vehicle_make, order.vehicle_model]
     .filter(Boolean).join(" ");
+  const buyerArrangedDetails = order as unknown as Record<string, unknown>;
+  const inspectionAddress = typeof buyerArrangedDetails.inspection_address === "string"
+    ? buyerArrangedDetails.inspection_address.trim()
+    : "";
+  const inspectionTimeWindow = typeof buyerArrangedDetails.inspection_time_window === "string"
+    ? buyerArrangedDetails.inspection_time_window.trim()
+    : "";
+  const notesToInspector = typeof buyerArrangedDetails.notes_to_inspector === "string"
+    ? buyerArrangedDetails.notes_to_inspector.trim()
+    : "";
+  const preferredLanguage = typeof buyerArrangedDetails.preferred_language === "string"
+    ? buyerArrangedDetails.preferred_language.trim()
+    : "";
+  const hasBuyerArrangedDetails = Boolean(
+    inspectionAddress || inspectionTimeWindow || notesToInspector || preferredLanguage,
+  );
 
   const systemReason = order.classification_reason || "—";
   const isOverridden = systemReason.startsWith("[OPS OVERRIDE");
@@ -584,6 +600,39 @@ export default function OpsOrderDetailPage() {
         {/* ── LEFT column ─────────────────────────────────── */}
         <div className="space-y-4">
           <OrderDetailPanel order={order} activities={activities} />
+          {hasBuyerArrangedDetails && (
+            <Card data-testid="card-buyer-arranged-details">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Buyer-Arranged Inspection Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                {inspectionAddress && (
+                  <div>
+                    <p className="font-medium text-muted-foreground">Inspection address</p>
+                    <p className="whitespace-pre-wrap">{inspectionAddress}</p>
+                  </div>
+                )}
+                {inspectionTimeWindow && (
+                  <div>
+                    <p className="font-medium text-muted-foreground">Inspection time window</p>
+                    <p>{inspectionTimeWindow}</p>
+                  </div>
+                )}
+                {notesToInspector && (
+                  <div>
+                    <p className="font-medium text-muted-foreground">Notes to inspector</p>
+                    <p className="whitespace-pre-wrap">{notesToInspector}</p>
+                  </div>
+                )}
+                {preferredLanguage && (
+                  <div>
+                    <p className="font-medium text-muted-foreground">Preferred language</p>
+                    <p>{preferredLanguage}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <SellerContactPanel order={order} onRefresh={loadData} />
           <CommunicationCenter order={order} onRefresh={loadData} />
         </div>

@@ -5,46 +5,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPrice, type PackageType, type BookingType } from "@/lib/utils/pricing";
 import { classifyVehicle } from "@/lib/vehicleClassification.server";
 import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
-import { z } from "zod";
+import { buildOptionalOrderFields, createOrderSchema } from "./contract";
 
 export const runtime = "nodejs";
-
-const createOrderSchema = z.object({
-  vehicle_year: z.number().int().min(1900).max(2030),
-  vehicle_make: z.string().min(1).max(100),
-  vehicle_model: z.string().min(1).max(100),
-  vehicle_description: z.string().max(2000).nullable().optional(),
-  listing_url: z.string().url().nullable().optional(),
-  vehicle_location: z.string().min(1).max(200),
-
-  seller_name: z.string().max(100).nullable().optional(),
-  seller_phone: z.string().max(20).nullable().optional(),
-
-  buyer_phone: z.string().min(7).max(20),
-  buyer_email_input: z.string().email().nullable().optional(),
-
-  booking_type: z.enum(["self_arrange", "concierge"]),
-  package: z.enum(["standard", "plus", "premium", "exotic", "comprehensive"]).optional(),
-  preferred_date: z.string().nullable().optional(),
-  vehicle_mileage: z.number().int().min(0).nullable().optional(),
-  vehicle_price: z.number().min(0).nullable().optional(),
-
-  inspection_address: z.string().optional(),
-  inspection_time_window: z.string().optional(),
-  notes_to_inspector: z.string().nullable().optional(),
-  vehicle_trim: z.string().nullable().optional(),
-
-  booking_method: z.string().optional(),
-  preferred_language: z.string().optional(),
-  listing_platform: z.string().nullable().optional(),
-  package_tier: z.string().optional(),
-
-  service_zip: z.string().regex(/^\d{5}$/, "ZIP must be 5 digits"),
-  listing_source: z.enum(["online_marketplace", "dealership", "roadside"]).optional(),
-  platform_source: z.string().max(60).nullable().optional(),
-  vehicle_seen_location: z.string().max(300).nullable().optional(),
-  seller_type: z.enum(["private_party", "dealership", "auction", "other"]).optional(),
-});
 
 function safeString(v: unknown, fallback = "") {
   return typeof v === "string" ? v : fallback;
@@ -196,6 +159,35 @@ export async function POST(req: NextRequest) {
       tracking_token,
       payment_link_token,
     };
+
+    // These columns are present in the canonical upgrade migration, but older
+    // installations may still be running the base schema. Probe individually
+    // so manual booking remains compatible while upgraded installations retain
+    // the buyer-arranged handoff and intake metadata.
+    const optionalOrderColumns = [
+      "booking_method", "preferred_language", "inspection_address",
+      "inspection_time_window", "notes_to_inspector", "vehicle_trim",
+      "listing_platform", "listing_claimed_vin", "intake_provenance",
+    ] as const;
+    const optionalColumnResults = await Promise.all(optionalOrderColumns.map(async (column) => {
+      const { error } = await supabaseAdmin.from("orders").select(column).limit(0);
+      return [column, !error] as const;
+    }));
+    const availableOptionalColumns = new Set(
+      optionalColumnResults.filter(([, available]) => available).map(([column]) => column),
+    );
+    const optionalFields = buildOptionalOrderFields(data, availableOptionalColumns);
+    if (optionalFields.error) {
+      console.error("[Order Create] optional intake storage unavailable", optionalFields.error);
+      return NextResponse.json({
+        error: optionalFields.error.code,
+        message: optionalFields.error.message,
+        ...(optionalFields.error.missing_fields
+          ? { missing_fields: optionalFields.error.missing_fields }
+          : {}),
+      }, { status: 503 });
+    }
+    Object.assign(insertPayload, optionalFields.fields);
 
     try {
       const { error: colErr } = await supabaseAdmin
