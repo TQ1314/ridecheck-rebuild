@@ -1,0 +1,198 @@
+RIDECHECK BACK-OFFICE E2E — READ-ONLY WORKFLOW + RIDGELINE INSPECTION AUDIT
+
+We have completed development testing of the buyer journey through order creation and Stripe payment. Do not implement anything in this task.
+
+The next production-readiness phase is the back-office workflow:
+
+Paid order → seller coordination → RideChecker communication → compensation offer → assignment → RideChecker acceptance → inspection → OBD evidence → submission → Ops/QA review → report generation → buyer delivery.
+
+Perform a read-only audit of the existing implementation and existing test data. Do not change code, schema, migrations, statuses, records, storage, communications, or configuration.
+
+1. TRACE THE CURRENT PAID-ORDER WORKFLOW
+
+Starting when Stripe confirms an inspection order as paid, document exactly what currently happens.
+
+Identify:
+
+authoritative paid status
+Ops visibility
+seller-coordination state
+Communication Center events
+compensation offer creation
+RideChecker eligibility
+assignment
+RideChecker notification
+acceptance/rejection
+inspection start
+inspection submission
+QA/review
+report generation
+report approval
+buyer delivery
+payout recording.
+
+For every transition identify whether it is:
+
+automatic
+Ops initiated
+RideChecker initiated
+QA initiated
+manual/off-platform.
+
+Do not infer behavior from filenames alone. Trace routes, components, database writes and guards.
+
+2. USE EXISTING RIDGELINE INSPECTIONS AS EVIDENCE
+
+Locate the two existing inspections involving the user's Honda Ridgeline if they are present in the connected development data.
+
+Do not alter them.
+
+For each inspection trace:
+
+inspection inputs → stored inspection evidence → submitted data → QA data → generated report.
+
+Report what information survived each stage and what was lost/transformed.
+
+Do not expose unnecessary customer PII in the audit output.
+
+3. INSPECTION TASK ENFORCEMENT
+
+The real RideChecker test showed that required inspection tasks could not simply be skipped. Preserve this principle.
+
+Determine exactly:
+
+which tasks are mandatory;
+what currently prevents submission;
+whether a legitimate inability to perform a task can be recorded;
+whether Unable to perform, reason, and supporting evidence exist;
+whether Not applicable exists and where it is appropriate;
+whether any route/API can bypass the UI requirement.
+
+Do NOT recommend a generic Skip button.
+
+4. OBD WORKFLOW — HIGH PRIORITY
+
+During the Ridgeline test, the RideChecker did not have an OBD scanner available. The vehicle was taken to AutoZone for a free scan, and photos/PDF evidence of that scan were uploaded.
+
+Determine exactly what RideCheck currently supports for:
+
+A. Direct RideChecker scan
+
+scanner brand
+scanner model
+MIL/check-engine status
+active/stored DTCs
+pending DTCs
+permanent DTCs
+readiness monitors
+scanner-reported mileage if available
+uploaded scan photos/documents
+manual code entry
+AI extraction.
+
+B. Third-party scan evidence
+Examples: AutoZone or another service provider.
+
+Determine whether the system can accurately preserve:
+
+that this was a third-party scan;
+provider/source if evidenced;
+uploaded original PDF/photos;
+extracted codes;
+extraction confidence;
+OCR quality;
+low-confidence codes;
+manually entered vs AI-extracted codes.
+
+A third-party document must never be represented as though the RideChecker personally performed the scan.
+
+5. VERIFY THE EXISTING OBD EXTRACTION WORK
+
+We previously implemented/expected:
+
+numeric confidence_score
+ocr_quality
+low_confidence_codes
+scanner brand
+scanner model
+source: "manual" for manually entered DTCs
+source: "ai_extracted" for AI-extracted DTCs
+codes below the confidence threshold should not silently auto-populate.
+
+Verify what is actually present in the current code and what survives into the final report.
+
+Do not assume prior implementation reports are accurate.
+
+6. INSPECTION EVIDENCE PROVENANCE
+
+Determine whether the current report can distinguish among:
+
+buyer/listing claim
+RideChecker visual observation
+RideChecker measurement/test
+RideChecker photo
+direct OBD scan
+third-party scan document
+AI-extracted information
+manually entered information
+RideCheck interpretation/conclusion.
+
+Identify where provenance currently disappears or becomes ambiguous.
+
+Do not build a new provenance architecture in this audit.
+
+7. RIDEHECKER COMMUNICATION + ASSIGNMENT
+
+Audit the current RideChecker communication experience:
+
+how Ops identifies eligible RideCheckers;
+compensation shown before assignment;
+what the RideChecker receives;
+how an individual RideChecker can be contacted;
+whether Ops can select one or multiple RideCheckers for a targeted message;
+acceptance timer;
+reject reasons;
+availability/radius enforcement;
+agreement gate;
+background-check behavior;
+what buyer/seller information is exposed before and after acceptance.
+
+Preserve the existing independence/privacy model unless the audit demonstrates a defect.
+
+8. QA + REPORT
+
+Trace exactly what QA sees after inspection submission.
+
+Determine:
+
+whether original evidence is accessible;
+whether QA can compare AI extraction against uploaded OBD evidence;
+whether missing required evidence is visible;
+whether QA can return/correct an inspection;
+whether corrections preserve an audit trail;
+how the final report is generated;
+whether report statements can be traced back to inspection evidence;
+whether AI-generated narrative introduces unsupported/generic claims;
+whether report generation remains manually initiated;
+what prevents delivery before QA approval.
+9. RETURN A SINGLE EVIDENCE MATRIX
+
+For each stage return:
+
+Stage | Current implementation | Evidence found | Working | Gap/Risk | Production blocker? | Smallest safe fix
+
+Categorize findings:
+
+A — Working and verified
+
+B — Implemented but needs live verification
+
+C — Defect/gap before production
+
+D — Improvement that can wait
+
+End with the smallest ordered set of back-office tasks required to get one real paid order safely from payment through report delivery.
+
+Do not implement fixes.
+
+READ-ONLY ONLY.
