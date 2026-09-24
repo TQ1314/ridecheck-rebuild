@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
-      .select("id, payment_link_token, payment_status, vehicle_year, vehicle_make, vehicle_model, booking_type, package, base_price, final_price, payment_link_click_ip")
+      .select("id, order_number, payment_link_token, payment_status, vehicle_year, vehicle_make, vehicle_model, booking_type, package, base_price, final_price, payment_link_click_ip")
       .eq("id", orderId)
       .maybeSingle();
 
@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
       valid: true,
       order: {
         id: order.id,
+        order_number: order.order_number,
         vehicle_year: order.vehicle_year,
         vehicle_make: order.vehicle_make,
         vehicle_model: order.vehicle_model,

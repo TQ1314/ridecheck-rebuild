@@ -44,14 +44,14 @@ const CONCIERGE_STEPS = [
     desc: "Fill out the booking form with the vehicle and seller details.",
   },
   {
-    icon: Phone,
-    title: "2. We Contact the Seller",
-    desc: "Our team reaches out to the seller to coordinate and confirm an appointment.",
+    icon: CreditCard,
+    title: "2. Complete Payment",
+    desc: "We send you a secure payment link after you submit your request.",
   },
   {
-    icon: CreditCard,
-    title: "3. Pay When Confirmed",
-    desc: "Once the seller confirms, we send you a payment link. No charge until confirmed.",
+    icon: Phone,
+    title: "3. We Contact the Seller",
+    desc: "After payment, our team coordinates with the seller and arranges access.",
   },
   {
     icon: Calendar,

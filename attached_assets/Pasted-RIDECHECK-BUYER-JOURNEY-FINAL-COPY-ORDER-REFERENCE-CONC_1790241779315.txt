@@ -1,0 +1,190 @@
+RIDECHECK BUYER JOURNEY — FINAL COPY + ORDER REFERENCE + CONCIERGE/SELF-ARRANGE ALIGNMENT
+
+We completed a successful development buyer journey through Universal Intake → AI extraction → booking → order creation → email → payment → Stripe Sandbox → Payment Confirmed.
+
+Make the following focused improvements based on that live test. Do not redesign or rebuild the working workflow.
+
+1. HUMAN-FRIENDLY ORDER NUMBER
+
+Customer-facing pages and emails currently display the internal UUID, for example:
+
+02e671b3-d7b1-4e07-a57b-ee624fab0da6
+
+First inspect whether RideCheck already has an order_number, booking reference, public reference, or equivalent.
+
+Reuse an existing identifier if one exists. Do not create a duplicate numbering system.
+
+The UUID must remain the internal database identifier and continue being used wherever required internally.
+
+Customer-facing surfaces should instead display a short reference such as:
+
+Order #RC-260924-4827
+
+Check:
+
+Order Received
+Payment Confirmed
+confirmation/payment emails
+Track Order
+buyer-facing report/delivery surfaces where applicable.
+
+If no suitable public order identifier currently exists, report that before adding schema.
+
+2. ENFORCE CONSISTENT PAYMENT-FIRST COPY
+
+RideCheck's operational sequence is:
+
+Order request → Payment → Seller coordination → RideChecker assignment → Inspection
+
+Buyer-facing copy must never imply RideCheck contacts the seller before payment.
+
+Replace contradictory booking Review copy with:
+
+After you submit your request, we'll send you a secure payment link. Payment is required before RideCheck contacts the seller or schedules the inspection.
+
+Audit the booking flow, confirmation page, confirmation email, payment page, payment-success page, and Track Order for contradictory language.
+
+Do not change the actual payment architecture.
+
+3. DIFFERENTIATE CONCIERGE FROM SELF-ARRANGE
+
+Use the existing canonical booking-type values. Do not create another booking-type system.
+
+Concierge
+
+RideCheck handles seller coordination after payment.
+
+The primary post-payment message should be:
+
+You're all set. We'll take it from here.
+
+RideCheck will coordinate with the seller, arrange access to the vehicle, assign a RideChecker, and keep you updated.
+
+Track Your Order should be the primary CTA.
+
+However, when the vehicle came from a marketplace such as Facebook Marketplace where RideCheck may not be able to initiate contact directly, allow the buyer to make a simple introduction.
+
+Label this clearly as an optional introduction, not seller coordination the buyer must perform.
+
+Suggested heading:
+
+Introduce RideCheck to the seller
+
+Supporting copy:
+
+If you're already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination.
+
+Dynamically generate the message from confirmed vehicle information:
+
+Hi,
+
+I'm interested in the [YEAR] [MAKE] [MODEL] and would like to move forward. Before making a purchase decision, I'd like to have a pre-purchase inspection completed first.
+
+I've arranged for RideCheck to perform an independent inspection. Their team will handle the scheduling from here, so you may hear from them shortly to coordinate access to the vehicle.
+
+Please let me know if that works for you. I appreciate your time and look forward to hearing from you.
+
+Thanks!
+
+Do not invent vehicle information if unavailable.
+
+Keep Copy Message functionality.
+
+Self-Arrange / Buyer-Arranged
+
+The buyer coordinates access/time with the seller. Preserve the appropriate seller-coordination tools and clearly explain that responsibility.
+
+Do not show Concierge “we handle everything” messaging to Self-Arrange customers.
+
+4. IMPROVE PURCHASE-DECISION ACKNOWLEDGMENT
+
+Replace:
+
+I understand I should not rely solely on RideCheck when making my vehicle purchase decision. The final decision is mine alone.
+
+with:
+
+I understand the RideCheck report is one source of information to help me make an informed purchase decision, and the final purchase decision remains mine.
+
+Preserve the checkbox requirement and evidence/audit trail of acceptance.
+
+Do not remove or weaken:
+
+visual/non-invasive inspection limitation
+hidden/intermittent issue limitation
+no warranty/guarantee/certification statement
+Terms of Service
+Customer Agreement
+Inspection Disclaimer
+existing liability protections.
+5. FIX ORDER SUMMARY MOBILE FORMATTING
+
+Correct the mobile presentation where:
+
+Vehicle2017 Audi Q7...
+
+runs together.
+
+Maintain proper spacing/alignment between labels and values on small screens.
+
+6. UPDATE CONFIRMATION EMAIL CONSISTENTLY
+
+The confirmation email currently exposes the UUID and tells Concierge customers:
+
+Our team will contact the seller to schedule the inspection.
+
+Make payment dependency explicit:
+
+Once payment is completed, RideCheck will begin coordinating with the seller to schedule your inspection.
+
+Use the human-readable order reference when available.
+
+For Concierge marketplace orders, the optional seller-introduction message may remain in the email, but make clear:
+
+Optional: If you're already messaging the seller, you can send this introduction. RideCheck will handle the coordination after that.
+
+7. DO NOT CHANGE WORKING SYSTEMS
+
+Do not modify:
+
+Universal Intake extraction
+Anthropic/model configuration
+intake-session reset
+5-image limit
+Supabase storage
+package classification
+$139/$169/$299+ pricing logic
+Lake/McHenry service-area rules
+Stripe payment processing
+payment-first enforcement
+Communication Center architecture
+RideChecker assignment
+seller-contact infrastructure
+database schema unless the order-reference audit proves it necessary.
+8. VERIFY
+
+Add/update focused tests covering:
+
+Concierge payment-first messaging
+Self-Arrange messaging
+Concierge optional marketplace introduction
+dynamic year/make/model insertion
+no invented missing vehicle values
+customer-facing order reference
+internal UUID remains unchanged
+payment acknowledgment wording
+confirmation email consistency
+mobile Order Summary formatting where practical.
+
+Run focused tests, npm run check, and npm run build.
+
+Do not deploy production.
+
+Return:
+
+whether RideCheck already had a human-readable order number,
+files changed,
+exact Concierge vs Self-Arrange behavior,
+exact customer-facing copy changed,
+test/check/build results,
+anything that could not be safely changed without altering architecture.

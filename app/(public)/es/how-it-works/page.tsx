@@ -26,8 +26,8 @@ const SELF_STEPS = [
 
 const CONCIERGE_STEPS = [
   { icon: ClipboardList, titleKey: "howItWorks.con1Title", descKey: "howItWorks.con1Desc" },
-  { icon: Phone, titleKey: "howItWorks.con2Title", descKey: "howItWorks.con2Desc" },
-  { icon: CreditCard, titleKey: "howItWorks.con3Title", descKey: "howItWorks.con3Desc" },
+  { icon: CreditCard, titleKey: "howItWorks.con2Title", descKey: "howItWorks.con2Desc" },
+  { icon: Phone, titleKey: "howItWorks.con3Title", descKey: "howItWorks.con3Desc" },
   { icon: Calendar, titleKey: "howItWorks.con4Title", descKey: "howItWorks.con4Desc" },
   { icon: Wrench, titleKey: "howItWorks.con5Title", descKey: "howItWorks.con5Desc" },
   { icon: FileText, titleKey: "howItWorks.con6Title", descKey: "howItWorks.con6Desc" },

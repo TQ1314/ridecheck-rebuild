@@ -38,7 +38,7 @@ export async function GET(
     const { data: order } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_id, customer_email, buyer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, report_storage_path, ops_report_url, report_status, report_delivered_at, report_logic_version"
+        "id, order_id, order_number, customer_email, buyer_email, customer_name, vehicle_year, vehicle_make, vehicle_model, report_storage_path, ops_report_url, report_status, report_delivered_at, report_logic_version"
       )
       .eq("id", params.orderId)
       .single();
@@ -65,7 +65,7 @@ export async function GET(
     const synthetic = {
       id:                  null as null,
       order_id:            order.id,
-      order_number:        (order as any).order_id,
+      order_number:        (order as any).order_number,
       buyer_email:         (order as any).buyer_email || order.customer_email,
       buyer_name:          order.customer_name,
       vehicle_year:        String(order.vehicle_year),

@@ -115,7 +115,7 @@ async function markOrderPaid(
     .from("orders")
     .select(
       "id, payment_status, customer_id, buyer_email, order_id, order_number, " +
-      "vehicle_year, vehicle_make, vehicle_model, package, final_price, booking_type"
+      "vehicle_year, vehicle_make, vehicle_model, package, final_price, booking_type, tracking_token"
     )
     .eq("id", orderId)
     .single() as unknown as Promise<{
@@ -132,6 +132,7 @@ async function markOrderPaid(
         package: string | null;
         final_price: number | null;
         booking_type: string | null;
+        tracking_token: string | null;
       } | null;
       error: any;
     }>);
@@ -268,12 +269,17 @@ async function markOrderPaid(
               <p style="margin:0 0 16px">Your RideCheck assessment has been confirmed and is now in our queue.</p>
               <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:24px">
                 <p style="margin:0 0 8px;font-size:14px;color:#6b7280;text-transform:uppercase;font-weight:600;letter-spacing:.05em">Assessment Details</p>
+                ${existingOrder.order_number ? `<p style="margin:0 0 8px;font-weight:600">Order #${existingOrder.order_number}</p>` : ""}
                 <p style="margin:0 0 4px;font-weight:600">${vehicle}</p>
                 <p style="margin:0 0 4px;color:#374151">${pkgLabel} Package</p>
                 ${existingOrder.final_price ? `<p style="margin:0;color:#374151">Amount Paid: <strong>$${Number(existingOrder.final_price).toFixed(2)}</strong></p>` : ""}
               </div>
-              <p style="margin:0 0 16px;color:#374151">Our operations team will be in touch shortly to confirm the inspection schedule. You can track your order status anytime:</p>
-              <a href="${appUrl}/dashboard" style="display:inline-block;background:#059669;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:24px">View My Dashboard</a>
+              <p style="margin:0 0 16px;color:#374151">${existingOrder.booking_type === "concierge"
+                ? "You're all set. We'll take it from here. RideCheck will coordinate with the seller, arrange access to the vehicle, assign a RideChecker, and keep you updated."
+                : "Your payment is confirmed. You coordinate access and timing with the seller; share the confirmed details with RideCheck."}</p>
+              ${existingOrder.tracking_token
+                ? `<a href="${appUrl}/track/${orderId}?t=${encodeURIComponent(existingOrder.tracking_token)}" style="display:inline-block;background:#059669;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:24px">Track Your Order</a>`
+                : `<a href="${appUrl}/dashboard" style="display:inline-block;background:#059669;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:24px">View My Dashboard</a>`}
               <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
               <p style="margin:0;font-size:12px;color:#9ca3af">Questions? Reply to this email or contact us at <a href="mailto:support@ridecheckauto.com" style="color:#059669">support@ridecheckauto.com</a></p>
             </div>

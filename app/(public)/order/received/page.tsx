@@ -8,9 +8,8 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ArrowRight, Home, MessageSquare, RefreshCw, Copy, Check } from "lucide-react";
-import { getSellerMessage } from "@/lib/email/templates/order-confirmation";
-
-const SELLER_MESSAGE = getSellerMessage();
+import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
+import { useJourneyOrder } from "@/lib/use-journey-order";
 
 export default function OrderReceivedPage() {
   return (
@@ -25,21 +24,26 @@ function OrderReceivedInner() {
   const orderId = searchParams.get("orderId");
   const trackUrl = searchParams.get("track");
   const status = searchParams.get("status");
+  const { order, safeTrackUrl } = useJourneyOrder(orderId, trackUrl, status === "paid");
 
   const [resending, setResending] = useState(false);
   const [resendResult, setResendResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const isPaid = status === "paid";
+  const isPaid = status === "paid" && order?.payment_status === "paid";
+  const paymentProcessing = status === "paid" && !isPaid;
+  const selfArrange = isSelfArranged(order?.booking_type);
+  const showIntroduction = isPaid && !!order && isMarketplaceConcierge(order);
+  const sellerMessage = showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(SELLER_MESSAGE);
+      await navigator.clipboard.writeText(sellerMessage);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       const textarea = document.createElement("textarea");
-      textarea.value = SELLER_MESSAGE;
+      textarea.value = sellerMessage;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand("copy");
@@ -80,18 +84,24 @@ function OrderReceivedInner() {
               <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <h1 className="text-2xl font-bold mb-2" data-testid="text-page-title">
-              {isPaid ? "Payment Confirmed!" : "Order Received!"}
+               {isPaid ? "Payment Confirmed!" : paymentProcessing ? "Payment Processing" : "Order Received!"}
             </h1>
-            {orderId && (
-              <p className="font-mono text-sm text-muted-foreground mb-4" data-testid="text-order-id">
-                Order ID: {orderId}
+            {publicOrderReference(order?.order_number) && (
+              <p className="text-sm text-muted-foreground mb-4 font-semibold" data-testid="text-order-id">
+                {publicOrderReference(order?.order_number)}
               </p>
             )}
 
             {isPaid ? (
               <p className="text-muted-foreground mb-6" data-testid="text-paid-message">
-                Your payment has been received. Our team is on it — you&apos;ll hear from us soon.
+                {!order
+                  ? "Your payment has been confirmed. Track your order for the next steps."
+                  : selfArrange
+                  ? "Your payment is confirmed. You coordinate access and timing with the seller; share the details with RideCheck."
+                  : <>You&apos;re all set. We&apos;ll take it from here. RideCheck will coordinate with the seller, arrange access to the vehicle, assign a RideChecker, and keep you updated.</>}
               </p>
+            ) : paymentProcessing ? (
+              <p className="text-muted-foreground mb-6">We&apos;re confirming your payment. RideCheck will not contact the seller or schedule the inspection until payment is confirmed. Track your order for updates.</p>
             ) : (
               <div className="space-y-4 mb-6">
                 <div className="flex items-start gap-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4 text-left">
@@ -127,15 +137,17 @@ function OrderReceivedInner() {
               </div>
             )}
 
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-5 text-left mb-6 border border-emerald-200 dark:border-emerald-800">
+            {(selfArrange || showIntroduction) && <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-5 text-left mb-6 border border-emerald-200 dark:border-emerald-800">
               <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-2">
-                Send This to the Seller
+                {selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
               </p>
               <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70 mb-3">
-                Copy the message below and send it to the seller. It sets expectations and helps prevent refusals.
+                {selfArrange
+                  ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck."
+                  : "If you're already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination. This is optional."}
               </p>
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 text-sm text-gray-700 dark:text-gray-300 italic leading-relaxed" data-testid="text-seller-message">
-                {SELLER_MESSAGE}
+                {sellerMessage}
               </div>
               <button
                 onClick={handleCopy}
@@ -154,13 +166,13 @@ function OrderReceivedInner() {
                   </>
                 )}
               </button>
-            </div>
+            </div>}
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {trackUrl && (
-                <Link href={trackUrl}>
-                  <Button variant={isPaid ? "default" : "outline"} data-testid="button-track-order">
-                    Track Order
+              {safeTrackUrl && (
+                <Link href={safeTrackUrl}>
+                  <Button variant="default" data-testid="button-track-order">
+                    Track Your Order
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>

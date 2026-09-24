@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
         const { sendEmail } = await import("@/lib/notifications/email");
         const pkgLabel = (serverPackage || "standard").charAt(0).toUpperCase() + (serverPackage || "standard").slice(1);
         const confirmHtml = orderConfirmationHtml({
-          orderId: order.id,
+          orderNumber: order.order_number,
           customerName: buyer_email.split("@")[0],
           vehicleYear: data.vehicle_year,
           vehicleMake: data.vehicle_make,
@@ -328,6 +328,7 @@ export async function POST(req: NextRequest) {
           packageName: pkgLabel,
           finalPrice: String(finalPrice),
           bookingType: data.booking_type,
+          listingSource: data.listing_source ?? "online_marketplace",
           trackUrl: track_url,
           payUrl,
         });

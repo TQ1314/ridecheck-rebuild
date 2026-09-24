@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, ArrowRight, Copy, Check, MessageSquare, Mail, Car } from "lucide-react";
-
-const SELLER_MESSAGE = `Hi! Before I drive out to see the car, I usually have a mobile RideCheck inspector take a quick look. It takes about 30–45 minutes and helps me move fast if everything checks out. Would that be okay with you?`;
+import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
+import { useJourneyOrder } from "@/lib/use-journey-order";
 
 export default function OrderConfirmationPage() {
   return (
@@ -26,17 +26,19 @@ function OrderConfirmationInner() {
   const orderId = searchParams.get("order_id");
   const method = searchParams.get("method") || "concierge";
   const trackUrl = searchParams.get("track") || null;
-
-  const isSelfArrange = method === "self_arrange" || method === "buyer_arranged";
+  const { order, safeTrackUrl } = useJourneyOrder(orderId, trackUrl);
+  const isSelfArrange = isSelfArranged(order?.booking_type || method);
+  const showIntroduction = !!order && isMarketplaceConcierge(order);
+  const sellerMessage = showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
 
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(SELLER_MESSAGE);
+      await navigator.clipboard.writeText(sellerMessage);
     } catch {
       const el = document.createElement("textarea");
-      el.value = SELLER_MESSAGE;
+      el.value = sellerMessage;
       document.body.appendChild(el);
       el.select();
       document.execCommand("copy");
@@ -60,9 +62,9 @@ function OrderConfirmationInner() {
           <p className="text-muted-foreground max-w-md mx-auto">
             Your RideCheck inspection request has been submitted successfully.
           </p>
-          {orderId && (
-            <p className="text-xs text-muted-foreground mt-3 font-mono" data-testid="text-order-id">
-              Order ID: {orderId}
+          {publicOrderReference(order?.order_number) && (
+            <p className="text-sm text-muted-foreground mt-3 font-semibold" data-testid="text-order-id">
+              {publicOrderReference(order?.order_number)}
             </p>
           )}
         </div>
@@ -87,33 +89,35 @@ function OrderConfirmationInner() {
                   <span className="text-primary mt-0.5">•</span>
                   <span><strong className="text-foreground">Text</strong> — a secure payment link to your phone</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary mt-0.5">•</span>
-                  <span><strong className="text-foreground">Seller script</strong> — the message below is also in your email</span>
-                </li>
+                {(isSelfArrange || showIntroduction) && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong className="text-foreground">Seller message</strong> — an optional introduction for Concierge, or coordination guidance for Self-Arrange</span>
+                  </li>
+                )}
               </ul>
             </CardContent>
           </Card>
 
-          <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" data-testid="card-seller-script">
+          {(isSelfArrange || showIntroduction) && <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" data-testid="card-seller-script">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-green-700 dark:text-green-400" />
-                    Message to Send the Seller
+                     {isSelfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
                     {isSelfArrange
-                      ? "Send this to the seller now to confirm the inspector is coming."
-                      : "Send this heads-up to the seller — it improves scheduling success and reduces refusals."}
+                       ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck after payment."
+                       : "If you're already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination."}
                   </p>
                 </div>
                 <Badge
                   variant="outline"
                   className="text-green-700 border-green-300 dark:text-green-400 dark:border-green-700 shrink-0 text-xs"
                 >
-                  {isSelfArrange ? "Action needed" : "Recommended"}
+                   {isSelfArrange ? "Your role" : "Optional"}
                 </Badge>
               </div>
             </CardHeader>
@@ -122,7 +126,7 @@ function OrderConfirmationInner() {
                 className="bg-white dark:bg-background border border-border rounded-md p-4 text-sm leading-relaxed italic text-foreground mb-3"
                 data-testid="text-seller-message"
               >
-                {SELLER_MESSAGE}
+                 {sellerMessage}
               </div>
               <Button
                 onClick={handleCopy}
@@ -147,7 +151,7 @@ function OrderConfirmationInner() {
                 Paste into your text thread, Facebook Messenger, email — however you&apos;re talking with the seller.
               </p>
             </CardContent>
-          </Card>
+          </Card>}
 
           <Card data-testid="card-next-steps">
             <CardHeader className="pb-3">
@@ -162,7 +166,7 @@ function OrderConfirmationInner() {
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
                   <div>
                     <p className="font-medium">Complete payment</p>
-                    <p className="text-muted-foreground text-xs mt-0.5">Tap the secure link we texted and emailed you to pay for the inspection.</p>
+                     <p className="text-muted-foreground text-xs mt-0.5">Payment is required before RideCheck contacts the seller or schedules the inspection. Use the secure link we sent you.</p>
                   </div>
                 </li>
                 {isSelfArrange ? (
@@ -170,7 +174,7 @@ function OrderConfirmationInner() {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
                     <div>
                       <p className="font-medium">Confirm with the seller</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">Use the message above to let the seller know an inspector will be coming.</p>
+                       <p className="text-muted-foreground text-xs mt-0.5">You coordinate access and time with the seller and share the confirmed details with RideCheck.</p>
                     </div>
                   </li>
                 ) : (
@@ -178,7 +182,7 @@ function OrderConfirmationInner() {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
                     <div>
                       <p className="font-medium">We contact the seller</p>
-                      <p className="text-muted-foreground text-xs mt-0.5">Our team reaches out to schedule the inspection at a time that works for everyone.</p>
+                       <p className="text-muted-foreground text-xs mt-0.5">After payment, RideCheck coordinates access and scheduling with the seller.</p>
                     </div>
                   </li>
                 )}
@@ -201,9 +205,9 @@ function OrderConfirmationInner() {
           </Card>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            {trackUrl && (
-              <Link href={trackUrl} className="flex-1" data-testid="link-track-order">
-                <Button variant="outline" className="w-full gap-2">
+            {safeTrackUrl && (
+              <Link href={safeTrackUrl} className="flex-1" data-testid="link-track-order">
+                <Button variant="default" className="w-full gap-2">
                   Track Your Order
                   <ArrowRight className="h-4 w-4" />
                 </Button>

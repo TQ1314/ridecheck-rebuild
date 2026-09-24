@@ -247,8 +247,7 @@ export async function POST(
         const { brandedEmailLayout } = await import("@/lib/email/templates/brandedEmailLayout");
         const vehicleLabel    = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
         const customerFirst   = (order.customer_name || "there").split(" ")[0];
-        const displayOrderId  = (order as any).order_id || order.id;
-        const reportId        = genReport?.id ?? null;
+        const displayOrderId  = (order as any).order_number;
 
         const bodyHtml = `
 <p style="margin:0 0 14px; color:#1e293b;">Hi ${customerFirst},</p>
@@ -258,22 +257,18 @@ export async function POST(
 </p>
 <table cellpadding="0" cellspacing="0" width="100%"
   style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin:0 0 24px;">
-  <tr>
+  ${displayOrderId ? `<tr>
     <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
                font-weight:600; color:#475569; width:40%;">Order</td>
     <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
-               color:#1e293b;">${displayOrderId}</td>
-  </tr>
+               color:#1e293b;">Order #${displayOrderId}</td>
+  </tr>` : ""}
   <tr>
     <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
                font-weight:600; color:#475569;">Vehicle</td>
     <td style="padding:10px 16px; border-bottom:1px solid #e2e8f0; font-size:13px;
                color:#1e293b;">${vehicleLabel}</td>
   </tr>
-  ${reportId ? `<tr>
-    <td style="padding:10px 16px; font-size:13px; font-weight:600; color:#475569;">Report ID</td>
-    <td style="padding:10px 16px; font-size:13px; color:#1e293b; font-family:monospace;">${reportId}</td>
-  </tr>` : ""}
 </table>
 ${!reportUrl
   ? `<p style="color:#475569; line-height:1.6;">Your report is ready. Please log in to your account to access it.</p>`

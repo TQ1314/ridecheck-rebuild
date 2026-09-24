@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction } from "@/lib/order-journey";
 
 type PublicOrder = {
   id: string;
@@ -16,6 +17,8 @@ type PublicOrder = {
   preferred_date: string | null;
   package: string | null;
   booking_type: string | null;
+  listing_source: string | null;
+  payment_status: string | null;
   vehicle_year: number | null;
   vehicle_make: string | null;
   vehicle_model: string | null;
@@ -55,6 +58,7 @@ function friendlyBookingType(raw?: string | null): string {
   if (!raw) return "Concierge";
   const map: Record<string, string> = {
     concierge: "Concierge",
+    self_arrange: "Self-Arranged",
     self_arranged: "Self-Arranged",
     buyer_arranged: "Buyer-Arranged",
   };
@@ -79,6 +83,7 @@ function TrackOrderInner() {
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!orderId || !token) {
@@ -156,7 +161,7 @@ function TrackOrderInner() {
             <div data-testid="status-error">
               <p className="font-semibold text-red-700">Order not found</p>
               <p className="mt-2 text-sm text-gray-700">
-                We couldn&apos;t find an order with that ID. Please double-check your tracking link.
+                 We couldn&apos;t find this order. Please double-check your tracking link.
               </p>
               <div className="mt-4">
                 <Link href="/" className="text-sm text-emerald-700 hover:underline">
@@ -178,7 +183,7 @@ function TrackOrderInner() {
                 <div>
                   <div className="text-sm text-gray-500">Order</div>
                   <div className="text-lg font-bold" data-testid="text-order-id">
-                    {order.order_number || order.id}
+                     {publicOrderReference(order.order_number) || "Reference pending"}
                   </div>
                 </div>
 
@@ -227,12 +232,29 @@ function TrackOrderInner() {
 
               <div className="rounded-xl border p-4">
                 <div className="text-sm font-semibold">What happens next</div>
-                <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
-                  <li>Our team will contact the seller to confirm access &amp; scheduling.</li>
+                 <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1">
+                   {order.payment_status !== "paid" ? (
+                     <li>Complete payment using your secure link. Payment is required before RideCheck contacts the seller or schedules the inspection.</li>
+                   ) : isSelfArranged(order.booking_type) ? (
+                     <li>You coordinate access and timing with the seller. Share the confirmed details with RideCheck.</li>
+                   ) : (
+                     <li>You&apos;re all set. We&apos;ll take it from here. RideCheck will coordinate with the seller, arrange access, and assign a RideChecker.</li>
+                   )}
                   <li>You&apos;ll see status updates here as the order moves forward.</li>
                   <li>If we need anything from you, we&apos;ll email you.</li>
                 </ul>
               </div>
+               {order.payment_status === "paid" && isMarketplaceConcierge(order) && (
+                 <div className="rounded-xl border p-4" data-testid="card-optional-introduction">
+                   <h2 className="font-semibold">Introduce RideCheck to the seller (optional)</h2>
+                   <p className="mt-1 text-sm text-gray-700">If you&apos;re already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination.</p>
+                   <p className="mt-3 whitespace-pre-line rounded-md bg-gray-50 p-3 text-sm">{sellerIntroduction(order)}</p>
+                   <button type="button" className="mt-3 text-sm font-semibold text-emerald-700 hover:underline" onClick={async () => {
+                     await navigator.clipboard.writeText(sellerIntroduction(order));
+                     setCopied(true);
+                   }}>{copied ? "Copied!" : "Copy Message"}</button>
+                 </div>
+               )}
 
               <div className="text-xs text-gray-500" data-testid="text-created-at">
                 Created: {new Date(order.created_at).toLocaleString()}

@@ -492,7 +492,7 @@ export async function POST(
 
     await supabaseAdmin.from("generated_reports").insert({
       order_id:             params.orderId,
-      order_number:         order.order_id ?? null,
+      order_number:         order.order_number ?? null,
       buyer_email:          (order as any).buyer_email || order.customer_email || null,
       buyer_name:           order.customer_name || null,
       vehicle_year:         order.vehicle_year ? String(order.vehicle_year) : null,

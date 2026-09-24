@@ -14,6 +14,8 @@ const SAFE_FIELDS = [
   "preferred_date",
   "package",
   "booking_type",
+  "listing_source",
+  "payment_status",
   "vehicle_year",
   "vehicle_make",
   "vehicle_model",

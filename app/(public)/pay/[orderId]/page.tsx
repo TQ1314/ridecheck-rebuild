@@ -11,9 +11,13 @@ import { CreditCard, AlertCircle, CheckCircle2, ShieldCheck, ShieldAlert } from 
 import { Logo } from "@/components/layout/Logo";
 import { formatCurrency } from "@/lib/utils/pricing";
 import { LEGAL_SUMMARY_BULLETS, TERMS_VERSION } from "@/lib/legal/constants";
+import { publicOrderReference } from "@/lib/order-journey";
+import { PURCHASE_DECISION_ACKNOWLEDGMENT } from "@/lib/order-journey";
+import { OrderSummaryRow } from "@/components/order-journey/OrderSummaryRow";
 
 interface PayOrderSummary {
   id: string;
+  order_number: string | null;
   vehicle_year: number;
   vehicle_make: string;
   vehicle_model: string;
@@ -160,20 +164,17 @@ function PayInner() {
                 <div className="mx-auto mb-3 w-10"><Logo size={40} /></div>
                 <h1 className="text-xl font-bold" data-testid="text-page-title">Confirm Your Inspection</h1>
                 <p className="text-sm text-gray-600 mt-1">Secure payment powered by Stripe</p>
+                {publicOrderReference(order.order_number) && (
+                  <p className="mt-1 text-sm font-semibold text-gray-700" data-testid="text-order-reference">{publicOrderReference(order.order_number)}</p>
+                )}
               </div>
 
               {/* Order Summary */}
               <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Vehicle</span>
-                  <span className="font-medium" data-testid="text-vehicle">
+                 <OrderSummaryRow label="Vehicle" testId="text-vehicle">
                     {order.vehicle_year} {order.vehicle_make} {order.vehicle_model}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Package</span>
-                  <span className="font-medium capitalize" data-testid="text-package">{order.package}</span>
-                </div>
+                 </OrderSummaryRow>
+                 <OrderSummaryRow label="Package" testId="text-package">{order.package}</OrderSummaryRow>
                 <div className="border-t pt-3 flex justify-between">
                   <span className="font-semibold">Total</span>
                   <span className="font-bold text-lg text-emerald-700" data-testid="text-price">
@@ -267,8 +268,7 @@ function PayInner() {
                     data-testid="checkbox-no-sole-reliance"
                   />
                   <span className="text-xs text-gray-700 leading-snug">
-                    I understand I should <strong>not rely solely on RideCheck</strong> when making my
-                    vehicle purchase decision. The final decision is mine alone.
+                     {PURCHASE_DECISION_ACKNOWLEDGMENT}
                   </span>
                 </label>
               </div>

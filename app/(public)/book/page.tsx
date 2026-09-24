@@ -1393,11 +1393,11 @@ function BookInner() {
                       : t("booking.concierge", lang)}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <span className="text-muted-foreground">
                   {t("booking.step.vehicle", lang)}
                 </span>
-                <span>
+                <span className="text-right min-w-0 break-words">
                   {vehicleYear} {vehicleMake} {vehicleModel}{vehicleTrim ? ` · ${vehicleTrim}` : ""}
                 </span>
               </div>
@@ -1517,6 +1517,9 @@ function BookInner() {
                     : t("booking.selfNote", lang)}
                 </p>
               )}
+              <p className="text-sm text-foreground bg-primary/5 rounded-md p-3 mt-2" data-testid="text-payment-first">
+                {t("booking.paymentFirst", lang)}
+              </p>
             </CardContent>
           </Card>
         )}
