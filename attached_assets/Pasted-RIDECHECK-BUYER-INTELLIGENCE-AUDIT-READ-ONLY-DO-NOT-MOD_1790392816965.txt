@@ -1,0 +1,578 @@
+RIDECHECK BUYER INTELLIGENCE AUDIT
+READ-ONLY — DO NOT MODIFY CODE
+
+OBJECTIVE
+
+Audit the current RideCheck product to determine whether the inspection workflow, report-generation system, and customer-facing website are aligned with RideCheck's core philosophy:
+
+RIDECHECK COMPETES ON INTELLIGENCE, EVIDENCE, AND RELEVANCE — NOT INSPECTION QUANTITY.
+
+RideCheck does NOT want to become another generic "150-point inspection," "200-point inspection," or checklist-volume service.
+
+Do not recommend additional inspection items simply to increase the number of checks.
+
+Every inspection step should materially contribute to helping the buyer understand the actual vehicle being considered.
+
+Do not modify any files, migrations, schemas, UI, prompts, APIs, routes, or database objects during this audit.
+
+==================================================
+1. RIDECHECK PRODUCT PRINCIPLE
+==================================================
+
+Evaluate the existing system against this principle:
+
+Every inspection activity should help answer one or more meaningful buyer questions:
+
+1. Is there observable evidence of a significant mechanical or functional concern?
+
+2. Is there diagnostic evidence the buyer should know about?
+
+3. Is there observable structural, corrosion/rust, flood, prior-repair, accident-repair, mileage, VIN, or title-related information relevant to the buyer?
+
+4. How did the vehicle actually operate during available functional testing and/or road testing?
+
+5. What financial exposure might significant observed findings represent?
+
+6. What important areas could NOT be inspected, tested, verified, or accessed?
+
+7. What evidence supports the findings?
+
+8. Are there vehicle-specific characteristics or concerns that deserve additional attention for this particular year/make/model/trim?
+
+9. Does the final report clearly distinguish:
+   - physical observations
+   - diagnostic evidence
+   - third-party/history information
+   - AI interpretation/context
+   - unavailable/unverified information?
+
+RideCheck should provide information and evidence.
+
+The BUYER makes the purchase decision.
+
+RideCheck should not recommend buying, rejecting, avoiding, or walking away from a vehicle.
+
+==================================================
+2. AUDIT THE CURRENT INSPECTION WORKFLOW
+==================================================
+
+Locate and inspect the actual RideChecker inspection workflow.
+
+Document every meaningful inspection module currently implemented.
+
+Expected areas may include, but are not limited to:
+
+- vehicle identification
+- exterior/body
+- engine/engine bay
+- visible leaks
+- transmission observations
+- steering
+- suspension
+- brakes
+- tires/wheels
+- underbody/frame
+- rust/corrosion
+- interior
+- electrical systems
+- HVAC/climate
+- warning lights
+- OBD-II diagnostics
+- road test
+- odometer/mileage
+- title/history observations
+- VIN observations
+- flood/water indicators
+- theft/tampering indicators
+- accident/repair indicators
+- photos/evidence
+- inspector notes
+
+Do NOT assume these exist because they are listed here.
+
+Verify them in the repository.
+
+For each module determine:
+
+A. What information is collected?
+B. Is it required, optional, conditional, or unavailable?
+C. What buyer problem does it address?
+D. Is the information persisted?
+E. Does it reach report generation?
+F. Does it actually appear in the final buyer report?
+G. Is supporting evidence captured?
+H. Is the information duplicated elsewhere?
+I. Is the module meaningful buyer intelligence or merely checklist activity?
+
+Flag:
+
+- collected-but-unused information
+- report information with no apparent inspection source
+- duplicated questions
+- low-value inspection steps
+- missing evidence
+- inconsistent terminology
+- fields that can create false confidence
+- inspection items that appear to exist primarily to increase quantity
+
+Do NOT remove anything.
+
+Report findings only.
+
+==================================================
+3. AUDIT OBD-II
+==================================================
+
+Verify the CURRENT implementation rather than relying on previous descriptions.
+
+Specifically inspect:
+
+POST /api/ridechecker/obd/extract
+
+and the corresponding RideChecker inspection UI, persistence layer, report pipeline, and PDF output.
+
+Verify whether the implementation currently supports:
+
+- PDF
+- PNG
+- JPG/JPEG
+- TXT
+- CSV
+- maximum file count
+- AI extraction for images/PDFs
+- non-AI parsing for TXT/CSV
+- DTC extraction
+- scanner brand detection
+- scanner model detection
+- extraction confidence score
+- OCR/extraction quality description
+- low-confidence handling
+- manual DTC entry
+- AI-extracted source labeling
+- manual source labeling
+- code deduplication
+- original diagnostic file preservation
+- scanner information in report
+- diagnostic files/evidence section in report
+
+IMPORTANT:
+
+Verify that low-confidence extracted codes cannot silently influence:
+
+- buyer-facing findings
+- risk level
+- repair estimates
+- Claude interpretation
+- final report conclusions
+
+Identify any pathway where unreviewed or low-confidence AI extraction could contaminate downstream reporting.
+
+Do NOT fix it during this audit.
+
+The OBD system will also receive a real field test separately.
+
+==================================================
+4. AUDIT ROAD TEST
+==================================================
+
+Verify the Road Test module and its actual report integration.
+
+Determine:
+
+- what is recorded
+- when it is available
+- how "seller did not permit" is handled
+- how "not possible" is handled
+- whether missing road-test information affects inspection completeness appropriately
+- whether road-test observations reach the buyer report
+- whether the report clearly distinguishes observations from conclusions
+
+Check whether RideCheck accidentally creates false confidence when a road test was not performed.
+
+==================================================
+5. AUDIT TITLE / VIN / HISTORY OBSERVATIONS
+==================================================
+
+Determine exactly what RideCheck currently collects.
+
+Pay particular attention to whether low-value or "fake measure" checks remain.
+
+RideCheck does NOT want steps that look protective without providing meaningful protection.
+
+Review:
+
+- physical title availability
+- title type/brand observations
+- title VIN comparison
+- seller/title name observations
+- lien observations
+- odometer/title consistency
+- dashboard VIN
+- door-jamb VIN
+- VIN photos
+- flood indicators
+- theft/tampering indicators
+- prior accident/repair indicators
+
+For each one answer:
+
+Does this materially improve buyer intelligence?
+
+Does it provide defensible evidence?
+
+Does it create false confidence?
+
+Is it worth the RideChecker's time?
+
+Do NOT remove anything.
+
+Flag candidates for later review.
+
+==================================================
+6. AUDIT ODOMETER / MILEAGE INTELLIGENCE
+==================================================
+
+Verify the dedicated odometer/mileage workflow and report section.
+
+Determine whether the system clearly distinguishes:
+
+- physically observed odometer reading
+- title mileage if available
+- seller-provided mileage
+- third-party historical mileage, if any
+- observed discrepancy
+- suspected tampering indicators
+- verified historical evidence
+
+RideCheck must not call something "rollback," "fraud," or similar unless authoritative evidence supports that conclusion.
+
+==================================================
+7. AUDIT REPAIR-COST / FINANCIAL EXPOSURE
+==================================================
+
+Determine how repair estimates are generated.
+
+Trace:
+
+inspection observation
+→ interpretation
+→ repair estimate
+→ report.
+
+Determine:
+
+- source of repair ranges
+- whether estimates are vehicle-specific
+- whether labor geography is considered
+- whether AI is inventing ranges
+- whether uncertainty is disclosed
+- whether multiple findings can accidentally be double-counted
+- whether repair estimates are presented as estimates rather than quotes
+
+RideCheck's goal is useful FINANCIAL CONTEXT, not false precision.
+
+==================================================
+8. AUDIT VEHICLE-SPECIFIC INTELLIGENCE
+==================================================
+
+Determine whether RideCheck currently changes inspection emphasis based on:
+
+- year
+- make
+- model
+- trim
+- engine/powertrain
+- mileage
+- vehicle category
+
+Do not assume this exists.
+
+Determine whether any current AI prompts generate "known issues" from model knowledge without a traceable source.
+
+Flag any such behavior.
+
+RideCheck's future goal is NOT generic vehicle trivia.
+
+Vehicle intelligence should eventually help answer:
+
+"What deserves additional attention on THIS vehicle?"
+
+Do not implement that system during this audit.
+
+==================================================
+9. AUDIT AI BOUNDARIES
+==================================================
+
+Locate all AI/Claude involvement in inspection/report generation.
+
+For each AI step document:
+
+INPUT
+→ AI TASK
+→ OUTPUT
+→ DOWNSTREAM USE.
+
+Identify where AI:
+
+- extracts evidence
+- normalizes information
+- interprets diagnostic information
+- creates narrative
+- estimates repair exposure
+- determines risk
+- summarizes findings
+- provides vehicle information
+
+Flag anywhere AI could:
+
+- invent an observation
+- convert uncertainty into certainty
+- diagnose something not supported by evidence
+- claim an inspection occurred when it did not
+- manufacture vehicle-specific "known issues"
+- turn third-party information into a RideCheck observation
+- make a purchase recommendation
+
+RideCheck AI should interpret and organize evidence.
+
+It should NEVER manufacture evidence.
+
+==================================================
+10. AUDIT THE BUYER REPORT
+==================================================
+
+Trace the actual current PDF/report template.
+
+Document the current report sections in order.
+
+Determine whether the report successfully answers:
+
+WHAT VEHICLE WAS INSPECTED?
+
+WHAT DID RIDECHECK ACTUALLY INSPECT?
+
+WHAT DID RIDECHECK OBSERVE?
+
+WHAT DID THE DIAGNOSTIC SCAN SHOW?
+
+HOW DID THE VEHICLE OPERATE?
+
+WHAT COULD NOT BE VERIFIED?
+
+WHAT EVIDENCE SUPPORTS THE FINDINGS?
+
+WHAT MAY THE SIGNIFICANT FINDINGS MEAN FINANCIALLY?
+
+WHAT INFORMATION COMES FROM OUTSIDE RIDECHECK, IF ANY?
+
+WHAT REMAINS FOR THE BUYER TO DECIDE?
+
+Identify:
+
+- redundant sections
+- generic AI filler
+- technical information with little buyer value
+- important findings buried too deeply
+- evidence that isn't surfaced
+- observations without evidence
+- contradictions
+- confusing risk terminology
+- report sections that could be mistaken for purchase advice
+
+==================================================
+11. AUDIT CUSTOMER-FACING WEBSITE
+==================================================
+
+Inspect the actual:
+
+- homepage
+- How It Works
+- service pages
+- pricing page
+- FAQ
+- booking flow
+- relevant SEO/landing pages
+
+Determine what a new visitor currently understands about RideCheck.
+
+Specifically determine whether the website clearly communicates:
+
+A. RideCheck physically goes to the vehicle.
+
+B. The buyer does not have to travel to the vehicle themselves.
+
+C. RideCheck performs an independent physical inspection.
+
+D. OBD-II diagnostic scanning is included where applicable.
+
+E. Road testing is performed when permitted and safe.
+
+F. Photos/evidence are included.
+
+G. Significant findings may include repair-cost/financial context.
+
+H. The buyer receives a RideCheck report.
+
+I. RideCheck provides information; the buyer makes the decision.
+
+J. RideCheck can be especially useful for vehicles found remotely, including marketplace/private-party listings.
+
+Also search for claims such as:
+
+- "150-point"
+- "150+ point"
+- "200-point"
+- "comprehensive"
+- "complete"
+- "certified"
+- "guaranteed"
+- "mechanic-approved"
+- "AI inspection"
+
+Flag anything that conflicts with RideCheck's current positioning.
+
+==================================================
+12. CUSTOMER VALUE MATRIX
+==================================================
+
+Produce this table:
+
+| Buyer Value | Information Collected | Inspection Source | Persisted? | Used by AI? | Appears in Report? | Communicated on Website? | Evidence Quality | Gap / Concern |
+
+Include all major buyer-value areas.
+
+==================================================
+13. INSPECTION VALUE MATRIX
+==================================================
+
+Produce:
+
+| Inspection Module | Buyer Question Answered | Evidence Produced | Report Impact | Value Assessment | Concern |
+
+For Value Assessment use ONLY:
+
+CORE VALUE
+SUPPORTING VALUE
+QUESTIONABLE VALUE
+DUPLICATIVE
+
+Do not score modules numerically.
+
+Explain every QUESTIONABLE VALUE or DUPLICATIVE classification.
+
+==================================================
+14. WEBSITE GAP ANALYSIS
+==================================================
+
+Separate:
+
+IMPLEMENTED BUT NOT COMMUNICATED
+
+from:
+
+COMMUNICATED BUT NOT VERIFIED IN PRODUCT
+
+from:
+
+IMPLEMENTED AND ACCURATELY COMMUNICATED.
+
+This distinction is critical.
+
+For example, if OBD is implemented but absent from the website, classify it:
+
+IMPLEMENTED BUT NOT COMMUNICATED.
+
+Do not automatically recommend website copy until implementation is verified.
+
+==================================================
+15. FINAL AUDIT RESULT
+==================================================
+
+Finish with:
+
+A. WHAT RIDECHECK ACTUALLY IS TODAY
+
+Describe the product based ONLY on repository evidence.
+
+B. RIDECHECK'S STRONGEST BUYER VALUE
+
+Identify the capabilities already implemented that provide meaningful buyer intelligence.
+
+C. LOW-VALUE / QUESTIONABLE ELEMENTS
+
+Identify anything that resembles checklist theater, unnecessary inspector work, duplicated information, or false protection.
+
+D. REPORT INTELLIGENCE GAPS
+
+Identify where useful collected evidence isn't being converted into useful buyer intelligence.
+
+E. WEBSITE COMMUNICATION GAPS
+
+Identify valuable capabilities that exist but customers are not currently being told about.
+
+F. SAFETY / LIABILITY / TRUST GAPS
+
+Identify wording or system behavior that could overstate what RideCheck knows.
+
+G. TOP 5 RECOMMENDED CHANGES
+
+Only after completing the audit, recommend the five highest-value changes.
+
+Do NOT implement them.
+
+Prioritize based on:
+
+1. buyer usefulness
+2. evidence quality
+3. trust
+4. operational simplicity
+5. defensibility
+
+NOT number of inspection points.
+
+==================================================
+NON-NEGOTIABLE AUDIT RULES
+==================================================
+
+DO NOT MODIFY CODE.
+
+DO NOT CREATE MIGRATIONS.
+
+DO NOT CHANGE DATABASES.
+
+DO NOT CHANGE THE WEBSITE.
+
+DO NOT CHANGE THE REPORT.
+
+DO NOT ADD INSPECTION QUESTIONS.
+
+DO NOT REMOVE INSPECTION QUESTIONS.
+
+DO NOT "IMPROVE" THE PRODUCT DURING THE AUDIT.
+
+DO NOT RECOMMEND FEATURES SIMPLY BECAUSE COMPETITORS HAVE THEM.
+
+DO NOT USE INSPECTION-POINT COUNTS AS A MEASURE OF QUALITY.
+
+Do not rely on README descriptions when implementation can be inspected directly.
+
+Trace actual code paths wherever possible.
+
+Clearly distinguish:
+
+VERIFIED IN CODE
+PARTIALLY VERIFIED
+NOT FOUND
+UNABLE TO VERIFY
+
+The purpose of this audit is to understand what RideCheck ACTUALLY does before we decide what to change.
+
+RideCheck principle:
+
+INTELLIGENCE OVER QUANTITY.
+EVIDENCE OVER CHECKLIST THEATER.
+THE BUYER MAKES THE DECISION.
+
+Return the complete audit report and STOP.
+
+Do not implement any recommendations.
