@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
-import { APPROVED_RECOMMENDATIONS } from "@/lib/legal/constants";
 
 const saveReportSchema = z.object({
   ops_severity_overall: z.enum(["minor", "moderate", "major", "safety_critical"]),
   ops_summary: z.string().min(1),
   ops_report_url: z.string().optional(),
-  ops_recommendation: z.enum([...APPROVED_RECOMMENDATIONS] as [string, ...string[]]).optional(),
   issues: z.any().optional(),
 });
 
@@ -29,7 +27,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid request body", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { ops_severity_overall, ops_summary, ops_report_url, ops_recommendation } = parsed.data;
+    const { ops_severity_overall, ops_summary, ops_report_url } = parsed.data;
 
     const updatePayload: Record<string, unknown> = {
       ops_severity_overall,
@@ -38,9 +36,6 @@ export async function POST(
       report_status: "in_review",
       updated_at: new Date().toISOString(),
     };
-    if (ops_recommendation !== undefined) {
-      updatePayload.ops_recommendation = ops_recommendation;
-    }
 
     const { error: updateError } = await supabaseAdmin
       .from("orders")
@@ -66,7 +61,7 @@ export async function POST(
         actorRole: actor.role,
         action: "order.report_saved",
         resourceId: params.orderId,
-        newValue: { ops_severity_overall, ops_summary, ops_report_url, ops_recommendation },
+        newValue: { ops_severity_overall, ops_summary, ops_report_url },
       }),
     ]);
 

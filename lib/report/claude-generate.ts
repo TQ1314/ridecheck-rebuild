@@ -108,7 +108,7 @@ function buildOBDSection(input: ReportInput): string {
   };
   lines.push(`Scan Status: ${statusLabels[obd.scan_performed] || obd.scan_performed}`);
   if (obd.scanner_brand) {
-    lines.push(`Scanner Used: ${obd.scanner_brand}`);
+    lines.push(`Scanner Recorded: ${obd.scanner_brand}${obd.scanner_model ? ` ${obd.scanner_model}` : ""}`);
   }
 
   // Warning lights (always show if present)
@@ -137,10 +137,15 @@ function buildOBDSection(input: ReportInput): string {
       lines.push(`Diagnostic Trouble Codes (${obd.dtc_codes.length} code${obd.dtc_codes.length !== 1 ? "s" : ""}):`);
       for (const code of obd.dtc_codes) {
         const desc = code.description ? ` — ${code.description}` : "";
-        lines.push(`  • ${code.system} / ${code.code} / ${code.status}${desc}`);
+        lines.push(`  • ${code.system} / ${code.code} / ${code.status}${desc} [${code.source === "manual" ? "inspector-entered" : "inspector-reviewed extraction"}]`);
       }
     } else {
-      lines.push("Diagnostic Trouble Codes: None entered manually");
+      lines.push(obd.unreviewed_code_count
+        ? "Diagnostic Trouble Codes: Extracted candidates await inspector review; no codes confirmed for this report"
+        : "Diagnostic Trouble Codes: None confirmed");
+    }
+    if (obd.unreviewed_code_count) {
+      lines.push(`${obd.unreviewed_code_count} extracted candidate code(s) excluded pending inspector review. Do not infer a clean scan.`);
     }
 
     // Uploaded files
@@ -488,11 +493,10 @@ Analyze these findings and return a single valid JSON object (no markdown, no co
   "total_repair_high": sum of all cost_high values,
   "negotiation_options": [
     {
-      "label": "OPTION A: Label (e.g. Request Seller Price Adjustment, Proceed at Current Price, Request Pre-Sale Repairs, Consider Alternative Vehicles)",
-      "description": "3-4 sentences of specific, neutral guidance describing this option and its estimated financial implications"
+       "label": "OPTION A: Neutral topic (e.g. Price Adjustment Context, Pre-Sale Repair Context, Further Inspection Context)",
+       "description": "3-4 sentences of factual price/condition context and estimated financial implications; no purchase recommendation"
     }
-    // 2-3 options. Do not use language like Walk Away, Do Not Buy, Avoid, or You Should. Frame as price and condition considerations only.
-    // If recommending the buyer look elsewhere, use label: "Consider Alternative Vehicles" — not "Walk Away".
+      // 2-3 neutral price and condition considerations, not instructions on whether or where to purchase.
   ]
 }
 

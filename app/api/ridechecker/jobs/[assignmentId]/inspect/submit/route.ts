@@ -73,7 +73,20 @@ export async function POST(
   if (obdMarker) {
     try {
       const parsed = JSON.parse(obdMarker[1]);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obdModule = parsed;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const guidedObd = parsed as Record<string, unknown>;
+        // The guided form is inspector-authored JSON, not an extraction result.
+        // Preserve explicitly marked AI codes for review; label otherwise
+        // unlabeled hand-entered codes as manual.
+        if (Array.isArray(guidedObd.dtc_codes)) {
+          guidedObd.dtc_codes = guidedObd.dtc_codes.map((code: any) =>
+            code && typeof code === "object" && !code.source
+              ? { ...code, source: "manual" }
+              : code
+          );
+        }
+        obdModule = guidedObd;
+      }
     } catch { /* malformed optional structured data is not report data */ }
   }
   const wizardPhotos = [obdStep?.wide_photo_url, obdStep?.close_photo_url]
@@ -139,7 +152,7 @@ export async function POST(
       interior_condition: stepMap.get("interior_driver")?.note ?? "See wizard submission",
       mechanical_issues: mechanicalNote,
       obd_module: obdModule,
-      test_drive_notes: "Wizard submission — see inspection steps",
+      test_drive_notes: "",
       immediate_concerns: immediateNote,
       submitted_at: now,
       extra_photos: [...stepMap.values()]

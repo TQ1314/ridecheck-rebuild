@@ -7,6 +7,7 @@ import { REPORT_LOGIC_VERSION } from "@/lib/report/report-version";
 import type { ReportInput, ReportMeta, ScopeRow, ConfidenceLevel, OBDModule, TitleHistoryModule } from "@/lib/report/types";
 import { validatePhotos, partitionResults } from "@/lib/report/photo-validator";
 import React from "react";
+import { hasConfirmedOBDEvidence, roadTestEvidence, reportableOBD } from "@/lib/report/field-evidence";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,10 +19,13 @@ function resolveOBDScope(submission: any): { level: string; status: ScopeRow["st
       case "yes": {
         const hasCodes   = (obd.dtc_codes?.length ?? 0) > 0;
         const hasFiles   = (obd.uploaded_files?.length ?? 0) > 0;
-        const hasEvidence = hasCodes || hasFiles;
+        const hasEvidence = hasConfirmedOBDEvidence(obd);
         return {
-          level:  hasEvidence ? "Full — Codes Retrieved" : "Limited — No Codes Retrieved",
-          status: "assessed",
+          level:  hasCodes ? "Full — Codes Retrieved"
+            : obd.unreviewed_code_count ? "Limited — Codes Awaiting Review"
+            : hasFiles && !hasEvidence ? "Limited — Scan Evidence Unconfirmed"
+            : "Limited — No Codes Retrieved",
+          status: hasEvidence ? "assessed" : "partial",
         };
       }
       case "no":            return { level: "Not Performed",                        status: "not_assessed" };
@@ -49,41 +53,17 @@ function buildScopeTable(submission: any): ScopeRow[] {
     submission.tire_tread_mm_rear_right,
   ].some((v) => v != null);
 
-  const rtModule = submission.road_test_module as { status?: string } | null | undefined;
-  const rtStatus = rtModule?.status;
-
-  let roadTestLevel: string;
-  let roadTestScopeStatus: ScopeRow["status"];
-  let transmissionLevel: string;
-
-  if (rtStatus === "completed") {
-    roadTestLevel       = "Completed";
-    roadTestScopeStatus = "assessed";
-    transmissionLevel   = "Road Test Observed";
-  } else if (rtStatus === "not_permitted") {
-    roadTestLevel       = "Not Permitted by Seller";
-    roadTestScopeStatus = "not_assessed";
-    transmissionLevel   = "Visual Only";
-  } else if (rtStatus === "not_possible") {
-    roadTestLevel       = "Not Possible — Location/Condition";
-    roadTestScopeStatus = "not_assessed";
-    transmissionLevel   = "Visual Only";
-  } else {
-    const hasNotes = !!(submission.test_drive_notes && submission.test_drive_notes.trim().length > 10);
-    roadTestLevel       = hasNotes ? "Completed" : "Not Performed";
-    roadTestScopeStatus = hasNotes ? "assessed" : "not_assessed";
-    transmissionLevel   = hasNotes ? "Road Test Observed" : "Visual Only";
-  }
+  const roadTest = roadTestEvidence(submission.road_test_module);
 
   return [
     { system: "Engine",            level: hasOBD           ? "Visual + OBD Scan"       : "Visual Only",  status: hasOBD           ? "assessed"     : "partial"      },
     { system: "OBD Scan",          level: obdScope.level,                                                status: obdScope.status                                     },
     { system: "Frame / Underbody", level: hasUndercarriage ? "Visual Only"              : "Not Assessed", status: hasUndercarriage ? "partial"      : "not_assessed" },
     { system: "Brakes",            level: hasBrakes        ? "Assessed"                 : "Not Assessed", status: hasBrakes        ? "assessed"     : "not_assessed" },
-    { system: "Transmission",      level: transmissionLevel,                                              status: "partial"                                           },
+    { system: "Transmission",      level: roadTest.transmission,                                          status: "partial"                                           },
     { system: "Electrical",        level: "Visual Only",                                                  status: "partial"                                           },
     { system: "Tires",             level: hasTread         ? "Visual + Tread Measured"  : "Visual Only",  status: hasTread         ? "assessed"     : "partial"      },
-    { system: "Road Test",         level: roadTestLevel,                                                  status: roadTestScopeStatus                                 },
+    { system: "Road Test",         level: roadTest.level,                                                status: roadTest.status                                     },
     ...buildTitleScopeRow(submission),
   ];
 }
@@ -111,7 +91,9 @@ function buildMissingItems(submission: any): string[] {
       case "no":            items.push("OBD-II diagnostic scan was not performed"); break;
       case "not_available": items.push("OBD-II diagnostic scan could not be completed — scanner or connection issue"); break;
       case "not_permitted": items.push("OBD-II diagnostic scan was not permitted by seller"); break;
-      // "yes" → scan performed; no missing item
+      case "yes":
+        if (!hasConfirmedOBDEvidence(obd)) items.push("OBD-II diagnostic result not confirmed");
+        break;
     }
   } else {
     const hasLegacyCodes = Array.isArray(submission.scan_codes) && submission.scan_codes.length > 0;
@@ -131,16 +113,8 @@ function buildMissingItems(submission: any): string[] {
   if (!hasTread)
     items.push("Tire tread depth not measured");
 
-  const rtModule = submission.road_test_module as { status?: string } | null | undefined;
-  const rtStatus = rtModule?.status;
-  if (rtStatus === "not_permitted") {
-    items.push("Road test not permitted by seller");
-  } else if (rtStatus === "not_possible") {
-    items.push("Road test not possible — location or vehicle condition");
-  } else if (rtStatus !== "completed") {
-    if (!submission.test_drive_notes || submission.test_drive_notes.trim().length <= 10)
-      items.push("Road test not performed");
-  }
+  const roadTestMissing = roadTestEvidence(submission.road_test_module).missing;
+  if (roadTestMissing) items.push(roadTestMissing);
 
   // Title & History module
   const thf = submission.title_history_module as TitleHistoryModule | null | undefined;
@@ -165,11 +139,7 @@ function buildConfidenceLevel(submission: any, missingCount: number): Confidence
   const roadTestCompleted = rtModule?.status === "completed";
 
   const obd = submission.obd_module as OBDModule | null | undefined;
-  const obdPerformed  = obd?.scan_performed === "yes";
-  const obdHasEvidence = obdPerformed && (
-    (obd?.dtc_codes?.length ?? 0) > 0 ||
-    (obd?.uploaded_files?.length ?? 0) > 0
-  );
+  const obdHasEvidence = hasConfirmedOBDEvidence(obd);
 
   const thf = submission.title_history_module as TitleHistoryModule | null | undefined;
   const thfOpsStatus = thf?.ops_review_status;
@@ -264,6 +234,13 @@ export async function POST(
       day: "numeric",
     });
 
+    // Raw submissions retain every candidate for audit; reports see accepted
+    // extracted codes only, never the legacy scan_codes mirror of pending codes.
+    const reportSubmission = {
+      ...submission,
+      obd_module: reportableOBD(submission.obd_module),
+      scan_codes: submission.obd_module ? [] : submission.scan_codes,
+    };
     const reportInput: ReportInput = {
       vehicle_year:          String(order.vehicle_year || ""),
       vehicle_make:          order.vehicle_make || "",
@@ -281,9 +258,9 @@ export async function POST(
       cosmetic_exterior:     submission.cosmetic_exterior || "",
       interior_condition:    submission.interior_condition || "",
       mechanical_issues:     submission.mechanical_issues || "",
-      test_drive_notes:      submission.test_drive_notes || "",
+      test_drive_notes:      submission.road_test_module?.status === "completed" ? submission.test_drive_notes || "" : "",
       immediate_concerns:    submission.immediate_concerns || "",
-      scan_codes:            submission.scan_codes || [],
+      scan_codes:            reportSubmission.scan_codes || [],
       brake_condition:       submission.brake_condition || undefined,
       tire_tread_mm_front_left:  submission.tire_tread_mm_front_left  || undefined,
       tire_tread_mm_front_right: submission.tire_tread_mm_front_right || undefined,
@@ -295,7 +272,7 @@ export async function POST(
       undercarriage_photo_url: submission.undercarriage_photo_url || "",
       extra_photos:          submission.extra_photos || [],
       road_test_module:      submission.road_test_module ?? undefined,
-      obd_module:            submission.obd_module ?? undefined,
+      obd_module:            reportSubmission.obd_module,
       title_history_module:  submission.title_history_module ?? undefined,
     };
 
@@ -366,8 +343,8 @@ export async function POST(
     const safe = (url: string) => (approvedUrls.has(url) ? url : "");
 
     // 5. Build report metadata (photos filtered to approved only)
-    const scopeTable   = buildScopeTable(submission);
-    const missingItems = buildMissingItems(submission);
+    const scopeTable   = buildScopeTable(reportSubmission);
+    const missingItems = buildMissingItems(reportSubmission);
     const rtModule     = submission.road_test_module ?? undefined;
 
     const reportMeta: ReportMeta = {
@@ -387,10 +364,10 @@ export async function POST(
       undercarriage_photo_url: safe(submission.undercarriage_photo_url || ""),
       extra_photos: (submission.extra_photos || []).filter((url: string) => approvedUrls.has(url)),
       scope_table:        scopeTable,
-      confidence_level:   buildConfidenceLevel(submission, missingItems.length),
+      confidence_level:   buildConfidenceLevel(reportSubmission, missingItems.length),
       missing_items:      missingItems,
       road_test_module:       rtModule,
-      obd_module:             submission.obd_module ?? undefined,
+      obd_module:             reportSubmission.obd_module,
       title_history_module:   submission.title_history_module ?? undefined,
     };
 
@@ -470,7 +447,7 @@ export async function POST(
         ops_report_url:       reportUrl,
         ops_summary:          generatedReport.overall_summary,
         ops_severity_overall: mapVerdictToSeverity(generatedReport.verdict),
-        ops_recommendation:   mapVerdictToRecommendation(generatedReport.verdict),
+        ops_recommendation:   null,
         report_status:        "in_review",
         report_logic_version: REPORT_LOGIC_VERSION,
         report_internal_json: generatedReport as unknown as Record<string, unknown>,
@@ -544,14 +521,5 @@ function mapVerdictToSeverity(verdict: string): string {
     case "MODERATE_RISK": return "moderate";
     case "HIGH_RISK":     return "major";
     default:              return "moderate";
-  }
-}
-
-function mapVerdictToRecommendation(verdict: string): string {
-  switch (verdict) {
-    case "LOW_RISK":      return "BUY";
-    case "MODERATE_RISK": return "BUY_WITH_NEGOTIATION";
-    case "HIGH_RISK":     return "DO_NOT_BUY_AT_ASKING_PRICE";
-    default:              return "BUY_WITH_NEGOTIATION";
   }
 }

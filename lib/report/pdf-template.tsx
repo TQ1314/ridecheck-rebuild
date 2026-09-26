@@ -1734,10 +1734,17 @@ function OBDFieldScanSection({ obd }: { obd: OBDModule }) {
           <Text style={{ fontSize: 7.5, color: scanColor, marginTop: 2 }}>
             {hasCodes
               ? `${dtcCodes.length} diagnostic trouble code${dtcCodes.length !== 1 ? "s" : ""} retrieved`
-              : "Scan completed — no diagnostic trouble codes retrieved"}
+              : obd.unreviewed_code_count
+                ? "Extracted codes pending inspector review — not confirmed"
+                : "Scan completed — no confirmed diagnostic trouble codes"}
           </Text>
         )}
       </View>
+      {!!obd.unreviewed_code_count && (
+        <Text style={{ fontSize: 8, color: C.muted, marginBottom: 5 }}>
+          {obd.unreviewed_code_count} extracted candidate code(s) excluded pending inspector review.
+        </Text>
+      )}
 
       <View style={s.obdTwoCol} wrap={false}>
         <View style={s.obdBox}>
@@ -1815,7 +1822,9 @@ function OBDFieldScanSection({ obd }: { obd: OBDModule }) {
                     </Text>
                   </View>
                 </View>
-                <Text style={[s.tdText, s.obdCol_desc]}>{code.description || "—"}</Text>
+                <Text style={[s.tdText, s.obdCol_desc]}>
+                  {code.description || "—"} · {code.source === "manual" ? "Manual entry" : "Inspector-reviewed extraction"}
+                </Text>
               </View>
             );
           })}

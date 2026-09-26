@@ -9,3 +9,4 @@
 - [Supabase & Lucide Type Pitfalls](supabase-type-patterns.md) — two build-breaking patterns: supabaseAdmin selects type as GenericStringError → cast `(data ?? []) as any[]`; LucideIcon is ForwardRefExoticComponent → use `LucideIcon` type, never a custom function signature.
 - [RideCheck DB target verification](ridecheck-db-target.md) — confirm the connected Supabase project matches RideCheck before querying or migrating live data.
 - [Buyer intake evidence retention](buyer-intake-evidence.md) — listing claims and RC observations stay distinct; do not silently delete private intake images without a retention decision.
+- [OBD report evidence policy](obd-report-evidence.md) — keep unreviewed extracted DTCs as raw evidence, but exclude them from buyer interpretation until linked and accepted.

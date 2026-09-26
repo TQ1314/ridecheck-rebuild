@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/ridechecker/PhotoUpload";
+import { uniqueExtractedCodes } from "@/lib/report/field-evidence";
 import {
   Camera,
   Car,
@@ -64,8 +65,11 @@ interface OBDUploadedFile {
   fileName: string;
   fileType: "image" | "pdf" | "txt" | "csv";
   ai_extracted?: boolean;
+  extraction_method?: "ai" | "text_parser";
+  extraction_status?: "pending" | "processed" | "failed";
   extraction_confidence?: number;
   ocr_quality?: string;
+  scanner_brand?: string;
   scanner_model?: string;
 }
 
@@ -75,7 +79,10 @@ interface OBDDTCEntry {
   code: string;
   description: string;
   status: string;
-  source?: "manual" | "ai_extracted";
+  source?: "manual" | "ai_extracted" | "parsed_text";
+  accepted?: boolean;
+  extraction_confidence?: number;
+  source_file_url?: string;
 }
 
 interface FormData {
@@ -503,7 +510,7 @@ export default function RideCheckerSubmitPage() {
       }
       const { url } = await res.json();
       const fileType: OBDUploadedFile["fileType"] = isPDF ? "pdf" : isTxt ? "txt" : isCsv ? "csv" : "image";
-      const entry: OBDUploadedFile = { url, fileName: file.name, fileType };
+      const entry: OBDUploadedFile = { url, fileName: file.name, fileType, extraction_status: "pending" };
       setForm((prev) => {
         const next = { ...prev, obd_uploaded_files: [...prev.obd_uploaded_files, entry] };
         saveDraft(next, currentStep);
@@ -520,6 +527,16 @@ export default function RideCheckerSubmitPage() {
     const file = form.obd_uploaded_files[idx];
     if (!file) return;
     setObdExtractingIndices((prev) => new Set(prev).add(idx));
+    const markFailed = () => setForm((prev) => {
+      const next = {
+        ...prev,
+        obd_uploaded_files: prev.obd_uploaded_files.map((f) =>
+          f.url === file.url ? { ...f, extraction_status: "failed" as const } : f
+        ),
+      };
+      saveDraft(next, currentStep);
+      return next;
+    });
     try {
       const mimeGuess = file.fileType === "pdf" ? "application/pdf"
         : file.fileType === "txt" ? "text/plain"
@@ -531,12 +548,14 @@ export default function RideCheckerSubmitPage() {
         body: JSON.stringify({ file_url: file.url, file_name: file.fileName, file_type: mimeGuess }),
       });
       if (!res.ok) {
+        markFailed();
         toast({ title: "Extraction failed — you can enter codes manually", variant: "destructive" });
         return;
       }
       const data = await res.json();
-      const confidence: number = data.confidence_score ?? 70;
+      const confidence: number = data.confidence_score ?? 0;
       const isLowConfidence = confidence < 60;
+      const isTextParse = file.fileType === "txt" || file.fileType === "csv";
       const codesFromExtraction: { system: string; code: string; status: string; description: string }[] = data.codes || [];
 
       setForm((prev) => {
@@ -544,9 +563,12 @@ export default function RideCheckerSubmitPage() {
         const updatedFiles = prev.obd_uploaded_files.map((f, i) =>
           i === idx ? {
             ...f,
-            ai_extracted: true,
+            ai_extracted: !isTextParse,
+            extraction_method: isTextParse ? "text_parser" as const : "ai" as const,
+            extraction_status: "processed" as const,
             extraction_confidence: confidence,
             ocr_quality: data.ocr_quality || undefined,
+            scanner_brand: data.scanner_brand || undefined,
             scanner_model: data.scanner_model || undefined,
           } : f
         );
@@ -554,21 +576,22 @@ export default function RideCheckerSubmitPage() {
         // Auto-detect scanner brand/model (only if not already set)
         const detectedBrand = data.scanner_brand || "";
         const detectedModel = data.scanner_model || "";
-        const shouldAutoDetect = !!detectedBrand && !prev.obd_scanner_auto_detected && !prev.obd_scanner_brand;
+        const shouldAutoDetect = !isLowConfidence && !!detectedBrand && !prev.obd_scanner_auto_detected && !prev.obd_scanner_brand;
 
         // Only add codes when confidence is sufficient
         let updatedCodes = prev.obd_dtc_codes;
         if (!isLowConfidence && codesFromExtraction.length > 0) {
-          const existingCodes = new Set(prev.obd_dtc_codes.map((c) => c.code.toUpperCase()));
-          const toAdd: OBDDTCEntry[] = codesFromExtraction
-            .filter((c) => c.code && !existingCodes.has(c.code.toUpperCase()))
+          const toAdd: OBDDTCEntry[] = uniqueExtractedCodes(prev.obd_dtc_codes, codesFromExtraction)
             .map((c) => ({
               _key: `ex_${Date.now()}_${Math.random().toString(36).slice(2)}`,
               system: c.system || "Unknown",
               code: c.code.toUpperCase(),
               description: c.description || "",
               status: c.status || "Unknown",
-              source: "ai_extracted" as const,
+              source: isTextParse ? "parsed_text" as const : "ai_extracted" as const,
+              accepted: false,
+              extraction_confidence: confidence,
+              source_file_url: file.url,
             }));
           updatedCodes = [...prev.obd_dtc_codes, ...toAdd];
         }
@@ -580,7 +603,9 @@ export default function RideCheckerSubmitPage() {
           obd_scanner_brand: shouldAutoDetect ? detectedBrand : prev.obd_scanner_brand,
           obd_scanner_model: shouldAutoDetect ? detectedModel : prev.obd_scanner_model,
           obd_scanner_auto_detected: shouldAutoDetect ? true : prev.obd_scanner_auto_detected,
-          obd_emissions: prev.obd_emissions || data.emissions_status || "",
+          // Extracted readiness is a diagnostic assertion: do not silently
+          // promote it to a RideChecker observation, especially below 60.
+          obd_emissions: prev.obd_emissions,
         };
         saveDraft(next, currentStep);
         return next;
@@ -603,6 +628,7 @@ export default function RideCheckerSubmitPage() {
         toast({ title: "No codes found in this file", description: "Add them manually below if needed." });
       }
     } catch {
+      markFailed();
       toast({ title: "Extraction failed", variant: "destructive" });
     } finally {
       setObdExtractingIndices((prev) => {
@@ -637,7 +663,12 @@ export default function RideCheckerSubmitPage() {
 
   const removeOBDFile = (index: number) => {
     setForm((prev) => {
-      const next = { ...prev, obd_uploaded_files: prev.obd_uploaded_files.filter((_, i) => i !== index) };
+      const removedUrl = prev.obd_uploaded_files[index]?.url;
+      const next = {
+        ...prev,
+        obd_uploaded_files: prev.obd_uploaded_files.filter((_, i) => i !== index),
+        obd_dtc_codes: prev.obd_dtc_codes.filter((code) => code.source_file_url !== removedUrl || !removedUrl),
+      };
       saveDraft(next, currentStep);
       return next;
     });
@@ -730,13 +761,16 @@ export default function RideCheckerSubmitPage() {
 
         if (form.obd_scan_performed === "yes") {
           // Uploaded files
-          if (form.obd_uploaded_files.length > 0) {
+           if (form.obd_uploaded_files.length > 0) {
             obdModule.uploaded_files = form.obd_uploaded_files.map(
-              ({ url, fileName, fileType, ai_extracted, extraction_confidence, ocr_quality, scanner_model }) => ({
+               ({ url, fileName, fileType, ai_extracted, extraction_method, extraction_status, extraction_confidence, ocr_quality, scanner_brand, scanner_model }) => ({
                 url, fileName, fileType, reviewStatus: "approved_for_report",
                 ai_extracted: ai_extracted ?? false,
+                 ...(extraction_method && { extraction_method }),
+                 ...(extraction_status && { extraction_status }),
                 ...(extraction_confidence != null && { extraction_confidence }),
                 ...(ocr_quality && { ocr_quality }),
+                 ...(scanner_brand && { scanner_brand }),
                 ...(scanner_model && { scanner_model }),
               })
             );
@@ -752,7 +786,9 @@ export default function RideCheckerSubmitPage() {
           if (validCodes.length > 0) {
             obdModule.dtc_codes = validCodes;
             // Populate legacy scan_codes for backward compatibility
-            const legacyCodes = validCodes.map((c) => c.code);
+            const legacyCodes = validCodes
+              .filter((c) => c.source === "manual" || (c.accepted === true && (c.extraction_confidence ?? 0) >= 60))
+              .map((c) => c.code);
             payload.scan_codes = [
               ...((payload.scan_codes as string[]) || []),
               ...legacyCodes,
@@ -1372,7 +1408,7 @@ export default function RideCheckerSubmitPage() {
                                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#22774F]/5 border-t border-[#22774F]/15 text-xs font-medium text-[#22774F] hover:bg-[#22774F]/10 transition-colors"
                               >
                                 <Sparkles className="h-3.5 w-3.5" />
-                                Extract codes with AI
+                                {f.fileType === "txt" || f.fileType === "csv" ? "Parse text export" : "Extract codes with AI"}
                               </button>
                             )}
                             {isExtracting && (
@@ -1391,7 +1427,7 @@ export default function RideCheckerSubmitPage() {
                 {/* ── DTC codes ── */}
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">Diagnostic Trouble Codes (DTC)</p>
-                  <p className="text-xs text-muted-foreground">Codes extracted above appear here. Add any missing ones manually.</p>
+                  <p className="text-xs text-muted-foreground">Compare extracted codes with the original scan and accept each one before it can appear in the buyer report. Add any missing codes manually.</p>
 
                   {form.obd_dtc_codes.length > 0 && (
                     <div className="space-y-3">
@@ -1404,9 +1440,9 @@ export default function RideCheckerSubmitPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code #{i + 1}</span>
-                              {entry.source === "ai_extracted" ? (
+                              {entry.source === "ai_extracted" || entry.source === "parsed_text" ? (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
-                                  <Sparkles className="h-2.5 w-2.5" /> AI
+                                  <Sparkles className="h-2.5 w-2.5" /> {entry.source === "parsed_text" ? "TXT/CSV parsed" : "AI extracted"}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border">
@@ -1485,6 +1521,28 @@ export default function RideCheckerSubmitPage() {
                               data-testid={`input-dtc-desc-${i}`}
                             />
                           </div>
+                          {entry.source !== "manual" && (
+                            <label className="flex items-center gap-2 text-xs font-medium">
+                                <input
+                                  type="checkbox"
+                                  checked={entry.accepted === true}
+                                  onChange={(e) => {
+                                    setForm((prev) => {
+                                      const next = {
+                                        ...prev,
+                                        obd_dtc_codes: prev.obd_dtc_codes.map((code) =>
+                                          code._key === entry._key ? { ...code, accepted: e.target.checked } : code
+                                        ),
+                                      };
+                                      saveDraft(next, currentStep);
+                                      return next;
+                                    });
+                                  }}
+                                  data-testid={`checkbox-accept-dtc-${i}`}
+                                />
+                                Reviewed against original scan — include in buyer report
+                            </label>
+                          )}
                         </div>
                       ))}
                     </div>

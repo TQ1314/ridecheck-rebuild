@@ -5,30 +5,8 @@ import { z } from "zod";
 import { isChecklistComplete } from "@/lib/ridechecker/scoring";
 import { emitScoreEvents } from "@/lib/ridechecker/scorecard";
 import type { ScoreEventType } from "@/lib/ridechecker/scorecard";
-
-const obdUploadedFileSchema = z.object({
-  url: z.string(),
-  fileName: z.string(),
-  fileType: z.enum(["image", "pdf"]),
-  reviewStatus: z.enum(["approved_for_report", "needs_review", "excluded_from_report"]).default("approved_for_report"),
-});
-
-const obdDTCCodeSchema = z.object({
-  system: z.string(),
-  code: z.string(),
-  description: z.string().optional().default(""),
-  status: z.string(),
-});
-
-const obdModuleSchema = z.object({
-  scan_performed: z.enum(["yes", "no", "not_available", "not_permitted"]),
-  uploaded_files: z.array(obdUploadedFileSchema).optional(),
-  dtc_codes: z.array(obdDTCCodeSchema).optional(),
-  notes: z.string().optional(),
-  emissions_readiness: z.enum(["ready", "not_ready", "unknown"]).optional(),
-  warning_lights: z.array(z.string()).optional(),
-  warning_other_desc: z.string().optional(),
-});
+import { obdModuleSchema } from "@/lib/report/obd-schema";
+import { reportableOBD } from "@/lib/report/field-evidence";
 
 const titleHistoryModuleSchema = z.object({
   title_review_status:    z.string().optional(),
@@ -197,7 +175,9 @@ export async function POST(
         tire_tread_mm_rear_left: data.tire_tread_mm_rear_left ?? null,
         tire_tread_mm_rear_right: data.tire_tread_mm_rear_right ?? null,
         brake_condition: data.brake_condition ?? null,
-        scan_codes: data.scan_codes ?? null,
+        scan_codes: data.obd_module
+          ? (reportableOBD(data.obd_module)?.dtc_codes ?? []).map((code) => code.code)
+          : data.scan_codes ?? null,
         cosmetic_exterior: data.cosmetic_exterior,
         interior_condition: data.interior_condition,
         mechanical_issues: data.mechanical_issues,

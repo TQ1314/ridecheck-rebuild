@@ -20,8 +20,11 @@ export interface OBDUploadedFile {
   fileType: "image" | "pdf" | "txt" | "csv";
   reviewStatus: "approved_for_report" | "needs_review" | "excluded_from_report";
   ai_extracted?: boolean;
+  extraction_method?: "ai" | "text_parser";
+  extraction_status?: "pending" | "processed" | "failed";
   extraction_confidence?: number;
   ocr_quality?: string;
+  scanner_brand?: string;
   scanner_model?: string;
 }
 
@@ -30,14 +33,19 @@ export interface OBDDTCCode {
   code: string;
   description: string;
   status: string;
-  source?: "manual" | "ai_extracted";
+  source?: "manual" | "ai_extracted" | "parsed_text";
+  accepted?: boolean;
+  extraction_confidence?: number;
+  source_file_url?: string;
 }
 
 export interface OBDModule {
   scan_performed: string;
   scanner_brand?: string;
+  scanner_model?: string;
   uploaded_files?: OBDUploadedFile[];
   dtc_codes?: OBDDTCCode[];
+  unreviewed_code_count?: number;
   notes?: string;
   emissions_readiness?: string;
   warning_lights?: string[];

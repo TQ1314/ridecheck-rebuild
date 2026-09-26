@@ -1,0 +1,513 @@
+RIDECHECK PRE-FIELD-TEST STABILIZATION
+FIX FOUR VERIFIED TRUTHFULNESS / PROVENANCE DEFECTS ONLY
+
+OBJECTIVE
+
+Prepare RideCheck for a real weekend field test by correcting four defects identified in the read-only Buyer Intelligence Audit.
+
+THIS IS NOT A FEATURE-BUILD SESSION.
+
+Do not add inspection modules.
+Do not redesign the inspection wizard.
+Do not redesign the report.
+Do not change pricing.
+Do not change the public website.
+Do not expand the inspection checklist.
+Do not refactor unrelated architecture.
+
+RideCheck principle:
+
+INTELLIGENCE OVER QUANTITY.
+EVIDENCE OVER CHECKLIST THEATER.
+AI MAY INTERPRET EVIDENCE — IT MAY NOT MANUFACTURE EVIDENCE.
+RIDECHECK PROVIDES INFORMATION — THE BUYER MAKES THE DECISION.
+
+Before editing anything:
+
+1. Inspect the current implementation.
+2. Confirm each defect still exists.
+3. If the code has changed since the audit, report the difference.
+4. Make the smallest safe correction.
+5. Preserve existing working behavior.
+
+==================================================
+FIX 1 — ROAD TEST TRUTHFULNESS
+CRITICAL
+==================================================
+
+AUDIT FINDING:
+
+The guided inspection path currently writes a generic string such as:
+
+"Wizard submission — see inspection steps"
+
+into test_drive_notes.
+
+When structured road_test_module data is absent, report-generation fallback logic can interpret a sufficiently long test_drive_notes value as evidence that a road test occurred.
+
+This can incorrectly produce:
+
+- Road Test Completed
+- Road Test Observed
+- transmission assessed
+- removal of "road test not performed" from missing information
+- potentially improved completeness/confidence
+
+This must stop.
+
+RULE:
+
+A road test may be represented as COMPLETED only when the system has explicit evidence that a road test was actually completed.
+
+Preferred authoritative statuses:
+
+completed
+not_permitted
+not_possible
+not_performed / unavailable if currently supported
+
+Do NOT infer road-test completion from:
+
+- generic notes
+- string length
+- inspection completion
+- mechanical notes
+- transmission observations
+- existence of test_drive_notes
+
+IMPLEMENTATION REQUIREMENTS:
+
+1. Locate every place report scope determines whether road testing occurred.
+
+2. Remove generic text/note-length inference.
+
+3. Structured explicit status must be authoritative.
+
+4. If no structured road-test status exists:
+
+   Road Test = Not documented / Not performed
+
+   Use terminology consistent with existing RideCheck architecture.
+
+5. "not_permitted" must remain explicitly represented as seller not permitting the road test.
+
+6. "not_possible" must remain explicitly represented as road testing not possible because of location, condition, safety, or other recorded reason.
+
+7. Absence of a road test must appropriately affect missing-information/completeness logic.
+
+8. Do NOT penalize the vehicle itself because a road test was unavailable.
+
+9. Transmission must NOT be described as road-test assessed unless the road test actually occurred and relevant observations were recorded.
+
+10. Remove or replace the guided wizard's generic test_drive_notes placeholder if it can create downstream ambiguity.
+
+TESTS REQUIRED:
+
+A. structured status = completed
+Expected:
+Road Test Completed.
+
+B. structured status = not_permitted
+Expected:
+Not permitted by seller.
+Never "completed."
+
+C. structured status = not_possible
+Expected:
+Not possible/performed.
+Never "completed."
+
+D. road_test_module absent + generic notes present
+Expected:
+Never "completed."
+
+E. no road-test information
+Expected:
+Missing/limited information appropriately reflects that no road test was documented.
+
+==================================================
+FIX 2 — OBD DATA CONTRACT / PROVENANCE
+CRITICAL
+==================================================
+
+AUDIT FINDING:
+
+The OBD extraction UI and extraction endpoint support:
+
+PDF
+PNG
+JPG/JPEG
+TXT
+CSV
+
+but the downstream legacy submission schema does not preserve the complete contract.
+
+The audit found potential loss/rejection involving:
+
+- TXT/CSV file type
+- ai_extracted flag
+- confidence score
+- OCR quality
+- scanner brand
+- scanner model
+- DTC source
+- extraction provenance
+
+The UI/extraction endpoint and persistence/report pipeline must agree.
+
+FIRST:
+
+Inspect the current OBD types, Zod schemas, API payloads, persistence objects, Claude input types and PDF types.
+
+Do NOT create a second OBD model.
+
+Use one consistent contract.
+
+REQUIRED FILE SUPPORT:
+
+PDF
+PNG
+JPG/JPEG
+TXT
+CSV
+
+Preserve current file-count/size rules unless a verified server-side safety problem requires a narrowly scoped correction.
+
+FOR EACH OBD FILE, preserve where applicable:
+
+- file URL/path/reference
+- filename
+- file type
+- scanner_brand
+- scanner_model
+- ai_extracted / extraction method
+- confidence_score
+- ocr_quality
+- processed/extracted status
+
+FOR EACH DTC, preserve:
+
+- system
+- code
+- status
+- description
+- source
+
+source should distinguish at minimum:
+
+manual
+ai_extracted
+
+If existing architecture supports more precise provenance, preserve it rather than removing it.
+
+Do not silently strip these fields through Zod parsing.
+
+==================================================
+FIX 3 — HUMAN CONFIRMATION BEFORE AI-EXTRACTED DTC
+INFLUENCES BUYER REPORT
+==================================================
+
+The extraction engine assists the RideChecker.
+
+It is NOT authoritative evidence by itself.
+
+CURRENT GOOD BEHAVIOR TO PRESERVE:
+
+confidence < 60:
+
+codes: []
+
+and extracted candidates remain low-confidence rather than automatically populating the normal DTC list.
+
+DO NOT weaken that behavior.
+
+NEW/VERIFIED REQUIREMENT:
+
+AI-extracted DTC codes must be reviewed/accepted by the RideChecker before they can influence:
+
+- Claude report interpretation
+- buyer-facing OBD findings
+- repair-cost context
+- significant findings
+- report narrative
+
+Use the smallest implementation compatible with the current UI.
+
+If the current "Extract codes with AI" workflow already presents extracted codes for inspector review, determine whether an explicit accepted/reviewed state already exists.
+
+Do not add unnecessary workflow if it already exists.
+
+If no durable review state exists, add the smallest appropriate field/state such as:
+
+reviewed / accepted
+
+or equivalent consistent with the existing architecture.
+
+IMPORTANT:
+
+Do NOT force manually entered codes through AI confirmation.
+
+Manual code entry remains source = manual.
+
+LOW CONFIDENCE:
+
+confidence < 60 must NEVER automatically become accepted diagnostic evidence.
+
+Also inspect the audit finding that low-confidence extraction may still populate:
+
+- scanner identity
+- aggregate emissions status
+
+Scanner identity may be retained as tentative metadata if appropriate.
+
+But low-confidence extracted diagnostic assertions must not silently influence buyer conclusions.
+
+If confidence is inadequate, preserve uncertainty.
+
+==================================================
+FIX 4 — REMOVE PURCHASE-DECISION MAPPINGS
+CRITICAL PRODUCT PRINCIPLE
+==================================================
+
+AUDIT FINDING:
+
+The report-generation route still contains internal recommendation mappings such as:
+
+BUY
+BUY_WITH_NEGOTIATION
+DO_NOT_BUY_AT_ASKING_PRICE
+
+These conflict with RideCheck's operating principle even if they are currently internal.
+
+RideCheck does not decide whether the customer should purchase a vehicle.
+
+REMOVE purchase-decision mappings from the report pipeline.
+
+Do not replace them with disguised recommendations such as:
+
+GOOD BUY
+BAD BUY
+SAFE TO BUY
+AVOID
+WALK AWAY
+RECOMMENDED PURCHASE
+NOT RECOMMENDED
+BUY IF...
+PASS
+
+RideCheck may communicate:
+
+- observed condition
+- evidence
+- HIGH / MODERATE / LOW risk
+- financial exposure
+- inspection completeness
+- missing/unverified information
+- price/condition context
+- buyer considerations
+
+The buyer makes the decision.
+
+If a database field such as ops_recommendation cannot safely be removed because of schema compatibility:
+
+Do NOT perform a risky migration for this stabilization.
+
+Instead:
+
+- stop generating purchase-decision values;
+- neutralize/deprecate the field in application logic;
+- confirm it cannot influence the buyer report or downstream workflow;
+- document the remaining schema debt.
+
+==================================================
+DO NOT FIX THESE YET
+==================================================
+
+The audit identified other legitimate issues.
+
+DO NOT expand this session to address them unless directly necessary for one of the four fixes above.
+
+Specifically defer:
+
+- full guided/legacy workflow consolidation
+- complete evidence-to-photo linkage
+- repair-cost methodology redesign
+- model-specific vehicle intelligence
+- third-party history integration
+- website copy changes
+- pricing changes
+- report visual redesign
+- additional inspection modules
+- new checklist items
+- broad risk-engine redesign
+- paint-depth workflow
+- Euro/EV/hybrid workflow
+- broad title/history redesign
+
+We are intentionally preventing scope creep before the field test.
+
+==================================================
+REGRESSION PROTECTION
+==================================================
+
+Do not break:
+
+- existing guided inspection
+- existing inspection photos
+- existing title/history data
+- HVAC
+- rust/corrosion observations
+- flood indicators
+- accident/repair indicators
+- odometer module
+- OBD upload
+- manual DTC entry
+- scanner auto-detection
+- confidence badges
+- low-confidence suppression
+- original diagnostic evidence
+- report generation
+- Supabase storage
+- Ops report review
+- report delivery
+
+==================================================
+TEST MATRIX
+==================================================
+
+Run existing relevant tests plus targeted tests for these changes.
+
+OBD TEST 1
+Clear scanner PDF/image:
+- extraction succeeds
+- scanner brand/model preserved
+- confidence preserved
+- extracted DTC source preserved
+- inspector accepts codes
+- accepted codes reach report pipeline
+
+OBD TEST 2
+Low-quality scanner image:
+- confidence <60
+- codes do not auto-populate
+- codes cannot influence report
+- uncertainty remains visible
+- original file remains preserved
+
+OBD TEST 3
+TXT:
+- parsed without Claude
+- submission succeeds
+- provenance persists
+- accepted codes reach report
+
+OBD TEST 4
+CSV:
+- parsed without Claude
+- submission succeeds
+- provenance persists
+- accepted codes reach report
+
+OBD TEST 5
+Manual DTC:
+- source = manual
+- persists
+- reaches report
+- is not mislabeled as AI-extracted
+
+OBD TEST 6
+Duplicate manual + extracted code:
+- deduplication behaves correctly
+- source/provenance is not silently corrupted
+
+ROAD TEST 1
+completed → report says completed
+
+ROAD TEST 2
+not_permitted → report says not permitted
+
+ROAD TEST 3
+not_possible → report says not possible/performed
+
+ROAD TEST 4
+module absent + generic notes → NEVER completed
+
+ROAD TEST 5
+module absent → missing/limited information reflects absence
+
+PURCHASE DECISION TEST
+Search repository after implementation for active report/business logic using:
+
+BUY
+BUY_WITH_NEGOTIATION
+DO_NOT_BUY_AT_ASKING_PRICE
+DO_NOT_BUY
+GOOD_BUY
+BAD_BUY
+WALK_AWAY
+
+Distinguish harmless historical/test/text occurrences from active decision logic.
+
+Confirm no active report-generation path instructs the customer whether to purchase the vehicle.
+
+==================================================
+FIELD-TEST READINESS OUTPUT
+==================================================
+
+After implementation, STOP and provide:
+
+1. FILES CHANGED
+
+For each file:
+- why it changed
+- exact behavior changed
+
+2. DEFECT CLOSURE MATRIX
+
+| Defect | Before | After | Verification |
+
+Include:
+
+- road-test false completion
+- OBD TXT/CSV contract
+- OBD metadata persistence
+- DTC source persistence
+- low-confidence protection
+- human review/acceptance
+- purchase-decision mapping
+
+3. TEST RESULTS
+
+List every targeted test and PASS/FAIL.
+
+Do not hide failing tests.
+
+4. REMAINING KNOWN LIMITATIONS
+
+Especially identify anything intentionally deferred from the audit.
+
+5. WEEKEND FIELD-TEST STATUS
+
+Return exactly one:
+
+READY FOR CONTROLLED FIELD TEST
+
+or
+
+NOT READY FOR FIELD TEST
+
+If NOT READY, state the blocking defect.
+
+Do not call the product production-ready.
+
+This session only determines whether it is ready for the controlled real-vehicle weekend test.
+
+==================================================
+FINAL RULE
+==================================================
+
+MAKE THE FOUR VERIFIED CORRECTIONS.
+TEST THEM.
+STOP.
+
+Do not begin another enhancement phase.
