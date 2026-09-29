@@ -1,0 +1,164 @@
+RIDECHECK — PAYMENT-FIRST CONTROLLED E2E VERIFICATION
+
+The payment-first hardening implementation has passed its focused automated tests.
+
+DO NOT publish/deploy production changes yet.
+DO NOT touch the historical Steven/Rivian order.
+DO NOT use live Stripe charges.
+
+Before beginning the controlled Stripe test, investigate the 7 existing failures in:
+
+lib/utils/__tests__/pricing.test.ts
+
+Compare each failing expectation against:
+1. the current production pricing implementation,
+2. the current RideCheck package/pricing configuration,
+3. current customer-facing pricing,
+4. existing pricing business rules.
+
+Do NOT change pricing behavior merely to satisfy tests.
+
+For each failure classify it as:
+
+A. STALE TEST — implementation/current pricing is authoritative
+B. REAL PRICING DEFECT
+C. AMBIGUOUS — business decision required
+
+Report the seven classifications before modifying those tests.
+
+If they are demonstrably stale, update the tests to reflect the existing authoritative pricing behavior and rerun the COMPLETE test suite.
+
+Then perform/prepare the controlled payment verification using Stripe TEST MODE only.
+
+TEST 1 — CREATED BUT UNPAID
+
+Create a NEW $299 Exotic Concierge test request.
+
+Verify:
+- order persists
+- payment_status remains unpaid/pending
+- ops_status = pending_payment
+- Ops displays PENDING PAYMENT — NOT ACTIONABLE
+- customer email says pending request / payment required
+- Ops receives new-request notification
+- seller details may be stored
+- seller contact controls are disabled
+- RC assignment/broadcast is disabled
+- inspection cannot begin
+
+Record the new TEST order ID.
+
+TEST 2 — CANCELED CHECKOUT
+
+Start Stripe Checkout for a new test request and cancel it.
+
+Verify:
+- order remains pending payment
+- no payment_received state
+- no paid confirmation
+- no seller outreach eligibility
+- no RC dispatch eligibility
+
+TEST 3 — FAILED PAYMENT
+
+Using an appropriate Stripe test failure method, attempt payment.
+
+Verify the same non-operational state.
+
+TEST 4 — SUCCESSFUL PAYMENT
+
+Using Stripe TEST MODE, successfully pay for a fresh $299 Exotic Concierge request.
+
+Verify:
+
+Stripe:
+- successful test transaction exists
+- amount = $299
+- currency = USD
+- Stripe identifiers link to correct RideCheck order
+
+RideCheck:
+- payment state becomes paid/payment_received
+- operational state advances correctly
+- order becomes actionable
+- seller coordination becomes available
+- RC assignment/broadcast becomes available
+- inspection workflow becomes available only after payment
+
+Customer:
+- exactly one paid confirmation
+
+Ops:
+- exactly one successful-payment alert
+- alert contains correct order/customer/vehicle/package/amount/Stripe identifiers
+
+TEST 5 — WEBHOOK REPLAY
+
+Replay/reprocess the successful Stripe event.
+
+Verify:
+- no duplicate payment transition
+- no duplicate customer paid confirmation
+- no duplicate ordinary Ops payment notification
+- order state remains correct
+
+TEST 6 — BROWSER SUCCESS PAGE
+
+Refresh/revisit the success URL.
+
+Verify:
+- it cannot independently mark an unpaid order paid
+- it cannot generate duplicate confirmation
+- it cannot trigger duplicate operational activation
+
+TEST 7 — PAYMENT GATES
+
+Before payment, directly attempt:
+- seller contact/status advancement
+- RC assignment/broadcast
+- RideChecker inspection start
+- legacy inspector workflow
+- protected order-status advancement
+
+Each must fail safely.
+
+After verified payment, confirm the legitimate corresponding operations become available.
+
+TEST 8 — OVERRIDE
+
+With authorized Ops credentials:
+- exercise the existing payment override on TEST DATA
+- verify audit record
+
+Attempt equivalent operation without authorization:
+- verify rejection
+
+Do not test override on real customer records.
+
+FINAL REPORT
+
+Return:
+
+1. Pricing-test investigation
+2. Complete-suite test result
+3. Test order IDs
+4. Stripe TEST transaction evidence
+5. Each E2E test: PASS / FAIL
+6. Customer emails observed
+7. Ops notifications observed
+8. Payment-state transitions observed
+9. Duplicate/replay results
+10. Authorization/override results
+11. Any defects discovered
+12. Files changed during verification
+13. Whether any production data was touched
+14. Whether any live Stripe transaction occurred
+15. Recommendation limited to one of:
+
+A. NOT READY — defects remain
+B. READY FOR CONTROLLED FIELD TEST
+C. CONTROLLED FIELD TEST PASSED — candidate for production deployment review
+
+Do NOT call the application production-ready.
+
+Do not publish/deploy anything without explicit approval.

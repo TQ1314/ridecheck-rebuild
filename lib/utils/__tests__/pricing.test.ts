@@ -14,11 +14,11 @@ describe("getPrice", () => {
     expect(result.discountAmount).toBe(0);
   });
 
-  it("returns same price for self_arrange (no discount)", () => {
+  it("applies the advertised $10 self-arrange discount", () => {
     const result = getPrice("standard", "self_arrange");
     expect(result.basePrice).toBe(139);
-    expect(result.finalPrice).toBe(139);
-    expect(result.discountAmount).toBe(0);
+    expect(result.finalPrice).toBe(129);
+    expect(result.discountAmount).toBe(10);
   });
 
   it("returns correct plus price", () => {
@@ -72,8 +72,8 @@ describe("getPackageTier", () => {
     expect(getPackageTier({ make: "BMW", model: "X5" })).toBe("premium");
   });
 
-  it("returns premium for Tesla (luxury brand)", () => {
-    expect(getPackageTier({ make: "Tesla", model: "Model 3" })).toBe("premium");
+  it("returns plus for Tesla as an EV", () => {
+    expect(getPackageTier({ make: "Tesla", model: "Model 3" })).toBe("plus");
   });
 
   it("returns plus for heavy duty trucks", () => {
