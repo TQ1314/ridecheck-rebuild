@@ -46,6 +46,8 @@ interface OrderQueueItem {
   status: string;
   assignment_status: string;
   payment_status: string | null;
+  payment_required?: boolean | null;
+  payment_override_approved?: boolean;
   scheduled_date: string | null;
   created_at: string;
   next_action: string;

@@ -3,6 +3,7 @@ import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getStep, isStepComplete } from "@/lib/inspection/steps";
 import type { StepData } from "@/lib/inspection/steps";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export async function PATCH(
   // Verify session ownership
   const { data: session } = await supabaseAdmin
     .from("ridecheck_inspection_sessions")
-    .select("id, ridechecker_id, status")
+    .select("id, order_id, ridechecker_id, status")
     .eq("assignment_id", assignmentId)
     .eq("status", "in_progress")
     .order("created_at", { ascending: false })
@@ -51,6 +52,19 @@ export async function PATCH(
 
   if (result.actor.role === "ridechecker_active" && session.ridechecker_id !== result.actor.userId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { data: gateOrder, error: gateError } = await supabaseAdmin
+    .from("orders")
+    .select("payment_status, payment_required, payment_override_approved")
+    .eq("id", session.order_id)
+    .maybeSingle();
+  if (gateError) {
+    console.error("[inspect step payment gate]", gateError);
+    return NextResponse.json({ error: "Could not verify payment before saving inspection work" }, { status: 500 });
+  }
+  if (!gateOrder || !canProceedWithRideCheck(gateOrder)) {
+    return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
   }
 
   // Build step data to check completion

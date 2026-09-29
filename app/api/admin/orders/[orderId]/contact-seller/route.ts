@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 const contactSchema = z.object({
   notes: z.string().optional(),
@@ -24,12 +25,15 @@ export async function POST(
 
     const { data: currentOrder } = await supabaseAdmin
       .from("orders")
-      .select("seller_contact_attempts, seller_contacted_at")
+      .select("seller_contact_attempts, seller_contacted_at, payment_status, payment_required, payment_override_approved")
       .eq("id", params.orderId)
       .single();
 
     if (!currentOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    if (!canProceedWithRideCheck(currentOrder)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
     }
 
     const newAttempts = (currentOrder.seller_contact_attempts || 0) + 1;

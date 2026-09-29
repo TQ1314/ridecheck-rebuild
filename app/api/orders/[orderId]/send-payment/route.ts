@@ -48,6 +48,10 @@ export async function POST(
         { status: 400 },
       );
     }
+    const priceCents = Math.round(Number(order.final_price) * 100);
+    if (!Number.isSafeInteger(priceCents) || priceCents <= 0) {
+      return NextResponse.json({ error: "Order price is invalid; payment request not created" }, { status: 409 });
+    }
 
     const stripe = getStripe();
     let paymentUrl = "";
@@ -64,7 +68,7 @@ export async function POST(
                 name: `RideCheck ${order.package.charAt(0).toUpperCase() + order.package.slice(1)} Assessment`,
                 description: `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`,
               },
-              unit_amount: Math.round(Number(order.final_price) * 100),
+              unit_amount: priceCents,
             },
             quantity: 1,
           },
@@ -72,21 +76,35 @@ export async function POST(
         metadata: {
           order_id: params.orderId,
           customer_email: order.buyer_email || order.customer_email || "",
+          ...(order.payment_link_token && { payment_link_token: order.payment_link_token }),
+        },
+        payment_intent_data: {
+          metadata: {
+            order_id: params.orderId,
+            ...(order.payment_link_token && { payment_link_token: order.payment_link_token }),
+          },
         },
         success_url: `${appUrl}/orders/${params.orderId}?payment=success`,
         cancel_url: `${appUrl}/orders/${params.orderId}?payment=cancelled`,
       });
       paymentUrl = checkoutSession.url || "";
 
-      await supabaseAdmin
+      const { data: linked, error: linkError } = await supabaseAdmin
         .from("orders")
         .update({
           payment_status: "requested",
           stripe_session_id: checkoutSession.id,
+          stripe_checkout_session_id: checkoutSession.id,
           status: "payment_requested",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", params.orderId);
+        .eq("id", params.orderId)
+        .eq("payment_status", "not_requested")
+        .select("id");
+      if (linkError || !linked?.length) {
+        console.error("[Send Payment] Checkout created but order linkage failed", { orderId: params.orderId, error: linkError });
+        return NextResponse.json({ error: "Payment session could not be linked; contact support" }, { status: 503 });
+      }
     } else {
       await supabaseAdmin
         .from("orders")

@@ -38,7 +38,7 @@ export function orderConfirmationHtml({
         <p style="margin:0 0 8px;font-weight:700;color:#166534;">${selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller (optional)"}</p>
         <p>${selfArrange
           ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck."
-          : "Optional: If you're already messaging the seller, you can send this introduction. RideCheck will handle the coordination after that."}</p>
+          : "Optional: If you're already messaging the seller, you can send this introduction. RideCheck will handle the coordination after payment is confirmed."}</p>
         <div style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:16px;white-space:pre-line;line-height:1.6;">${escapeHtml(selfArrange ? SELF_ARRANGE_MESSAGE : sellerIntroduction({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }))}</div>
       </div>`
     : "";
@@ -58,10 +58,10 @@ export function orderConfirmationHtml({
         <p style="color:#64748b;font-size:14px;margin:4px 0 0;">Independent Vehicle Inspection</p>
       </div>
 
-      <h2 style="color:#1e293b;margin-bottom:16px;">Your Inspection Request</h2>
+      <h2 style="color:#1e293b;margin-bottom:16px;">Inspection Request — Pending Payment</h2>
        <p>Hi ${escapeHtml(customerName)},</p>
-      <p>Thanks for using RideCheck! Your order has been created.</p>
-       <p>After you submit your request, we'll send you a secure payment link. Payment is required before RideCheck contacts the seller or schedules the inspection.</p>
+      <p>Thanks for your request. It is pending payment and is not yet a confirmed inspection.</p>
+       <p>Use the secure payment link below. Payment must be confirmed before RideCheck contacts the seller or schedules the inspection.</p>
 
       <table style="width:100%;border-collapse:collapse;margin:20px 0;background:#f8fafc;border-radius:8px;">
         ${orderNumber ? `<tr><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569;">Order</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;">${escapeHtml(publicOrderReference(orderNumber)!)}</td></tr>` : ""}

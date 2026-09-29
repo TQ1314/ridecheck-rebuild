@@ -20,10 +20,18 @@ export async function POST(
     if (!isAuthorized(result)) return result.error;
     const { actor } = result;
 
-    let body: { diff_cents: number; new_package: string } = { diff_cents: 0, new_package: "" };
-    try { body = await req.json(); } catch { /* ignore */ }
+    let body: { diff_cents: number; new_package: string };
+    try {
+      const parsedBody = await req.json();
+      if (!parsedBody || typeof parsedBody !== "object") {
+        return NextResponse.json({ error: "Invalid upgrade payment request" }, { status: 400 });
+      }
+      body = parsedBody as { diff_cents: number; new_package: string };
+    } catch {
+      return NextResponse.json({ error: "Invalid upgrade payment request" }, { status: 400 });
+    }
 
-    if (!body.diff_cents || body.diff_cents <= 0) {
+    if (!Number.isSafeInteger(body.diff_cents) || body.diff_cents <= 0) {
       return NextResponse.json({ error: "diff_cents must be a positive integer" }, { status: 400 });
     }
 
@@ -77,20 +85,9 @@ export async function POST(
       cancel_url:  `${appUrl}/order/received?orderId=${params.orderId}`,
     });
 
-    // Save the payment link to the order
-    const now = new Date().toISOString();
-    await supabaseAdmin
-      .from("orders")
-      .update({
-        payment_link_url:            session.url,
-        stripe_checkout_session_id:  session.id,
-        stripe_session_id:           session.id,
-        payment_status:              "requested",
-        updated_at:                  now,
-      })
-      .eq("id", params.orderId)
-      .eq("payment_status", "paid"); // guard: only if already paid (this is a top-up)
-
+    // A package top-up is a separate payment. Do not reuse base-order payment
+    // fields or mark the already-paid inspection as requested/unpaid. Keep the
+    // top-up session and amount in the existing append-only order/audit events.
     await Promise.all([
       writeOrderEvent({
         orderId:    params.orderId,
@@ -101,6 +98,8 @@ export async function POST(
           diff_cents:  body.diff_cents,
           new_package: newPkg,
           session_id:  session.id,
+          session_url: session.url,
+          base_payment_status: "paid",
         },
       }),
       writeAuditLog({
@@ -109,7 +108,12 @@ export async function POST(
         actorRole:  actor.role,
         action:     "order.upgrade_payment_requested",
         resourceId: params.orderId,
-        newValue: { diff_cents: body.diff_cents, new_package: newPkg },
+        newValue: {
+          diff_cents: body.diff_cents,
+          new_package: newPkg,
+          session_id: session.id,
+          base_payment_status: "paid",
+        },
       }),
     ]);
 

@@ -62,6 +62,7 @@ import { formatRelative } from "@/lib/utils/format";
 interface SellerContactPanelProps {
   order: Order;
   onRefresh: () => void;
+  paymentBlocked?: boolean;
 }
 
 function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -167,7 +168,7 @@ function getChannelIcon(channel: string) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps) {
+export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }: SellerContactPanelProps) {
   const { toast } = useToast();
 
   // ── Existing state ──
@@ -707,6 +708,16 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
 
   return (
     <TooltipProvider>
+      <div
+        aria-disabled={paymentBlocked}
+        inert={paymentBlocked || undefined}
+        className={paymentBlocked ? "pointer-events-none opacity-70" : undefined}
+      >
+      {paymentBlocked && (
+        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900" data-testid="seller-payment-lock">
+          Pending payment — seller contact actions are disabled. Existing seller information and history remain visible.
+        </div>
+      )}
       <Card data-testid="seller-contact-panel">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -2157,6 +2168,7 @@ export function SellerContactPanel({ order, onRefresh }: SellerContactPanelProps
         </DialogContent>
       </Dialog>
 
+      </div>
     </TooltipProvider>
   );
 }

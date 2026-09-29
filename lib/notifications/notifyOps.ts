@@ -15,6 +15,7 @@ export interface OpsNotificationPayload {
   body:     string;
   smsBody:  string;
   orderId?: string;
+  emailAll?: boolean;
 }
 
 export async function notifyOpsTeam(payload: OpsNotificationPayload): Promise<void> {
@@ -26,21 +27,31 @@ export async function notifyOpsTeam(payload: OpsNotificationPayload): Promise<vo
       .in("role", ["operations", "operations_lead", "ops_lead", "owner"])
       .eq("is_active", true);
 
-    if (!opsUsers || opsUsers.length === 0) return;
+    if ((!opsUsers || opsUsers.length === 0) && !process.env.ADMIN_EMAIL) {
+      console.error("[notifyOps] No recipients configured", { orderId: payload.orderId });
+      return;
+    }
 
     const tasks: Promise<any>[] = [];
 
-    for (const user of opsUsers as any[]) {
+    const emailRecipients = new Set<string>();
+    for (const user of (opsUsers ?? []) as any[]) {
       if (user.phone) {
         tasks.push(
-          sendSMS({ to: user.phone, body: payload.smsBody }).catch((e) =>
-            console.error(`[notifyOps] SMS to ${user.phone} failed:`, e)
-          )
+          sendSMS({ to: user.phone, body: payload.smsBody }).then((result) => {
+            if (!result.success) console.error("[notifyOps] SMS provider rejected notification", { orderId: payload.orderId });
+          }).catch((e) => console.error("[notifyOps] SMS failed", { orderId: payload.orderId, error: e }))
         );
-      } else if (user.email) {
+      }
+      if (user.email && (payload.emailAll || !user.phone)) emailRecipients.add(user.email);
+    }
+    if (payload.emailAll && process.env.ADMIN_EMAIL) emailRecipients.add(process.env.ADMIN_EMAIL);
+    for (const recipient of emailRecipients) {
+        const escape = (text: string) => text.replace(/[&<>"']/g, (char) =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
         const html = `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-            <p style="font-size:16px;color:#111;">${payload.body.replace(/\n/g, "<br>")}</p>
+            <p style="font-size:16px;color:#111;">${escape(payload.body).replace(/\n/g, "<br>")}</p>
             ${
               payload.orderId
                 ? `<p><a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/orders/${payload.orderId}" style="color:#22774F;">View Order →</a></p>`
@@ -51,11 +62,10 @@ export async function notifyOpsTeam(payload: OpsNotificationPayload): Promise<vo
           </div>
         `;
         tasks.push(
-          sendEmail({ to: user.email, subject: payload.subject, html }).catch((e) =>
-            console.error(`[notifyOps] Email to ${user.email} failed:`, e)
-          )
+          sendEmail({ to: recipient, subject: payload.subject, html }).then((result) => {
+            if (!result.success) console.error("[notifyOps] Email provider rejected notification", { orderId: payload.orderId });
+          }).catch((e) => console.error("[notifyOps] Email failed", { orderId: payload.orderId, error: e }))
         );
-      }
     }
 
     await Promise.allSettled(tasks);

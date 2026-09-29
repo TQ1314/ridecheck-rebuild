@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized, writeOrderEvent } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,23 @@ export async function PATCH(
       { error: `Cannot transition from '${assignment.status}' to '${new_status}'` },
       { status: 400 }
     );
+  }
+
+  // En-route, arrival and inspection transitions are field work. Escalation
+  // remains available so an inspector can report a safety or access issue.
+  if (new_status !== "escalated") {
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("payment_status, payment_required, payment_override_approved")
+      .eq("id", assignment.order_id)
+      .maybeSingle();
+    if (orderError) {
+      console.error("[status PATCH payment gate]", orderError);
+      return NextResponse.json({ error: "Could not verify payment before field work" }, { status: 500 });
+    }
+    if (!order || !canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
+    }
   }
 
   const now = new Date().toISOString();

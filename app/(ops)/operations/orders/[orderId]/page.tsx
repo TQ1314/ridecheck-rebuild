@@ -556,10 +556,10 @@ export default function OpsOrderDetailPage() {
           <Lock className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              Field Work Locked — Payment Not Confirmed
+              PENDING PAYMENT — NOT ACTIONABLE
             </p>
             <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-              Seller outreach, RideChecker assignment, inspection, report generation, and buyer delivery are all blocked until payment is received.
+              Seller outreach, RideChecker assignment, dispatch, and inspection are blocked until payment is verified or an authorized Ops override is active.
               {order.payment_status === "override_approved"
                 ? null
                 : canPaymentOverride
@@ -633,7 +633,7 @@ export default function OpsOrderDetailPage() {
               </CardContent>
             </Card>
           )}
-          <SellerContactPanel order={order} onRefresh={loadData} />
+          <SellerContactPanel order={order} onRefresh={loadData} paymentBlocked={!paymentAuthorized} />
           <CommunicationCenter order={order} onRefresh={loadData} />
         </div>
 
@@ -646,7 +646,7 @@ export default function OpsOrderDetailPage() {
             userRole={role}
             highlighted={compensationHighlighted}
           />
-          <RideCheckerAssignmentPanel order={order} onRefresh={loadData} onNoPay={handleNoPay} />
+          <RideCheckerAssignmentPanel order={order} onRefresh={loadData} onNoPay={handleNoPay} paymentBlocked={!paymentAuthorized} />
           <JobStatusPanel order={order} onRefresh={loadData} />
           <PayPanel order={order} onRefresh={loadData} userRole={role} />
           <ReportPanel order={order} onRefresh={loadData} />

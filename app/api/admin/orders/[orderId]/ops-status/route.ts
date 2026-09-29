@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
+import { canProceedWithRideCheck } from "@/lib/payment/payment-gate";
 
 const opsStatusSchema = z.object({
   ops_status: z.enum([
@@ -32,9 +33,15 @@ export async function POST(
 
     const { data: currentOrder } = await supabaseAdmin
       .from("orders")
-      .select("ops_status")
+      .select("ops_status, payment_status, payment_required, payment_override_approved")
       .eq("id", params.orderId)
       .single();
+
+    if (!currentOrder) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    const passiveUnpaidStatuses = ["new", "payment_pending", "on_hold", "needs_buyer_info", "cancelled"];
+    if (!canProceedWithRideCheck(currentOrder) && !passiveUnpaidStatuses.includes(parsed.data.ops_status)) {
+      return NextResponse.json({ error: "Pending payment orders cannot enter operational fulfillment statuses." }, { status: 402 });
+    }
 
     const oldOpsStatus = currentOrder?.ops_status || "new";
 

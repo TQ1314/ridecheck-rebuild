@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export async function POST(
 
     let query = supabaseAdmin
       .from("orders")
-      .select("id, order_id, inspector_status, report_status")
+      .select("id, order_id, inspector_status, report_status, payment_status, payment_required, payment_override_approved")
       .eq("order_id", params.orderId);
 
     if (actor.role !== "owner" && inspector) {
@@ -59,6 +60,9 @@ export async function POST(
 
     if (fetchError || !order) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+    if (!canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
     }
 
     const ext = file.name.split(".").pop() || "pdf";
@@ -82,7 +86,7 @@ export async function POST(
       );
     }
 
-    const { error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from("orders")
       .update({
         report_status: "uploaded",
@@ -90,10 +94,21 @@ export async function POST(
         report_uploaded_at: new Date().toISOString(),
       })
       .eq("id", order.id);
+    if (order.payment_required === false) {
+      updateQuery = updateQuery.eq("payment_required", false);
+    } else if (order.payment_status === "override_approved" && order.payment_override_approved === true) {
+      updateQuery = updateQuery.eq("payment_status", "override_approved").eq("payment_override_approved", true);
+    } else {
+      updateQuery = updateQuery.eq("payment_status", order.payment_status);
+    }
+    const { data: updatedRows, error: updateError } = await updateQuery.select("id");
 
     if (updateError) {
       console.error("Order update error:", updateError);
       return NextResponse.json({ error: "File uploaded but failed to update order" }, { status: 500 });
+    }
+    if (!updatedRows?.length) {
+      return NextResponse.json({ error: "Payment status changed before report upload was saved; refresh and try again." }, { status: 409 });
     }
 
     await supabaseAdmin.from("order_events").insert({

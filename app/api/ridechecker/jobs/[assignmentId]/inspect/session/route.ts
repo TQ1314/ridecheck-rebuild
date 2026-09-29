@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, isAuthorized } from "@/lib/rbac";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { INSPECTION_STEPS } from "@/lib/inspection/steps";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,22 @@ export async function POST(
 
   if (result.actor.role === "ridechecker_active" && assignment.ridechecker_id !== result.actor.userId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { data: gateOrder, error: gateError } = await supabaseAdmin
+    .from("orders")
+    .select("payment_status, payment_required, payment_override_approved")
+    .eq("id", assignment.order_id)
+    .maybeSingle();
+  if (gateError) {
+    console.error("[inspect session payment gate]", gateError);
+    return NextResponse.json({ error: "Could not verify payment before inspection" }, { status: 500 });
+  }
+  if (!gateOrder) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+  if (!canProceedWithRideCheck(gateOrder)) {
+    return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
   }
 
   const readyStatuses = ["assigned", "accepted", "en_route", "arrived", "inspection_started", "inspecting", "in_progress"];

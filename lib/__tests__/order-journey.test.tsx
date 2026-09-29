@@ -37,7 +37,8 @@ describe("buyer journey copy and references", () => {
 
   it("keeps Concierge payment-first and makes marketplace introduction optional with confirmed vehicle details", () => {
     const html = orderConfirmationHtml(base);
-    expect(html).toContain("Payment is required before RideCheck contacts the seller or schedules the inspection.");
+    expect(html).toContain("Payment must be confirmed before RideCheck contacts the seller or schedules the inspection.");
+    expect(html).toContain("not yet a confirmed inspection");
     expect(html).toContain("Once payment is completed, RideCheck will begin coordinating with the seller");
     expect(html).toContain("Introduce RideCheck to the seller (optional)");
     expect(html).toContain("the 2017 Audi Q7");

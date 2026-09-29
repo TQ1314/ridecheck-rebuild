@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
+import { canProceedWithRideCheck } from "@/lib/payment/payment-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export async function POST(
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, payment_status, ops_status, booking_type, " +
+        "id, payment_status, payment_required, payment_override_approved, ops_status, booking_type, " +
         "listing_url, vehicle_year, vehicle_make, vehicle_model, vehicle_trim, " +
         "vehicle_location, seller_name, seller_phone, package, " +
         "base_price, final_price, ops_internal_note"
@@ -63,6 +64,9 @@ export async function POST(
 
     if (fetchErr || !order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    if (body.restore_to_contact_seller && !canProceedWithRideCheck(order as any)) {
+      return NextResponse.json({ error: "Payment is required before seller coordination can resume." }, { status: 402 });
     }
 
     // Build update payload — never touch payment_status

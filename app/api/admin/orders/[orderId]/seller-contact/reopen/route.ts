@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 
 const schema = z.object({
   reason: z.string().optional(),
@@ -21,6 +22,20 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const parsed = schema.safeParse(body);
     const reason = parsed.success ? (parsed.data.reason || null) : null;
+
+    const { data: gateOrder, error: gateError } = await supabaseAdmin
+      .from("orders")
+      .select("payment_status, payment_required, payment_override_approved")
+      .eq("id", params.orderId)
+      .maybeSingle();
+    if (gateError) {
+      console.error("[seller-contact/reopen] payment gate lookup failed", gateError);
+      return NextResponse.json({ error: "Could not verify payment before reopening outreach" }, { status: 500 });
+    }
+    if (!gateOrder) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    if (!canProceedWithRideCheck(gateOrder)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
+    }
 
     const now = new Date().toISOString();
 

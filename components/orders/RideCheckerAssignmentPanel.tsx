@@ -74,6 +74,7 @@ interface RideCheckerAssignmentPanelProps {
   order: Order;
   onRefresh: () => void;
   onNoPay?: () => void;
+  paymentBlocked?: boolean;
 }
 
 function useCountdown(expiresAt: string | null | undefined, active: boolean) {
@@ -135,7 +136,7 @@ function broadcastStatusLabel(status: string) {
   }
 }
 
-export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCheckerAssignmentPanelProps) {
+export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay, paymentBlocked = false }: RideCheckerAssignmentPanelProps) {
   const { toast } = useToast();
 
   const [ridecheckers, setRidecheckers] = useState<RideCheckerSuggestion[]>([]);
@@ -506,6 +507,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
   const isExpiredCountdown = secsLeft !== null && secsLeft === 0;
 
   return (
+    <div
+      aria-disabled={paymentBlocked}
+      inert={paymentBlocked || undefined}
+      className={paymentBlocked ? "pointer-events-none opacity-70" : undefined}
+    >
     <Card data-testid="card-ridechecker-assignment">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center justify-between gap-2">
@@ -517,6 +523,11 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {paymentBlocked && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900" data-testid="assignment-payment-lock">
+            Pending payment — assignment and broadcast actions are disabled. Existing assignment history remains visible.
+          </div>
+        )}
 
         {/* ── Awaiting acceptance status pane ─────────────────── */}
         {isAwaitingAcceptance && order.assigned_ridechecker_id && (
@@ -1097,5 +1108,6 @@ export function RideCheckerAssignmentPanel({ order, onRefresh, onNoPay }: RideCh
         onOpenChange={setProfileDrawerOpen}
       />
     </Card>
+    </div>
   );
 }

@@ -1,71 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized } from "@/lib/rbac";
+import { computeNextAction } from "@/lib/payment/ops-next-action";
 
 export const dynamic = "force-dynamic";
-
-type Urgency = "high" | "medium" | "low" | "done";
-
-interface NextAction {
-  label: string;
-  urgency: Urgency;
-  link?: string;
-}
-
-function computeNextAction(order: any): NextAction {
-  const { id, status, assignment_status, payment_status } = order;
-  const base = `/operations/orders/${id}`;
-
-  // Cancelled / done
-  if (status === "cancelled") return { label: "Cancelled", urgency: "done" };
-  if (status === "completed") return { label: "Complete", urgency: "done" };
-  if (status === "report_sent") return { label: "Report Sent", urgency: "done" };
-
-  // Payment
-  if (!payment_status || ["not_requested", "unpaid", "pending", "requested"].includes(payment_status)) {
-    return { label: "Collect Payment", urgency: "medium", link: base };
-  }
-  if (payment_status === "failed") {
-    return { label: "Payment Failed", urgency: "high", link: base };
-  }
-
-  // Assignment
-  const paid = ["paid", "paid_manual_verified"].includes(payment_status);
-  if (paid) {
-    if (!assignment_status || assignment_status === "unassigned") {
-      return { label: "Assign RideChecker", urgency: "high", link: base };
-    }
-    if (assignment_status === "awaiting_acceptance") {
-      return { label: "Awaiting RC Accept", urgency: "medium", link: base };
-    }
-    if (assignment_status === "declined" || assignment_status === "expired") {
-      return { label: "Reassign RideChecker", urgency: "high", link: base };
-    }
-    if (assignment_status === "accepted") {
-      return { label: "Inspection Confirmed", urgency: "low", link: base };
-    }
-  }
-
-  // Inspection
-  if (status === "inspection_in_progress") {
-    return { label: "Inspection Underway", urgency: "low", link: base };
-  }
-
-  // Submission
-  if (status === "submitted" || status === "report_requested") {
-    return { label: "Review Submission", urgency: "high", link: base };
-  }
-
-  // Report
-  if (status === "report_drafting") {
-    return { label: "Generate Report", urgency: "medium", link: base };
-  }
-  if (status === "report_ready") {
-    return { label: "Send to Buyer", urgency: "high", link: base };
-  }
-
-  return { label: "Review Order", urgency: "medium", link: base };
-}
 
 export async function GET() {
   try {
@@ -78,7 +16,7 @@ export async function GET() {
     const [ordersRes, payoutsRes, rcProfilesRes, availabilityRes, assignmentsRes] = await Promise.all([
       supabaseAdmin
         .from("orders")
-        .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, package, status, assignment_status, payment_status, created_at, inspection_datetime, assigned_ridechecker_id, current_offer, base_pay")
+        .select("id, order_id, vehicle_year, vehicle_make, vehicle_model, package, status, assignment_status, payment_status, payment_required, payment_override_approved, created_at, inspection_datetime, assigned_ridechecker_id, current_offer, base_pay")
         .not("status", "eq", "cancelled")
         .order("created_at", { ascending: false })
         .limit(150),
@@ -145,6 +83,8 @@ export async function GET() {
           status: o.status,
           assignment_status: o.assignment_status ?? "unassigned",
           payment_status: o.payment_status ?? null,
+          payment_required: o.payment_required ?? null,
+          payment_override_approved: o.payment_override_approved ?? false,
           scheduled_date: (o as any).inspection_datetime ? (o as any).inspection_datetime.split("T")[0] : null,
           created_at: o.created_at,
           next_action: na.label,

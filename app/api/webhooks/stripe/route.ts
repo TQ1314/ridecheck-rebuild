@@ -4,6 +4,9 @@ import { getStripe } from "@/lib/stripe/server";
 import { sendEmail } from "@/lib/email/resend";
 import { generateCreditCode } from "@/lib/founding/credit-code";
 import { buildSupporterConfirmationEmail, buildGiftRecipientEmail } from "@/lib/email/founding-supporter";
+import { notifyOpsTeam } from "@/lib/notifications/notifyOps";
+import { expectedStripeAmountCents } from "@/lib/payment/stripe-validation";
+import { getPrice, type BookingType, type PackageType } from "@/lib/utils/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +107,7 @@ async function markOrderPaid(
   customerEmail?: string | null,
   checkoutSessionId?: string | null,
   eventDetails?: { eventId: string; amount: number | null; currency: string | null },
+  sessionEvidence?: { metadataToken?: string | null; taxCents?: number | null; taxEnabled?: boolean },
 ) {
   console.log("[Stripe Webhook] markOrderPaid — looking up order", {
     orderId,
@@ -115,7 +119,8 @@ async function markOrderPaid(
     .from("orders")
     .select(
       "id, payment_status, customer_id, buyer_email, order_id, order_number, " +
-      "vehicle_year, vehicle_make, vehicle_model, package, final_price, booking_type, tracking_token"
+      "vehicle_year, vehicle_make, vehicle_model, package, final_price, base_price, booking_type, tracking_token, " +
+      "stripe_checkout_session_id, stripe_session_id, stripe_payment_intent_id, payment_intent_id, payment_link_token"
     )
     .eq("id", orderId)
     .single() as unknown as Promise<{
@@ -131,8 +136,14 @@ async function markOrderPaid(
         vehicle_model: string | null;
         package: string | null;
         final_price: number | null;
+        base_price: number | null;
         booking_type: string | null;
         tracking_token: string | null;
+        stripe_checkout_session_id: string | null;
+        stripe_session_id: string | null;
+        stripe_payment_intent_id: string | null;
+        payment_intent_id: string | null;
+        payment_link_token: string | null;
       } | null;
       error: any;
     }>);
@@ -143,7 +154,11 @@ async function markOrderPaid(
       errorCode: fetchError?.code,
       errorMessage: fetchError?.message,
     });
-    return { skipped: false, error: "Order not found" };
+    return {
+      skipped: false,
+      error: fetchError ? "Order lookup failed" : "Order not found",
+      retryable: !!fetchError,
+    };
   }
 
   console.log("[Stripe Webhook] markOrderPaid — order found", {
@@ -154,9 +169,71 @@ async function markOrderPaid(
   });
 
   // Idempotency: skip if already paid
-  if (existingOrder.payment_status === "paid") {
+  if (existingOrder.payment_status === "paid" || existingOrder.payment_status === "paid_manual_verified") {
     console.log("[Stripe Webhook] markOrderPaid — already paid, skipping", { orderId });
     return { skipped: true };
+  }
+
+  const orderPriceDollars = Number(existingOrder.final_price || existingOrder.base_price || 0) ||
+    getPrice(
+      (existingOrder.package || "standard") as PackageType,
+      (existingOrder.booking_type || "concierge") as BookingType,
+    ).finalPrice;
+  const expectedAmountCents = expectedStripeAmountCents({
+    orderPriceDollars,
+    stripeTaxCents: sessionEvidence?.taxCents ?? 0,
+    includesTax: sessionEvidence?.taxEnabled === true,
+  });
+  const receivedCurrency = eventDetails?.currency?.toLowerCase();
+  if (
+    !Number.isSafeInteger(expectedAmountCents) || expectedAmountCents <= 0 ||
+    eventDetails?.amount !== expectedAmountCents || receivedCurrency !== "usd"
+  ) {
+    console.error("[Stripe Webhook] payment amount/currency mismatch — order not activated", {
+      orderId,
+      expectedAmountCents,
+      expectedCurrency: "usd",
+      receivedAmountCents: eventDetails?.amount ?? null,
+      receivedCurrency: receivedCurrency ?? null,
+      stripeEventId: eventDetails?.eventId,
+    });
+    return { skipped: false, error: "Stripe amount or currency does not match order" };
+  }
+
+  if (checkoutSessionId) {
+    const linkedSessionId = existingOrder.stripe_checkout_session_id || existingOrder.stripe_session_id;
+    if (!linkedSessionId && (!sessionEvidence?.metadataToken ||
+      sessionEvidence.metadataToken !== existingOrder.payment_link_token)) {
+      console.error("[Stripe Webhook] checkout has no verified order linkage", { orderId, checkoutSessionId });
+      return { skipped: false, error: "Checkout session is not linked to order" };
+    }
+    if (linkedSessionId && linkedSessionId !== checkoutSessionId) {
+      console.error("[Stripe Webhook] checkout session does not match order linkage", {
+        orderId,
+        checkoutSessionId,
+        linkedSessionId,
+      });
+      return { skipped: false, error: "Checkout session is not linked to order" };
+    }
+    if (
+      sessionEvidence?.metadataToken &&
+      sessionEvidence.metadataToken !== existingOrder.payment_link_token
+    ) {
+      console.error("[Stripe Webhook] checkout token does not match order", { orderId, checkoutSessionId });
+      return { skipped: false, error: "Checkout payment token does not match order" };
+    }
+    const linkedIntentId = existingOrder.stripe_payment_intent_id || existingOrder.payment_intent_id;
+    if (paymentIntentId && linkedIntentId && linkedIntentId !== paymentIntentId) {
+      console.error("[Stripe Webhook] checkout payment intent does not match order linkage", { orderId, paymentIntentId });
+      return { skipped: false, error: "Checkout payment intent is not linked to order" };
+    }
+  } else if (
+    paymentIntentId &&
+    (existingOrder.stripe_payment_intent_id || existingOrder.payment_intent_id) &&
+    (existingOrder.stripe_payment_intent_id || existingOrder.payment_intent_id) !== paymentIntentId
+  ) {
+    console.error("[Stripe Webhook] payment intent does not match order linkage", { orderId, paymentIntentId });
+    return { skipped: false, error: "Payment intent is not linked to order" };
   }
 
   const now = new Date().toISOString();
@@ -201,14 +278,16 @@ async function markOrderPaid(
     }
   }
 
-  const { data: updatedRows, error: updateError } = await supabaseAdmin
+  let updateQuery = supabaseAdmin
     .from("orders")
     .update(updatePayload)
-    .eq("id", orderId)
-    // The read above is advisory; this conditional write prevents two
-    // concurrent Stripe deliveries from both applying payment effects.
-    .neq("payment_status", "paid")
-    .select("id");
+    .eq("id", orderId);
+    // Compare-and-set prevents concurrent webhook deliveries from both
+    // sending confirmations, even when they read the same pre-paid status.
+  updateQuery = existingOrder.payment_status == null
+    ? updateQuery.is("payment_status", null)
+    : updateQuery.eq("payment_status", existingOrder.payment_status);
+  const { data: updatedRows, error: updateError } = await updateQuery.select("id");
 
   if (updateError) {
     console.error("[Stripe Webhook] markOrderPaid — DB update failed", {
@@ -216,7 +295,7 @@ async function markOrderPaid(
       errorCode: updateError.code,
       errorMessage: updateError.message,
     });
-    return { skipped: false, error: updateError.message };
+    return { skipped: false, error: updateError.message, retryable: true };
   }
   if (!updatedRows || updatedRows.length === 0) {
     console.log("[Stripe Webhook] markOrderPaid — concurrent delivery already applied payment", { orderId });
@@ -246,6 +325,39 @@ async function markOrderPaid(
       currency:                  eventDetails?.currency ?? null,
     },
   });
+
+  const paidAmount = (eventDetails!.amount / 100).toFixed(2);
+  const paymentTimestamp = now;
+  try {
+    await notifyOpsTeam({
+      subject: `Payment successful — Order ${existingOrder.order_number || orderId}`,
+      body: [
+        "PAYMENT SUCCESSFUL",
+        `Order: ${existingOrder.order_number || orderId} (${orderId})`,
+        `Stripe Checkout: ${checkoutSessionId || "not available"}`,
+        `Stripe PaymentIntent: ${paymentIntentId || "not available"}`,
+        `Amount actually paid: $${paidAmount} USD`,
+        `Customer: ${customerEmail || existingOrder.buyer_email || "not recorded"}`,
+        `Vehicle: ${existingOrder.vehicle_year || ""} ${existingOrder.vehicle_make || ""} ${existingOrder.vehicle_model || ""}`.trim(),
+        `Package: ${existingOrder.package || "not recorded"}`,
+        "Payment status: paid",
+        `Timestamp: ${paymentTimestamp}`,
+        `Operational status: ${nextOpsStatus}`,
+      ].join("\n"),
+      smsBody: `RideCheck PAYMENT SUCCESSFUL: Order ${existingOrder.order_number || orderId}; $${paidAmount} USD; ${existingOrder.vehicle_year || ""} ${existingOrder.vehicle_make || ""} ${existingOrder.vehicle_model || ""}; ${nextOpsStatus}.`,
+      orderId,
+      emailAll: true,
+    });
+  } catch (notificationError) {
+    // Payment is already durable: do not return an error that could replay
+    // the payment side effects. The existing Ops notification helper logs
+    // individual provider failures; this catches any unexpected rejection.
+    console.error("[Stripe Webhook] payment Ops notification failed after payment persisted", {
+      orderId,
+      stripeEventId: eventDetails?.eventId,
+      error: notificationError,
+    });
+  }
 
   // Send buyer confirmation email
   const buyerEmail = customerEmail || existingOrder.buyer_email;
@@ -331,11 +443,20 @@ export async function POST(req: NextRequest) {
     const sessionType = session.metadata?.session_type;
 
     if (sessionType === "founding_supporter") {
+      if (session.payment_status !== "paid") {
+        return NextResponse.json({ received: true, ignored: "session is not paid" });
+      }
       console.log("[Stripe Webhook] checkout.session.completed — founding_supporter branch", {
         sessionId: session.id,
       });
       await handleFoundingSupporter(session);
       return NextResponse.json({ received: true });
+    }
+
+    // Upgrade sessions charge only the difference and must not be interpreted
+    // as payment for an unpaid base inspection order.
+    if (sessionType === "package_upgrade") {
+      return NextResponse.json({ received: true, ignored: "package upgrade is not a base-order payment" });
     }
 
     const orderId      = session.metadata?.order_id;
@@ -366,13 +487,27 @@ export async function POST(req: NextRequest) {
     if (session.payment_status !== "paid") {
       return NextResponse.json({ received: true, ignored: "session is not paid" });
     }
+    if (session.mode !== "payment") {
+      console.error("[Stripe Webhook] refusing non-payment checkout session for order", {
+        orderId,
+        checkoutSessionId: session.id,
+        mode: session.mode,
+      });
+      return NextResponse.json({ received: true, ignored: "checkout session is not a one-time payment" });
+    }
     const result = await markOrderPaid(orderId, paymentIntentId, customerEmail, session.id, {
       eventId: event.id,
       amount: typeof session.amount_total === "number" ? session.amount_total : null,
       currency: session.currency ?? null,
+    }, {
+      metadataToken: session.metadata?.payment_link_token ?? null,
+      taxCents: typeof session.total_details?.amount_tax === "number" ? session.total_details.amount_tax : null,
+      taxEnabled: session.automatic_tax?.enabled === true,
     });
     if (result.error) {
-      return NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 });
+      return result.retryable
+        ? NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 })
+        : NextResponse.json({ received: true, ignored: "Payment evidence did not match order; Ops review required" });
     }
   }
 
@@ -389,6 +524,53 @@ export async function POST(req: NextRequest) {
     });
 
     if (orderId) {
+      if (intent.status !== "succeeded") {
+        return NextResponse.json({ received: true, ignored: "payment intent is not succeeded" });
+      }
+      const { data: linkedOrder, error: linkedOrderError } = await supabaseAdmin
+        .from("orders")
+        .select("id, payment_link_token, stripe_payment_intent_id, payment_intent_id, stripe_checkout_session_id, stripe_session_id, final_price, base_price, package, booking_type")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (linkedOrderError || !linkedOrder) {
+        return NextResponse.json({ error: "Payment intent order could not be reconciled" }, { status: 500 });
+      }
+      const intentIsStored = linkedOrder.stripe_payment_intent_id === intent.id ||
+        linkedOrder.payment_intent_id === intent.id;
+      const metadataTokenMatches = !!intent.metadata?.payment_link_token &&
+        intent.metadata.payment_link_token === linkedOrder.payment_link_token;
+      if (!intentIsStored && !metadataTokenMatches) {
+        console.error("[Stripe Webhook] payment intent is not securely linked to order", { orderId, intentId: intent.id });
+        return NextResponse.json({ error: "Payment intent is not securely linked to order" }, { status: 409 });
+      }
+      // Checkout PaymentIntents carry a reusable order token, not proof that
+      // this particular session is the currently linked Checkout. PI-first
+      // deliveries must wait for the paid Checkout event to validate its ID.
+      if (!intentIsStored && (linkedOrder.stripe_checkout_session_id || linkedOrder.stripe_session_id)) {
+        return NextResponse.json({ received: true, ignored: "Awaiting linked Checkout session payment confirmation" });
+      }
+      // Checkout automatic tax is only fully verifiable from the session's
+      // amount_total/tax breakdown. If the PI arrives first and its gross
+      // differs from the base price, wait for checkout.session.completed to
+      // validate the authoritative Checkout total rather than activating or
+      // asking Stripe to retry a legitimate taxed payment indefinitely.
+      const intentOrder = linkedOrder as { final_price?: number | null; base_price?: number | null; package?: string | null; booking_type?: string | null };
+      const intentPriceDollars = Number(intentOrder.final_price || intentOrder.base_price || 0) ||
+        getPrice(
+          (intentOrder.package || "standard") as PackageType,
+          (intentOrder.booking_type || "concierge") as BookingType,
+        ).finalPrice;
+      const baseAmountCents = Math.round(intentPriceDollars * 100);
+      const amountReceived = typeof intent.amount_received === "number" ? intent.amount_received : null;
+      if (
+        amountReceived !== baseAmountCents ||
+        intent.currency?.toLowerCase() !== "usd"
+      ) {
+        return NextResponse.json({
+          received: true,
+          ignored: "PaymentIntent gross will be validated against its Checkout session",
+        });
+      }
       // No checkoutSessionId available from PI events — pass null
       const result = await markOrderPaid(orderId, intent.id, customerEmail, null, {
         eventId: event.id,
@@ -396,7 +578,9 @@ export async function POST(req: NextRequest) {
         currency: intent.currency ?? null,
       });
       if (result.error) {
-        return NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 });
+        return result.retryable
+          ? NextResponse.json({ error: "Payment could not be persisted; retrying" }, { status: 500 })
+          : NextResponse.json({ received: true, ignored: "Payment evidence did not match order; Ops review required" });
       }
     } else {
       console.warn("[Stripe Webhook] payment_intent.succeeded — no order_id in intent metadata; cannot update order", {
@@ -404,6 +588,26 @@ export async function POST(req: NextRequest) {
         metadata: intent.metadata,
       });
       return NextResponse.json({ error: "Payment event is missing order_id metadata" }, { status: 422 });
+    }
+  }
+
+  // Expired or asynchronously failed Checkout sessions never activate orders.
+  if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object as any;
+    const orderId = session.metadata?.order_id;
+    if (orderId && session.metadata?.session_type !== "package_upgrade") {
+      const { error } = await supabaseAdmin
+        .from("orders")
+        .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", orderId)
+        .eq("stripe_checkout_session_id", session.id)
+        .neq("payment_status", "paid")
+        .neq("payment_status", "paid_manual_verified")
+        .neq("payment_status", "override_approved");
+      if (error) {
+        console.error("[Stripe Webhook] expired/failed checkout status update failed", { orderId, sessionId: session.id, error });
+        return NextResponse.json({ error: "Payment status could not be reconciled; retrying" }, { status: 500 });
+      }
     }
   }
 
@@ -421,7 +625,7 @@ export async function POST(req: NextRequest) {
     if (orderId) {
       const { data: order, error: orderLookupError } = await supabaseAdmin
         .from("orders")
-        .select("payment_status")
+        .select("payment_status, payment_link_token, stripe_payment_intent_id, payment_intent_id")
         .eq("id", orderId)
         .single();
       if (orderLookupError) {
@@ -429,14 +633,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Payment status could not be reconciled; retrying" }, { status: 500 });
       }
 
-      if (order && order.payment_status !== "paid") {
+      const intentIsStored = order?.stripe_payment_intent_id === intent.id ||
+        order?.payment_intent_id === intent.id;
+      const metadataTokenMatches = !!intent.metadata?.payment_link_token &&
+        intent.metadata.payment_link_token === order?.payment_link_token;
+      if (order && !intentIsStored && !metadataTokenMatches) {
+        console.warn("[Stripe Webhook] ignoring unlinked payment_intent.payment_failed", { orderId, intentId: intent.id });
+        return NextResponse.json({ received: true, ignored: "payment intent is not linked to order" });
+      }
+
+      if (order && !["paid", "paid_manual_verified", "override_approved"].includes(order.payment_status)) {
         const { error: failedUpdateError } = await supabaseAdmin
           .from("orders")
           .update({
             payment_status: "failed",
             updated_at: new Date().toISOString(),
           })
-          .eq("id", orderId);
+          .eq("id", orderId)
+          .neq("payment_status", "paid")
+          .neq("payment_status", "paid_manual_verified")
+          .neq("payment_status", "override_approved");
         if (failedUpdateError) {
           console.error("[Stripe Webhook] payment failure status could not be persisted", failedUpdateError);
           return NextResponse.json({ error: "Payment status could not be persisted; retrying" }, { status: 500 });

@@ -1,0 +1,304 @@
+RIDECHECK — TRACE UNPAID ORDER ACTIVATION + HARDEN PAYMENT-FIRST + OPS ALERTS
+
+We have discovered a REAL CUSTOMER incident in production. Treat this as a production workflow investigation, not a feature redesign.
+
+DO NOT modify, delete, mark paid, complete, or otherwise alter the historical customer order described below.
+
+REAL INCIDENT / REGRESSION CASE
+
+Order ID:
+b58b009e-3308-4028-8176-8b1948d31940
+
+Vehicle:
+2023 Rivian R1S
+
+Package:
+Exotic
+
+Displayed price:
+$299
+
+Service type:
+Concierge
+
+Observed production state:
+- Order exists in RideCheck Admin.
+- Ops Status = New
+- Payment = Unpaid
+- Seller contact = Not Started
+- Seller/dealer information was successfully captured.
+- Customer received an email saying the order had been created.
+- Customer subsequently contacted RideCheck because nobody contacted the dealer.
+- Stripe transaction history shows NO corresponding $299 payment.
+- Therefore, do NOT assume payment occurred.
+- The customer has already been contacted manually and apologized to.
+
+This order is forensic evidence. DO NOT MUTATE IT.
+
+PRIMARY OBJECTIVE
+
+Determine exactly how an unpaid customer request was able to:
+
+1. create an order,
+2. appear in the operational/admin workflow as New,
+3. trigger an order-created/customer confirmation email,
+4. contain actionable Concierge seller information,
+
+without a verified successful Stripe payment.
+
+Then harden the workflow so payment-first enforcement is authoritative and add reliable Ops notifications for order creation and successful payment.
+
+PHASE 1 — AUDIT BEFORE CHANGING CODE
+
+Trace the complete production code path for:
+
+customer booking
+→ order/database creation
+→ Stripe Checkout/PaymentIntent creation
+→ payment completion
+→ Stripe webhook
+→ payment status update
+→ operational status activation
+→ confirmation email
+→ Concierge seller-contact eligibility
+→ RideChecker dispatch eligibility
+
+Identify:
+
+- where the order record is initially created
+- what initial status/payment_status it receives
+- whether order creation occurs before Stripe payment
+- whether checkout cancellation/failure leaves an order behind
+- whether the browser success URL can activate an order
+- whether any client-supplied payment state is trusted
+- what event currently changes an order to payment_received/paid
+- what event currently sends the "Your order has been created" email
+- whether that email can fire before payment confirmation
+- whether unpaid orders appear in the same Ops queue as paid actionable orders
+- whether Concierge seller-contact actions are available before payment
+- whether RC assignment/broadcast can occur before payment
+- whether any legacy endpoint or alternate booking path bypasses payment
+- whether webhook idempotency is enforced
+- whether payment/order linkage can fail or become orphaned
+
+Specifically trace the historical Rivian order if database fields/logs make that possible.
+
+Do NOT fabricate an explanation if historical evidence is unavailable. Clearly distinguish:
+CONFIRMED CAUSE
+LIKELY CAUSE
+UNKNOWN / NOT RECOVERABLE FROM CURRENT DATA
+
+PHASE 2 — DEFINE THE REQUIRED STATE MODEL
+
+RideCheck payment policy:
+
+PAYMENT FIRST BEFORE OPERATIONAL WORK.
+
+An order/request may be persisted before payment if technically necessary, but it must remain non-operational.
+
+Suggested distinction:
+
+pending_payment
+→ payment_received
+→ operational workflow
+
+An unpaid/pending order MUST NOT:
+
+- become an actionable New Ops order
+- initiate seller coordination
+- become eligible for RC assignment/broadcast
+- represent itself to Ops as ready for fulfillment
+- generate language implying that a paid inspection has been confirmed
+
+Only one of these may activate fulfillment:
+
+A. verified successful Stripe server-side payment event
+OR
+B. explicit authorized Ops Lead override
+
+Never trust the browser redirect alone as proof of payment.
+
+Preserve existing legitimate unpaid/pending records. Do not destructively migrate historical orders merely to make statuses look clean.
+
+PHASE 3 — CUSTOMER EMAIL BEHAVIOR
+
+Audit existing customer emails.
+
+If an order/request is created BEFORE payment, customer messaging must accurately describe it as a pending request/payment step — NOT as a confirmed paid inspection.
+
+After verified successful payment, send the appropriate confirmed-order/payment-received communication.
+
+Do not create duplicate customer emails if an existing correct template already exists.
+
+Ensure retries/webhook replays cannot send duplicate confirmations.
+
+PHASE 4 — OPS NOTIFICATIONS
+
+Implement reliable internal notifications for TWO distinct events.
+
+A. NEW ORDER/REQUEST CREATED
+
+Notify Ops when a genuine customer request/order is created.
+
+Include where available:
+- order ID
+- creation timestamp
+- customer name
+- customer email/phone
+- year/make/model
+- package
+- amount
+- Concierge vs Self-Arrange
+- seller/dealer information
+- inspection location
+- requested/preferred date
+- payment state
+
+The notification must clearly say if it is:
+PENDING PAYMENT
+or
+PAID / ACTIONABLE
+
+B. PAYMENT SUCCESSFUL
+
+When Stripe authoritatively confirms successful payment, send a separate Ops notification including:
+- order ID
+- Stripe payment/checkout identifier
+- amount actually paid
+- customer
+- vehicle
+- package
+- payment status
+- timestamp
+- resulting operational status
+
+This payment notification must originate from verified server-side payment state/webhook processing, not from a client-side success page.
+
+Use the project's existing email infrastructure/provider and existing Ops recipient configuration where possible. Do not introduce a second email platform unnecessarily.
+
+Notification failure must NOT corrupt payment state. Log notification failures for retry/diagnosis.
+
+PHASE 5 — STRIPE SAFETY
+
+Verify:
+
+- webhook signature verification
+- idempotent webhook handling
+- Stripe event IDs cannot be processed twice
+- payment amount/order mapping is validated
+- payment success is tied to the correct RideCheck order
+- failed/canceled checkout cannot activate fulfillment
+- success-page refresh cannot activate fulfillment
+- manually entering an order URL cannot activate fulfillment
+- client-side requests cannot forge paid status
+- Ops override is authenticated, authorized and auditable
+
+Do NOT modify live Stripe configuration, issue refunds, create live charges, or manipulate real customer payments during this task.
+
+Use test mode/mocks for payment tests.
+
+PHASE 6 — ADMIN UX
+
+Make payment state operationally unmistakable.
+
+An unpaid/pending order may remain visible for follow-up/recovery, but it should be visually separated or clearly labeled as:
+
+PENDING PAYMENT / NOT ACTIONABLE
+
+Seller-contact, assignment, broadcast, inspection-start and other fulfillment actions must be blocked/disabled until:
+
+payment verified
+OR
+authorized Ops override
+
+Do not hide historical evidence.
+
+PHASE 7 — REGRESSION TESTS
+
+Add tests proving at minimum:
+
+1. Request can be persisted before payment if architecture requires it.
+2. Unpaid request cannot enter actionable fulfillment.
+3. Unpaid request cannot trigger paid-order confirmation language.
+4. Canceled Stripe checkout leaves order non-operational.
+5. Failed payment leaves order non-operational.
+6. Browser success redirect alone cannot mark order paid.
+7. Verified Stripe success activates the correct order.
+8. Webhook replay is idempotent.
+9. Successful payment generates only one payment confirmation/notification.
+10. Unpaid Concierge order cannot begin seller coordination.
+11. Unpaid order cannot be assigned/broadcast to a RideChecker.
+12. Authorized Ops override works and creates an audit record.
+13. Unauthorized override is rejected.
+14. Notification failure does not roll back or corrupt a valid Stripe payment.
+15. Historical unpaid orders are not silently converted to paid/actionable.
+
+Use the Steven/Rivian incident as the conceptual regression case, but NEVER mutate the actual production order in automated tests.
+
+PHASE 8 — DO NOT EXPAND SCOPE
+
+Do not redesign RideCheck.
+Do not change pricing.
+Do not alter inspection packages.
+Do not change RC compensation.
+Do not change report generation.
+Do not modify the historical Rivian order.
+Do not perform unrelated refactoring.
+
+Keep changes narrowly focused on:
+
+payment-first enforcement
+order/payment state integrity
+customer confirmation timing
+Ops visibility
+Ops notifications
+regression protection
+
+FINAL RESPONSE REQUIRED
+
+Do not simply say "fixed."
+
+Return:
+
+1. ROOT CAUSE
+   - confirmed technical cause
+   - evidence/code path
+   - whether the historical Rivian order can be definitively explained
+
+2. FILES CHANGED
+   - file
+   - exact behavior changed
+
+3. BEFORE vs AFTER WORKFLOW
+
+4. PAYMENT SECURITY CONTROLS
+
+5. OPS NOTIFICATIONS
+   - trigger
+   - recipient mechanism
+   - contents
+   - retry/failure behavior
+
+6. CUSTOMER EMAIL CHANGES
+
+7. ADMIN UX CHANGES
+
+8. TESTS
+   - tests added/modified
+   - exact results
+
+9. MIGRATIONS
+   - if any
+   - why they are safe
+   - rollback considerations
+
+10. REMAINING RISKS / MANUAL VERIFICATION
+
+11. CONTROLLED FIELD-TEST CHECKLIST
+
+Do not claim production readiness merely because builds/tests pass.
+
+The correct conclusion, if everything passes, is:
+"Ready for controlled end-to-end field verification."
+
+Start with the audit. Do not implement until you understand the existing path.

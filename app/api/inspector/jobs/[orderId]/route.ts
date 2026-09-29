@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
+import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export async function PATCH(
 
     let query = supabaseAdmin
       .from("orders")
-      .select("id, order_id, inspector_status")
+      .select("id, order_id, inspector_status, payment_status, payment_required, payment_override_approved")
       .eq("order_id", params.orderId);
 
     if (actor.role !== "owner" && inspector) {
@@ -101,6 +102,9 @@ export async function PATCH(
 
     if (fetchError || !order) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+    if (!canProceedWithRideCheck(order)) {
+      return NextResponse.json({ error: PAYMENT_GATE_ERRORS.inspection_start }, { status: 402 });
     }
 
     const updates: Record<string, any> = {
@@ -116,13 +120,24 @@ export async function PATCH(
       updates.report_status = "pending_upload";
     }
 
-    const { error: updateError } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from("orders")
       .update(updates)
       .eq("id", order.id);
+    if (order.payment_required === false) {
+      updateQuery = updateQuery.eq("payment_required", false);
+    } else if (order.payment_status === "override_approved" && order.payment_override_approved === true) {
+      updateQuery = updateQuery.eq("payment_status", "override_approved").eq("payment_override_approved", true);
+    } else {
+      updateQuery = updateQuery.eq("payment_status", order.payment_status);
+    }
+    const { data: updatedRows, error: updateError } = await updateQuery.select("id");
 
     if (updateError) {
       return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
+    }
+    if (!updatedRows?.length) {
+      return NextResponse.json({ error: "Payment status changed before inspection update; refresh and try again." }, { status: 409 });
     }
 
     await supabaseAdmin.from("order_events").insert({

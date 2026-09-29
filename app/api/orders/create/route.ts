@@ -6,6 +6,7 @@ import { getPrice, type PackageType, type BookingType } from "@/lib/utils/pricin
 import { classifyVehicle } from "@/lib/vehicleClassification.server";
 import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
 import { buildOptionalOrderFields, createOrderSchema } from "./contract";
+import { notifyNewOrderRequest } from "@/lib/notifications/order-created-ops";
 
 export const runtime = "nodejs";
 
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
       booking_type: data.booking_type,
       status: "submitted",
       payment_status: "unpaid",
+      ops_status: "pending_payment",
 
       vehicle_year: data.vehicle_year,
       vehicle_make: data.vehicle_make,
@@ -248,6 +250,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // An unpaid request is visible to Ops for recovery, never for fulfillment.
+    // This alert is informational and must not block payment or change its state.
+    try {
+      await notifyNewOrderRequest({
+        id: order.id,
+        created_at: order.created_at,
+        buyer_email,
+        buyer_phone,
+        vehicle_year: data.vehicle_year,
+        vehicle_make: data.vehicle_make,
+        vehicle_model: data.vehicle_model,
+        package: serverPackage,
+        final_price: finalPrice,
+        booking_type: data.booking_type,
+        seller_name: data.seller_name,
+        seller_phone: data.seller_phone,
+        seller_type: data.seller_type,
+        inspection_address: data.inspection_address,
+        vehicle_location: data.vehicle_location,
+        preferred_date: data.preferred_date,
+      });
+    } catch (alertError) {
+      console.error("[order created ops] notification failed", { orderId: order.id, error: alertError });
+    }
+
     // Phase 3: stamp profile_type on authenticated buyer (best-effort, additive only)
     if (customer_id) {
       try {
@@ -281,23 +308,7 @@ export async function POST(req: NextRequest) {
         });
         if (smsResult.success) {
           paymentChannel = "sms";
-        } else if (buyer_email && buyer_email !== "guest@ridecheckauto.com") {
-          const { sendEmail } = await import("@/lib/notifications/email");
-          const emailResult = await sendEmail({
-            to: buyer_email,
-            subject: "RideCheck payment link for your inspection",
-            html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${finalPrice}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
-          });
-          if (emailResult.success) paymentChannel = "email";
         }
-      } else if (buyer_email && buyer_email !== "guest@ridecheckauto.com") {
-        const { sendEmail } = await import("@/lib/notifications/email");
-        const emailResult = await sendEmail({
-          to: buyer_email,
-          subject: "RideCheck payment link for your inspection",
-          html: `<p>Hi! Your RideCheck inspection for <strong>${vehicleLabel}</strong> is ready for payment.</p><p>Price: <strong>$${finalPrice}</strong></p><p><a href="${payUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Pay Now</a></p><p>Or copy this link: ${payUrl}</p>`,
-        });
-        if (emailResult.success) paymentChannel = "email";
       }
 
       if (paymentChannel) {
@@ -332,11 +343,21 @@ export async function POST(req: NextRequest) {
           trackUrl: track_url,
           payUrl,
         });
-        await sendEmail({
+        const confirmationResult = await sendEmail({
           to: buyer_email,
-          subject: `Your RideCheck Inspection Request - ${vehicleLabel}`,
+          subject: `Your RideCheck request is pending payment — ${vehicleLabel}`,
           html: confirmHtml,
         });
+        if (confirmationResult.success && !paymentChannel) {
+          paymentChannel = "email";
+          await supabaseAdmin.from("orders").update({
+            payment_link_sent_to: buyer_email,
+            payment_link_sent_channel: "email",
+            payment_link_sent_at: new Date().toISOString(),
+          }).eq("id", order.id);
+        } else if (!confirmationResult.success) {
+          console.error("[Order Confirmation Email] Provider rejected pending request email", { orderId: order.id });
+        }
       }
     } catch (confirmErr) {
       console.error("[Order Confirmation Email Error]", confirmErr);

@@ -35,7 +35,7 @@ export async function POST(
       );
     }
 
-    if (order.payment_status === "paid") {
+    if (["paid", "paid_manual_verified", "override_approved"].includes(order.payment_status)) {
       return NextResponse.json(
         { error: "Order already paid" },
         { status: 400 }
@@ -43,7 +43,29 @@ export async function POST(
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.ridecheckauto.com";
-    const finalPrice = Number(order.final_price || order.base_price || 14900);
+    const finalPrice = Number(order.final_price);
+    if (!Number.isFinite(finalPrice) || !Number.isSafeInteger(Math.round(finalPrice * 100)) || finalPrice <= 0) {
+      return NextResponse.json({ error: "Order price is invalid; payment request not created" }, { status: 409 });
+    }
+    const linkedSessionId = order.stripe_checkout_session_id || order.stripe_session_id;
+    if (linkedSessionId) {
+      let existingSession: Stripe.Checkout.Session;
+      try {
+        existingSession = await stripe.checkout.sessions.retrieve(linkedSessionId);
+      } catch (sessionError) {
+        console.error("[Request Payment] Could not verify existing session", { orderId: params.orderId, linkedSessionId, error: sessionError });
+        return NextResponse.json({ error: "Existing payment session cannot be checked; contact support" }, { status: 503 });
+      }
+      if (existingSession.status === "open" && existingSession.url) {
+        return NextResponse.json({ success: true, payment_url: existingSession.url, reused: true });
+      }
+      if (existingSession.status === "complete") {
+        return NextResponse.json({ error: "Payment is processing. Check the order payment status before requesting again." }, { status: 409 });
+      }
+      if (existingSession.status !== "expired") {
+        return NextResponse.json({ error: "Existing payment session is not ready for replacement" }, { status: 409 });
+      }
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -64,25 +86,42 @@ export async function POST(
       metadata: {
         order_id: params.orderId,
         customer_email: order.buyer_email || order.customer_email || "",
+        ...(order.payment_link_token && { payment_link_token: order.payment_link_token }),
+      },
+      payment_intent_data: {
+        metadata: {
+          order_id: params.orderId,
+          ...(order.payment_link_token && { payment_link_token: order.payment_link_token }),
+        },
       },
       success_url: `${appUrl}/order/received?orderId=${params.orderId}&status=paid${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
       cancel_url: `${appUrl}/order/received?orderId=${params.orderId}&status=cancelled${order.tracking_token ? `&track=${encodeURIComponent(`/track/${params.orderId}?t=${order.tracking_token}`)}` : ""}`,
-    });
+    }, { idempotencyKey: `ridecheck-admin-checkout:${params.orderId}:${linkedSessionId || "first"}` });
 
     const now = new Date().toISOString();
 
-    await supabaseAdmin
+    let linkQuery = supabaseAdmin
       .from("orders")
       .update({
         payment_status: "requested",
         payment_requested_at: now,
         payment_link_url: session.url,
         stripe_session_id: session.id,
+        stripe_checkout_session_id: session.id,
         status: "payment_requested",
         ops_status: "payment_pending",
         updated_at: now,
       })
-      .eq("id", params.orderId);
+      .eq("id", params.orderId)
+      .eq("payment_status", order.payment_status);
+    linkQuery = order.stripe_session_id
+      ? linkQuery.eq("stripe_session_id", order.stripe_session_id)
+      : linkQuery.is("stripe_session_id", null);
+    const { data: linked, error: linkError } = await linkQuery.select("id");
+    if (linkError || !linked?.length) {
+      console.error("[Request Payment] Checkout created but order linkage failed", { orderId: params.orderId, error: linkError });
+      return NextResponse.json({ error: "Payment session could not be linked; contact support" }, { status: 503 });
+    }
 
     const buyerEmail = order.buyer_email || order.customer_email;
     if (buyerEmail && buyerEmail !== "guest@ridecheckauto.com") {

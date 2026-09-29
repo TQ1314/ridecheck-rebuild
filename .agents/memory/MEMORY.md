@@ -10,3 +10,4 @@
 - [RideCheck DB target verification](ridecheck-db-target.md) — confirm the connected Supabase project matches RideCheck before querying or migrating live data.
 - [Buyer intake evidence retention](buyer-intake-evidence.md) — listing claims and RC observations stay distinct; do not silently delete private intake images without a retention decision.
 - [OBD report evidence policy](obd-report-evidence.md) — keep unreviewed extracted DTCs as raw evidence, but exclude them from buyer interpretation until linked and accepted.
+- [Payment-first order policy](payment-first-order-policy.md) — persisted requests are not actionable orders; payment evidence and fulfillment activation must remain separate.
