@@ -29,7 +29,12 @@ export const TIER_PRICES: Record<VehicleTier, number> = {
 export const TIER_CONFIG = {
   exotic_brands: ["ferrari", "lamborghini", "mclaren", "bentley", "rolls-royce", "aston martin", "bugatti", "pagani", "koenigsegg", "lotus", "maserati"],
   plus_brands: ["mercedes-benz", "mercedes benz", "mercedes", "bmw", "audi", "porsche", "land rover", "range rover", "jaguar", "volvo", "volkswagen", "vw", "mini", "saab", "alfa romeo", "fiat", "peugeot", "renault", "citroen", "skoda", "seat", "opel", "vauxhall", "smart", "ineos", "lancia", "dacia", "cupra", "abarth"],
-  performance_models: ["911", "gt3", "gt2", "m5", "m8", "amg gt"],
+  performance_models: {
+    porsche: ["911", "gt2", "gt3", "turbo"],
+    bmw: ["m2", "m3", "m4", "m5", "m6", "m8"],
+    ford: ["gt", "gt350", "gt500", "shelby"],
+    dodge: ["hellcat", "demon", "viper"],
+  },
 } as const;
 
 const EV_MAKES = ["tesla", "rivian", "lucid", "polestar", "fisker"];
@@ -39,6 +44,34 @@ const DIESEL_MODELS = ["diesel", "tdi", "duramax", "cummins", "powerstroke", "po
 
 function hasToken(text: string, token: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^a-z0-9])`).test(text);
+}
+
+function isPerformanceModel(make: string, model: string): boolean {
+  if (make === "porsche") {
+    return TIER_CONFIG.performance_models.porsche.some((name) => hasToken(model, name));
+  }
+  if (make === "bmw") {
+    return TIER_CONFIG.performance_models.bmw.some((name) => hasToken(model, name)) ||
+      /(?:^|[^a-z0-9])x[3-6]\s+m(?=$|[^a-z0-9])(?!\s*(?:sport|package)\b)/.test(model);
+  }
+  if (["mercedes", "mercedes-benz", "mercedes benz"].includes(make)) {
+    // AMG 43/53, including AMG GT 43/53, remain Plus. "AMG Line" is styling.
+    if (/(?:^|[^a-z0-9])amg\s+gt\s*(?:43|53)(?=$|[^a-z0-9])/.test(model)) return false;
+    return hasToken(model, "amg gt") ||
+      /(?:^|[^a-z0-9])(?:c|e|s|g|sl|glc|gle|gls|cls|gt)\s*-?6[35](?=$|[^a-z0-9])/.test(model) ||
+      /(?:^|[^a-z0-9])amg\s+6[35](?=$|[^a-z0-9])/.test(model);
+  }
+  if (make === "chevrolet" || make === "chevy") {
+    return hasToken(model, "corvette") || hasToken(model, "stingray");
+  }
+  if (make === "ford") {
+    return hasToken(model, "mustang") && !hasToken(model, "mach-e") &&
+      TIER_CONFIG.performance_models.ford.some((name) => hasToken(model, name));
+  }
+  if (make === "dodge") {
+    return TIER_CONFIG.performance_models.dodge.some((name) => hasToken(model, name));
+  }
+  return false;
 }
 
 export function classifyVehicle(input: ClassificationInput): ClassificationResult {
@@ -54,10 +87,7 @@ export function classifyVehicle(input: ClassificationInput): ClassificationResul
   } else if (TIER_CONFIG.exotic_brands.some((brand) => brand === make)) {
     packageTier = "exotic";
     classificationReason = "Exotic make";
-  } else if (
-    TIER_CONFIG.performance_models.some((name) => hasToken(model, name)) ||
-    (["mercedes", "mercedes-benz", "mercedes benz"].includes(make) && ["s63", "s65", "s 63", "s 65"].some((name) => hasToken(model, name)))
-  ) {
+  } else if (isPerformanceModel(make, model)) {
     packageTier = "exotic";
     classificationReason = "Performance model";
   } else if (TIER_CONFIG.plus_brands.some((brand) => brand === make)) {

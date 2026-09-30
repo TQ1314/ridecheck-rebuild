@@ -140,6 +140,51 @@ describe("three-tier vehicle policy", () => {
     expect(vehicle("Toyota", "Camry", { collector: true }).packageTier).toBe("exotic");
     expect(vehicle("Toyota", "Camry M50").packageTier).toBe("standard");
   });
+
+  it("classifies full BMW M models but not M Performance or appearance packages", () => {
+    for (const model of ["M2", "M3 Competition", "M4", "M5", "M6", "M8", "X5 M", "X3 M Competition"]) {
+      expect(vehicle("BMW", model).packageTier).toBe("exotic");
+      expect(getPackageTier({ make: "BMW", model })).toBe("exotic");
+    }
+    for (const model of ["M340i", "M550i", "X3 M40i", "X5 M Sport"]) {
+      expect(vehicle("BMW", model).packageTier).toBe("plus");
+    }
+    expect(vehicle("Audi", "M3").packageTier).toBe("plus");
+  });
+
+  it("reserves Mercedes performance pricing for AMG 63/65 and AMG GT, not 43/53 or AMG Line", () => {
+    for (const model of ["C63", "E 63 S", "G63", "GLC 63", "S65", "AMG GT", "AMG GT 63"]) {
+      expect(vehicle("Mercedes-Benz", model).packageTier).toBe("exotic");
+    }
+    for (const model of ["C43 AMG", "E53 AMG", "AMG GT 43", "AMG GT 53", "C300 AMG Line", "Maybach S580"]) {
+      expect(vehicle("Mercedes-Benz", model).packageTier).toBe("plus");
+    }
+  });
+
+  it("includes Porsche Turbo variants while leaving ordinary Porsche SUVs in Plus", () => {
+    for (const model of ["Macan Turbo", "Cayenne Turbo", "Panamera Turbo S", "Taycan Turbo"]) {
+      expect(vehicle("Porsche", model).packageTier).toBe("exotic");
+    }
+    expect(vehicle("Porsche", "Macan").packageTier).toBe("plus");
+    expect(vehicle("Porsche", "Cayenne").packageTier).toBe("plus");
+    expect(vehicle("Volkswagen", "Turbo").packageTier).toBe("plus");
+  });
+
+  it("recognizes Corvette, Mustang GT and clearly named American performance variants", () => {
+    for (const [make, model] of [
+      ["Chevrolet", "Corvette Stingray"], ["Chevrolet", "Corvette Z06"],
+      ["Ford", "Mustang GT"], ["Ford", "Mustang Shelby GT500"],
+      ["Dodge", "Challenger Hellcat"], ["Dodge", "Viper"],
+    ]) {
+      const result = vehicle(make, model);
+      expect(result.packageTier).toBe("exotic");
+      expect(result.basePrice).toBe(299);
+      expect(getPriceCents(getPackageTier({ make, model }), "concierge")).toBe(29900);
+    }
+    expect(vehicle("Ford", "Mustang EcoBoost").packageTier).toBe("standard");
+    expect(vehicle("Ford", "Mustang Mach-E GT").packageTier).toBe("plus");
+    expect(vehicle("Ford", "Explorer GT").packageTier).toBe("standard");
+  });
 });
 
 describe("detectListingPlatform", () => {
