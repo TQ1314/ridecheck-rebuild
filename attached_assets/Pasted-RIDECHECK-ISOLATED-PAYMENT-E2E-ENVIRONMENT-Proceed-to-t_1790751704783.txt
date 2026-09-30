@@ -1,0 +1,90 @@
+RIDECHECK — ISOLATED PAYMENT E2E ENVIRONMENT
+
+Proceed to the next stabilization item: prepare an isolated environment for the Stripe payment-first end-to-end test.
+
+DO NOT publish the current workspace.
+DO NOT modify the main RideCheck-v2 Supabase database.
+DO NOT modify historical customer orders.
+DO NOT create test records in the main database.
+DO NOT use Stripe live mode.
+DO NOT create a live charge.
+
+OBJECTIVE
+
+Create or identify a safe isolated database/environment where we can run the complete RideCheck booking → Stripe TEST payment → operational activation workflow without contaminating production/customer data.
+
+Before creating or changing infrastructure, audit the current environment configuration and report:
+
+1. Which Supabase project/database the development preview currently uses.
+2. Which environment variables control Supabase connectivity.
+3. Which Stripe mode/account the development preview uses.
+4. Which webhook endpoint/environment Stripe TEST events currently target.
+5. Whether a staging/test Supabase project already exists.
+6. Whether there is an existing staging environment that can safely be reused.
+7. Which migrations/schema/seed data would be required for an isolated RideCheck test database.
+8. Which external services could still cause real-world side effects during testing:
+   - customer email
+   - Ops email
+   - SMS
+   - seller contact
+   - RideChecker notifications
+   - any other outbound communication.
+
+IMPORTANT:
+
+An isolated database alone is NOT sufficient if the test can send emails/texts/calls to real customers, sellers, RideCheckers, or Ops recipients.
+
+The E2E environment must prevent unintended real-world communication.
+
+Propose a TEST-SAFE notification strategy such as:
+- explicit test recipients,
+- notification sink/capture,
+- or disabled external delivery with observable logs,
+
+while still allowing us to verify that the correct notification WOULD have been generated.
+
+Do not weaken production notification behavior to accomplish this.
+
+STRIPE
+
+Stripe must remain TEST MODE.
+
+The test environment must still allow us to verify:
+
+request creation
+→ pending_payment
+→ Stripe Checkout
+→ verified Stripe webhook
+→ payment_received
+→ Ops activation
+→ customer paid confirmation event
+→ Ops payment notification event
+→ fulfillment gates opening
+
+We must also be able to test:
+- canceled checkout
+- failed payment
+- webhook replay/idempotency
+- success-page refresh
+- unauthorized payment override
+- authorized audited override
+
+Do not run those tests yet.
+
+FIRST RESPONSE REQUIRED
+
+Before implementation, return:
+
+A. Current environment map
+B. Existing isolation capabilities
+C. Recommended isolation approach
+D. Exact resources/configuration that would be created or changed
+E. How outbound email/SMS/other communications will be contained
+F. How Stripe TEST webhooks will reach the isolated environment
+G. Whether any production secrets/data would be copied
+H. Cleanup/rollback plan
+I. Any decision or credential you need from me
+
+STOP after the proposal.
+
+Do not provision infrastructure, create orders, send notifications, or execute the E2E test until I approve the isolation plan.
