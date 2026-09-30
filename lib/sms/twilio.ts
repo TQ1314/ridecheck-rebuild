@@ -1,3 +1,5 @@
+import { captureStagingNotification, stagingCaptureEnabled } from "@/lib/notifications/staging-capture";
+
 let twilioClient: any = null;
 
 function getTwilioClient() {
@@ -17,15 +19,33 @@ function getTwilioClient() {
 export async function sendSMS({
   to,
   body,
+  event,
+  template,
+  orderId,
 }: {
   to: string;
   body: string;
+  event?: string;
+  template?: string;
+  orderId?: string;
 }) {
+  if (stagingCaptureEnabled()) {
+    await captureStagingNotification({
+      recipient: to,
+      channel: "sms",
+      event: event ?? "sms.send",
+      template: template ?? event ?? "sms.send",
+      orderId,
+      content: body,
+      payload: { to, body },
+    });
+    return { success: true, dev: true };
+  }
+
   const client = getTwilioClient();
   const from = process.env.TWILIO_PHONE_NUMBER;
   if (!client || !from) {
-    const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : body;
-    console.log(`[SMS-TEST] to=${to} body=${safeBody}`);
+    console.log(`[SMS-TEST] to=${to}`);
     return { success: true, dev: true };
   }
   try {

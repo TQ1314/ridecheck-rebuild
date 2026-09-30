@@ -309,6 +309,9 @@ export async function POST(req: NextRequest) {
         const smsResult = await sendSMS({
           to: buyer_phone,
           body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
+          event: "order.payment-link",
+          template: "order-payment-link-sms",
+          orderId: order.id,
         });
         if (smsResult.success) {
           paymentChannel = "sms";
@@ -351,6 +354,9 @@ export async function POST(req: NextRequest) {
           to: buyer_email,
           subject: `Your RideCheck request is pending payment — ${vehicleLabel}`,
           html: confirmHtml,
+          event: "order.confirmation",
+          template: "order-confirmation",
+          orderId: order.id,
         });
         if (confirmationResult.success && !paymentChannel) {
           paymentChannel = "email";

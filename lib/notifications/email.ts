@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { captureStagingNotification, stagingCaptureEnabled } from "./staging-capture";
 
 const apiKey = process.env.RESEND_API_KEY;
 const _rawFrom = process.env.RESEND_FROM_EMAIL || "support@ridecheckauto.com";
@@ -16,15 +17,33 @@ export async function sendEmail({
   subject,
   html,
   replyTo,
+  event,
+  template,
+  orderId,
 }: {
   to: string;
   subject: string;
   html: string;
   replyTo?: string;
+  event?: string;
+  template?: string;
+  orderId?: string;
 }): Promise<{ success: boolean; dev?: boolean; messageId?: string; data?: any; error?: any }> {
+  if (stagingCaptureEnabled()) {
+    await captureStagingNotification({
+      recipient: to,
+      channel: "email",
+      event: event ?? "email.send",
+      template: template ?? event ?? "email.send",
+      orderId,
+      content: html,
+      payload: { from: fromDisplay, to, subject, html, replyTo },
+    });
+    return { success: true, dev: true };
+  }
+
   if (!resend) {
-    const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : html;
-    console.log(`[EMAIL-TEST] to=${to} subject=${subject} reply_to=${replyTo ?? "n/a"} body=${safeBody}`);
+    console.log(`[EMAIL-TEST] to=${to} subject=${subject} reply_to=${replyTo ?? "n/a"}`);
     return { success: true, dev: true };
   }
 

@@ -38,7 +38,13 @@ export async function notifyOpsTeam(payload: OpsNotificationPayload): Promise<vo
     for (const user of (opsUsers ?? []) as any[]) {
       if (user.phone) {
         tasks.push(
-          sendSMS({ to: user.phone, body: payload.smsBody }).then((result) => {
+          sendSMS({
+            to: user.phone,
+            body: payload.smsBody,
+            event: "ops.notification",
+            template: "ops-notification-sms",
+            orderId: payload.orderId,
+          }).then((result) => {
             if (!result.success) console.error("[notifyOps] SMS provider rejected notification", { orderId: payload.orderId });
           }).catch((e) => console.error("[notifyOps] SMS failed", { orderId: payload.orderId, error: e }))
         );
@@ -62,7 +68,14 @@ export async function notifyOpsTeam(payload: OpsNotificationPayload): Promise<vo
           </div>
         `;
         tasks.push(
-          sendEmail({ to: recipient, subject: payload.subject, html }).then((result) => {
+          sendEmail({
+            to: recipient,
+            subject: payload.subject,
+            html,
+            event: "ops.notification",
+            template: "ops-notification-email",
+            orderId: payload.orderId,
+          }).then((result) => {
             if (!result.success) console.error("[notifyOps] Email provider rejected notification", { orderId: payload.orderId });
           }).catch((e) => console.error("[notifyOps] Email failed", { orderId: payload.orderId, error: e }))
         );

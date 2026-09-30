@@ -1,0 +1,151 @@
+APPROVED — proceed with the isolated RideCheck E2E environment, with the following constraints.
+
+GOAL
+
+Build the smallest safe, disposable staging environment necessary to prove:
+
+booking
+→ pending payment
+→ Stripe TEST Checkout
+→ verified payment
+→ operational activation
+→ fulfillment gates
+→ notification generation
+
+This is NOT a new infrastructure project.
+
+SUPABASE
+
+Use the SAME Supabase organization that currently contains RideCheck-v2.
+
+Create a NEW, clearly identified project dedicated to RideCheck testing/staging.
+
+Suggested name:
+RideCheck-Staging
+
+DO NOT:
+- modify RideCheck-v2
+- use the unrelated existing Supabase project
+- copy production customer/order data
+- copy production auth users
+- switch the current production/shared workspace to staging credentials
+
+Before creating the project, report any recurring Supabase cost that requires approval.
+
+STAGING APP
+
+Use a separate staging workspace/environment.
+
+It must have its own:
+- Supabase URL
+- Supabase anon key
+- Supabase service-role key
+- Stripe TEST credentials
+- Stripe TEST webhook secret
+- staging-safe notification configuration
+
+Production secrets must not be copied unless they are explicitly safe TEST credentials.
+
+STRIPE
+
+Use Stripe TEST MODE only.
+
+Before any transaction:
+- positively verify the secret key is TEST
+- positively verify the publishable key is TEST
+- positively verify the webhook destination is staging
+- positively verify the webhook signing secret belongs to that TEST destination
+
+Fail closed if any of these cannot be established.
+
+NOTIFICATION CONTAINMENT
+
+Implement the staging-only capture transport you proposed.
+
+ALL outbound communication paths must be captured rather than delivered externally, including:
+- buyer email
+- buyer SMS
+- Ops email
+- Ops SMS
+- seller communication
+- RideChecker communication
+- any direct Resend/Twilio/provider calls
+
+Production notification behavior must remain unchanged.
+
+Captured notifications must expose enough information to verify:
+- intended recipient
+- channel
+- event/template
+- order ID
+- timestamp
+- relevant payload/content
+
+Use synthetic identities only.
+
+Example buyer:
+RideCheck Test Buyer
+buyer-test@example.invalid
+
+Example seller:
+RideCheck Test Seller
+seller-test@example.invalid
+
+Example RideChecker:
+RideCheck Test Inspector
+ridechecker-test@example.invalid
+
+Use obviously synthetic phone numbers that cannot result in external delivery.
+
+DATABASE / SCHEMA
+
+Do NOT blindly execute incomplete migration sequences.
+
+Determine the minimum schema required by the CURRENT application for the E2E workflow.
+
+Reconcile the migration gap (049–054) before applying anything.
+
+Create only the roles, storage resources and synthetic fixtures necessary for this controlled test.
+
+Do not import production records.
+
+SAFETY GATES
+
+Before E2E testing is allowed, staging must prove:
+
+1. Database identity is RideCheck-Staging.
+2. Database identity is NOT RideCheck-v2.
+3. Stripe keys are TEST mode.
+4. Stripe webhook destination is staging.
+5. Notification capture mode is active.
+6. External email delivery is blocked.
+7. External SMS delivery is blocked.
+8. Seller external contact is blocked.
+9. RideChecker external contact is blocked.
+
+If ANY gate cannot be proven, STOP.
+
+NEXT STEP
+
+Provision/configure only what has been approved above.
+
+DO NOT run the booking/payment E2E test yet.
+
+When staging is ready, return:
+
+1. Staging Supabase project identity
+2. Staging workspace identity
+3. Schema/migrations applied
+4. Explanation of migration gap 049–054
+5. Synthetic fixtures created
+6. Stripe TEST-mode verification
+7. Stripe TEST webhook destination verification
+8. Notification containment verification
+9. Evidence each of the nine safety gates passes
+10. Any costs incurred or recurring
+11. Any remaining blocker
+
+Then STOP for approval before creating the first E2E booking.
+
+Do not publish RideCheck production.
+Do not touch RideCheck-v2 customer/order data.

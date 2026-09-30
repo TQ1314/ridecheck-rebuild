@@ -1,3 +1,5 @@
+import { captureStagingNotification, stagingCaptureEnabled } from "./staging-capture";
+
 let twilioClient: any = null;
 
 function getTwilioClient() {
@@ -15,18 +17,36 @@ export async function sendSMS({
   to,
   body,
   statusCallback,
+  event,
+  template,
+  orderId,
 }: {
   to: string;
   body: string;
   /** Optional HTTPS URL for Twilio to POST delivery status updates */
   statusCallback?: string;
+  event?: string;
+  template?: string;
+  orderId?: string;
 }): Promise<{ success: boolean; dev?: boolean; sid?: string; error?: any }> {
+  if (stagingCaptureEnabled()) {
+    await captureStagingNotification({
+      recipient: to,
+      channel: "sms",
+      event: event ?? "sms.send",
+      template: template ?? event ?? "sms.send",
+      orderId,
+      content: body,
+      payload: { to, body, statusCallback },
+    });
+    return { success: true, dev: true };
+  }
+
   const client = getTwilioClient();
   const from = process.env.TWILIO_PHONE_NUMBER;
 
   if (!client || !from) {
-    const safeBody = process.env.NODE_ENV === "production" ? "[REDACTED]" : body;
-    console.log(`[SMS-TEST] to=${to} body=${safeBody}`);
+    console.log(`[SMS-TEST] to=${to}`);
     return { success: true, dev: true };
   }
 

@@ -372,6 +372,9 @@ async function markOrderPaid(
       await sendEmail({
         to: buyerEmail,
         subject: `Payment Confirmed — RideCheck Assessment for ${vehicle}`,
+        event: "order.payment-received.buyer",
+        template: "buyer-paid-confirmation",
+        orderId,
         html: `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">
             <div style="background:#059669;padding:24px;border-radius:8px 8px 0 0;text-align:center">

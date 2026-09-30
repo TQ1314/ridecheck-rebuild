@@ -59,6 +59,9 @@ export async function notifyNewOrderRequest(order: NewOrderNotification): Promis
       to,
       subject: `RideCheck request created — PENDING PAYMENT — ${order.id}`,
       html,
+      event: "order.created.ops-alert",
+      template: "new-order-ops",
+      orderId: order.id,
     });
     if (!result.success) throw new Error("Email provider did not accept Ops notification");
   }));

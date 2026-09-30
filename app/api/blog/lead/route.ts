@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
+import { captureStagingNotification, stagingCaptureEnabled } from "@/lib/notifications/staging-capture";
 
 const schema = z.object({
   listingUrl: z.string().url("Must be a valid URL"),
   name: z.string().max(100).optional(),
   contact: z.string().max(200).optional(),
 });
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
   const fromSender = _rawFrom.includes("<") ? _rawFrom : `RideCheck Blog <${_rawFrom}>`;
 
   try {
-    await resend.emails.send({
+    const notification = {
       from: fromSender,
       to: toEmail,
       subject: "New Blog Lead — Listing Submitted",
@@ -61,7 +60,20 @@ export async function POST(req: NextRequest) {
           This lead came from a blog post CTA on ridecheckauto.com. Follow up to schedule a pre-purchase inspection.
         </p>
       `,
-    });
+    };
+    if (stagingCaptureEnabled()) {
+      await captureStagingNotification({
+        recipient: toEmail,
+        channel: "email",
+        event: "blog.lead.submitted",
+        template: "blog-lead-notification",
+        content: notification.html,
+        payload: notification,
+      });
+    } else {
+      const resend = new Resend(process.env.RESEND_API_KEY!);
+      await resend.emails.send(notification);
+    }
   } catch (err) {
     console.error("[blog/lead] Resend error:", err);
     return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });

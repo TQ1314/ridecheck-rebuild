@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { captureStagingNotification, stagingCaptureEnabled } from "@/lib/notifications/staging-capture";
 
 export const dynamic = "force-dynamic";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(
   req: NextRequest,
@@ -85,7 +84,7 @@ export async function POST(
     const rcName = profile.full_name || session.user.email || "RideChecker";
 
     try {
-      await resend.emails.send({
+      const notification = {
         from: fromSender,
         to: opsEmail,
         subject: `[Field Message] ${rcName} — ${vehicleLabel}`,
@@ -103,8 +102,23 @@ export async function POST(
             <p style="color:#888;font-size:12px">Sent via RideChecker Portal — reply to this RideChecker directly via phone/text.</p>
           </div>
         `,
-      });
+      };
+      if (stagingCaptureEnabled()) {
+        await captureStagingNotification({
+          recipient: opsEmail,
+          channel: "email",
+          event: "ridechecker.message.ops",
+          template: "ridechecker-field-message",
+          orderId: assignment.order_id,
+          content: notification.html,
+          payload: notification,
+        });
+      } else {
+        const resend = new Resend(process.env.RESEND_API_KEY!);
+        await resend.emails.send(notification);
+      }
     } catch (emailErr) {
+      if (stagingCaptureEnabled()) throw emailErr;
       console.error("[message-ops email error]", emailErr);
     }
 
