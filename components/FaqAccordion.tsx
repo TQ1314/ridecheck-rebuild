@@ -41,7 +41,7 @@ This is a non-invasive visual inspection — not a mechanical teardown.`,
   },
   {
     q: "How much does RideCheck cost?",
-    a: `Pricing depends on the vehicle type. Standard vehicles start at $119. Certain vehicle types (European, EV, heavy-duty, luxury/exotic) may require higher-tier pricing. You’ll see the final price before payment—no hidden fees.`,
+    a: `Standard is $139 for regular gasoline vehicles; Plus is $169 for European, hybrid, EV, diesel, and heavy-duty vehicles; Premium/Exotic starts at $299 for exotic, performance, and collector vehicles. Self-Arranged bookings save $10. You’ll see the final price before payment.`,
   },
   {
     q: "Do you inspect salvage or rebuilt vehicles?",

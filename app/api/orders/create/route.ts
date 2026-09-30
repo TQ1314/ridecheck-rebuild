@@ -112,10 +112,12 @@ export async function POST(req: NextRequest) {
 
     const classification = classifyVehicle({
       make: data.vehicle_make,
-      model: data.vehicle_model,
+      model: [data.vehicle_model, data.vehicle_trim].filter(Boolean).join(" "),
       year: data.vehicle_year,
       mileage: data.vehicle_mileage ?? null,
       askingPrice: data.vehicle_price ?? null,
+      fuelType: data.vehicle_fuel_type ?? null,
+      collector: data.vehicle_collector ?? false,
     });
 
     const serverPackage = classification.packageTier;
@@ -141,7 +143,9 @@ export async function POST(req: NextRequest) {
       vehicle_make: data.vehicle_make,
       vehicle_model: data.vehicle_model,
       vehicle_location: data.vehicle_location,
-      vehicle_description: data.vehicle_description ?? null,
+      vehicle_description: data.vehicle_fuel_type || data.vehicle_collector
+        ? [data.vehicle_description, data.vehicle_fuel_type && `Fuel type: ${data.vehicle_fuel_type}`, data.vehicle_collector && "Collector vehicle: buyer indicated"].filter(Boolean).join("\n")
+        : data.vehicle_description ?? null,
 
       listing_url: data.listing_url ?? null,
       listing_source: data.listing_source ?? "online_marketplace",

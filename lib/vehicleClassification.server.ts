@@ -1,206 +1,12 @@
 import "server-only";
 
-import type { ClassificationInput, ClassificationResult, VehicleTier } from "./vehicleClassification";
-import { TIER_PRICES } from "./vehicleClassification";
+import {
+  classifyVehicle, TIER_CONFIG,
+  type ClassificationInput, type ClassificationResult, type VehicleTier,
+} from "./vehicleClassification";
 
-export const TIER_CONFIG = {
-  exotic_brands: [
-    "ferrari",
-    "lamborghini",
-    "mclaren",
-    "bentley",
-    "rolls-royce",
-    "aston martin",
-    "bugatti",
-    "pagani",
-    "koenigsegg",
-    "lotus",
-    "maserati",
-  ],
-
-  plus_brands: [
-    "mercedes-benz",
-    "mercedes",
-    "bmw",
-    "audi",
-    "porsche",
-    "lexus",
-    "land rover",
-    "range rover",
-    "jaguar",
-    "tesla",
-    "volvo",
-    "acura",
-    "infiniti",
-  ],
-
-  exotic_model_overrides: [
-    "911 turbo",
-    "911 gt3",
-    "911 gt2",
-    "gt3 rs",
-    "gt2 rs",
-    "m5",
-    "m8",
-    "amg gt",
-    "amg gts",
-    "amg gt r",
-    "amg gt s",
-    "s-class",
-    "s class",
-    "s550",
-    "s560",
-    "s580",
-    "s600",
-    "s63",
-    "s65",
-    "maybach",
-  ],
-
-  value_thresholds: {
-    exotic: 60000,
-  },
-
-  aging_thresholds: {
-    luxury: { minAge: 15, minMileage: 150000, maxPrice: 10000 },
-    plus:   { minAge: 15, minMileage: 150000, maxPrice: 8000 },
-  },
-} as const;
-
-const EV_HYBRID_KEYWORDS = [
-  "ev", "hybrid", "plug-in", "phev",
-  "model s", "model 3", "model x", "model y", "cybertruck",
-  "electric", "e-tron", "etron", "bolt ev", "bolt euv",
-  "leaf", "ioniq", "mach-e", "id.4", "id.3", "mustang mach-e",
-  "rivian", "lucid", "polestar",
-];
-
-const EV_MAKES = ["tesla", "rivian", "lucid", "polestar", "fisker"];
-
-const THREE_ROW_SUV_KEYWORDS = [
-  "highlander", "pilot", "telluride", "palisade", "explorer",
-  "traverse", "tahoe", "suburban", "expedition", "sequoia",
-  "armada", "qx80", "qx60", "pathfinder", "atlas", "ascent",
-  "cx-9", "cx-90", "durango", "4runner", "land cruiser",
-  "gx", "lx", "enclave", "acadia",
-];
-
-const HEAVY_DUTY_KEYWORDS = [
-  "2500", "3500", "f-250", "f-350", "f250", "f350",
-  "duramax", "cummins", "powerstroke", "power stroke",
-  "sprinter", "super duty",
-];
-
-function matchesAny(value: string, keywords: readonly string[]): boolean {
-  return keywords.some((kw) => value.includes(kw));
-}
-
-export function classifyVehicle(input: ClassificationInput): ClassificationResult {
-  const make = (input.make || "").toLowerCase().trim();
-  const model = (input.model || "").toLowerCase().trim();
-  const makeModel = `${make} ${model}`;
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - (input.year || currentYear);
-  const mileage = input.mileage ?? null;
-  const price = input.askingPrice ?? null;
-
-  if ((TIER_CONFIG.exotic_brands as readonly string[]).includes(make)) {
-    return {
-      packageTier: "exotic",
-      basePrice: TIER_PRICES.exotic,
-      modifier: null,
-      classificationReason: "Exotic brand",
-      requiresUpgrade: true,
-    };
-  }
-
-  if (price !== null && price >= TIER_CONFIG.value_thresholds.exotic) {
-    return {
-      packageTier: "exotic",
-      basePrice: TIER_PRICES.exotic,
-      modifier: null,
-      classificationReason: `High value vehicle`,
-      requiresUpgrade: true,
-    };
-  }
-
-  const isExoticModel =
-    matchesAny(model, TIER_CONFIG.exotic_model_overrides) ||
-    matchesAny(makeModel, TIER_CONFIG.exotic_model_overrides);
-
-  if (isExoticModel) {
-    return {
-      packageTier: "exotic",
-      basePrice: TIER_PRICES.exotic,
-      modifier: null,
-      classificationReason: "High-complexity model",
-      requiresUpgrade: true,
-    };
-  }
-
-  const isPlusBrand = (TIER_CONFIG.plus_brands as readonly string[]).includes(make);
-
-  if (isPlusBrand) {
-    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.luxury;
-    if (
-      age >= minAge &&
-      mileage !== null && mileage >= minMileage &&
-      price !== null && price <= maxPrice
-    ) {
-      return {
-        packageTier: "standard",
-        basePrice: TIER_PRICES.standard,
-        modifier: "aging_luxury",
-        classificationReason: "Aging luxury vehicle",
-        requiresUpgrade: false,
-      };
-    }
-    return {
-      packageTier: "plus",
-      basePrice: TIER_PRICES.plus,
-      modifier: null,
-      classificationReason: "Luxury brand",
-      requiresUpgrade: true,
-    };
-  }
-
-  const isEV       = EV_MAKES.includes(make) || matchesAny(model, EV_HYBRID_KEYWORDS);
-  const isThreeRow = matchesAny(model, THREE_ROW_SUV_KEYWORDS);
-  const isHeavyDuty = matchesAny(model, HEAVY_DUTY_KEYWORDS);
-
-  if (isEV || isThreeRow || isHeavyDuty) {
-    const plusReason = isEV ? "EV/Hybrid vehicle" : isThreeRow ? "3-row SUV" : "Heavy-duty truck";
-    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.plus;
-    if (
-      age >= minAge &&
-      mileage !== null && mileage >= minMileage &&
-      price !== null && price <= maxPrice
-    ) {
-      return {
-        packageTier: "standard",
-        basePrice: TIER_PRICES.standard,
-        modifier: "aging_plus",
-        classificationReason: "Aging complex vehicle",
-        requiresUpgrade: false,
-      };
-    }
-    return {
-      packageTier: "plus",
-      basePrice: TIER_PRICES.plus,
-      modifier: null,
-      classificationReason: plusReason,
-      requiresUpgrade: true,
-    };
-  }
-
-  return {
-    packageTier: "standard",
-    basePrice: TIER_PRICES.standard,
-    modifier: null,
-    classificationReason: "Standard vehicle",
-    requiresUpgrade: false,
-  };
-}
+export { classifyVehicle, TIER_CONFIG };
+export type { ClassificationInput, ClassificationResult, VehicleTier };
 
 export interface ClassificationResultInternal extends ClassificationResult {
   signals_triggered: string[];
@@ -208,69 +14,24 @@ export interface ClassificationResultInternal extends ClassificationResult {
 }
 
 export function classifyVehicleInternal(input: ClassificationInput): ClassificationResultInternal {
-  const make = (input.make || "").toLowerCase().trim();
-  const model = (input.model || "").toLowerCase().trim();
-  const makeModel = `${make} ${model}`;
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - (input.year || currentYear);
-  const mileage = input.mileage ?? null;
-  const price = input.askingPrice ?? null;
+  const result = classifyVehicle(input);
   const signals: string[] = [];
   const riskFlags: Record<string, unknown> = {};
-
-  if (age >= 10) { signals.push("VEHICLE_AGE_10_PLUS"); }
-  if (mileage !== null && mileage >= 100000) { signals.push("HIGH_MILEAGE"); riskFlags.high_mileage = mileage; }
-  if (mileage !== null && mileage >= 150000) { signals.push("VERY_HIGH_MILEAGE"); }
-  if (price !== null && price < 5000) { signals.push("LOW_ASK_PRICE"); riskFlags.low_price = price; }
-
-  if ((TIER_CONFIG.exotic_brands as readonly string[]).includes(make)) {
-    signals.push("EXOTIC_BRAND");
-    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "Exotic brand", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+  const age = new Date().getFullYear() - input.year;
+  if (age >= 10) signals.push("VEHICLE_AGE_10_PLUS");
+  if (input.mileage != null && input.mileage >= 100000) {
+    signals.push("HIGH_MILEAGE");
+    riskFlags.high_mileage = input.mileage;
   }
-
-  if (price !== null && price >= TIER_CONFIG.value_thresholds.exotic) {
+  if (input.mileage != null && input.mileage >= 150000) signals.push("VERY_HIGH_MILEAGE");
+  if (input.askingPrice != null && input.askingPrice < 5000) {
+    signals.push("LOW_ASK_PRICE");
+    riskFlags.low_price = input.askingPrice;
+  }
+  if (input.askingPrice != null && input.askingPrice >= 60000) {
     signals.push("HIGH_VALUE");
-    riskFlags.high_value_price = price;
-    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "High value vehicle", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
+    riskFlags.high_value_price = input.askingPrice;
   }
-
-  const isExoticModel = matchesAny(model, TIER_CONFIG.exotic_model_overrides) || matchesAny(makeModel, TIER_CONFIG.exotic_model_overrides);
-  if (isExoticModel) {
-    signals.push("EXOTIC_MODEL_OVERRIDE");
-    return { packageTier: "exotic", basePrice: TIER_PRICES.exotic, modifier: null, classificationReason: "High-complexity model", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
-  }
-
-  const isPlusBrand = (TIER_CONFIG.plus_brands as readonly string[]).includes(make);
-  if (isPlusBrand) {
-    signals.push("PLUS_BRAND");
-    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.luxury;
-    if (age >= minAge && mileage !== null && mileage >= minMileage && price !== null && price <= maxPrice) {
-      signals.push("AGING_LUXURY_DOWNGRADE");
-      return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: "aging_luxury", classificationReason: "Aging luxury vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
-    }
-    return { packageTier: "plus", basePrice: TIER_PRICES.plus, modifier: null, classificationReason: "Luxury brand", requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
-  }
-
-  const isEV = EV_MAKES.includes(make) || matchesAny(model, EV_HYBRID_KEYWORDS);
-  const isThreeRow = matchesAny(model, THREE_ROW_SUV_KEYWORDS);
-  const isHeavyDuty = matchesAny(model, HEAVY_DUTY_KEYWORDS);
-
-  if (isEV) { signals.push("EV_OR_HYBRID"); }
-  if (isThreeRow) { signals.push("THREE_ROW_SUV"); }
-  if (isHeavyDuty) { signals.push("HEAVY_DUTY_TRUCK"); }
-
-  if (isEV || isThreeRow || isHeavyDuty) {
-    const plusReason = isEV ? "EV/Hybrid vehicle" : isThreeRow ? "3-row SUV" : "Heavy-duty truck";
-    const { minAge, minMileage, maxPrice } = TIER_CONFIG.aging_thresholds.plus;
-    if (age >= minAge && mileage !== null && mileage >= minMileage && price !== null && price <= maxPrice) {
-      signals.push("AGING_PLUS_DOWNGRADE");
-      return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: "aging_plus", classificationReason: "Aging complex vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
-    }
-    return { packageTier: "plus", basePrice: TIER_PRICES.plus, modifier: null, classificationReason: plusReason, requiresUpgrade: true, signals_triggered: signals, risk_flags: riskFlags };
-  }
-
-  signals.push("STANDARD");
-  return { packageTier: "standard", basePrice: TIER_PRICES.standard, modifier: null, classificationReason: "Standard vehicle", requiresUpgrade: false, signals_triggered: signals, risk_flags: riskFlags };
+  signals.push(result.packageTier.toUpperCase());
+  return { ...result, signals_triggered: signals, risk_flags: riskFlags };
 }
-
-export type { ClassificationInput, ClassificationResult, VehicleTier };

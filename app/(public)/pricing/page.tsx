@@ -23,7 +23,7 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {PACKAGES.map((pkg) => {
             const info = PACKAGE_INFO[pkg];
             const prices = PRICING[pkg];
@@ -86,9 +86,10 @@ export default function PricingPage() {
                 <div>
                   <h4 className="font-semibold mb-1">How is my package determined?</h4>
                   <p className="text-sm text-muted-foreground">
-                    Your vehicle determines the assessment level. Luxury brands, EVs, and
-                    heavy-duty trucks get Plus. Standard vehicles get Basic.
-                    Exotic and specialty vehicles get the Exotic package.
+                    Regular gasoline vehicles get Standard. European, hybrid, EV, diesel, and
+                    heavy-duty vehicles get Plus, including ordinary Mercedes-Benz and BMW models.
+                    Exotic, performance, and collector vehicles get Premium/Exotic ($299+).
+                    Price, luxury branding, or a flagship badge alone does not make a vehicle Premium/Exotic.
                     Just enter your vehicle details when booking — we&apos;ll match the right package automatically.
                   </p>
                 </div>

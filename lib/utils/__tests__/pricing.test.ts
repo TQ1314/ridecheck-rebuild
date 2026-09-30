@@ -5,6 +5,7 @@ import {
   getPackageTier,
   detectListingPlatform,
 } from "../pricing";
+import { classifyVehicle } from "../../vehicleClassification";
 
 describe("getPrice", () => {
   it("returns correct standard price", () => {
@@ -28,10 +29,10 @@ describe("getPrice", () => {
     expect(result.discountAmount).toBe(0);
   });
 
-  it("returns correct premium price", () => {
+  it("keeps legacy premium records priced as Plus, not a separate $189 tier", () => {
     const result = getPrice("premium", "concierge");
-    expect(result.basePrice).toBe(189);
-    expect(result.finalPrice).toBe(189);
+    expect(result.basePrice).toBe(169);
+    expect(result.finalPrice).toBe(169);
     expect(result.discountAmount).toBe(0);
   });
 
@@ -52,8 +53,8 @@ describe("getPriceCents", () => {
     expect(getPriceCents("plus", "concierge")).toBe(16900);
   });
 
-  it("returns price in cents for premium", () => {
-    expect(getPriceCents("premium", "concierge")).toBe(18900);
+  it("returns Plus cents for the legacy premium alias", () => {
+    expect(getPriceCents("premium", "concierge")).toBe(16900);
   });
 });
 
@@ -64,12 +65,12 @@ describe("getPackageTier", () => {
     expect(getPackageTier({ make: "Ford", model: "F-150" })).toBe("standard");
   });
 
-  it("returns premium for Mercedes-Benz", () => {
-    expect(getPackageTier({ make: "Mercedes-Benz", model: "GLE" })).toBe("premium");
+  it("returns plus for ordinary Mercedes-Benz", () => {
+    expect(getPackageTier({ make: "Mercedes-Benz", model: "GLE" })).toBe("plus");
   });
 
-  it("returns premium for BMW", () => {
-    expect(getPackageTier({ make: "BMW", model: "X5" })).toBe("premium");
+  it("returns plus for ordinary BMW", () => {
+    expect(getPackageTier({ make: "BMW", model: "X5" })).toBe("plus");
   });
 
   it("returns plus for Tesla as an EV", () => {
@@ -92,15 +93,52 @@ describe("getPackageTier", () => {
     expect(getPackageTier({ make: "", model: "" })).toBe("standard");
   });
 
-  it("returns premium for flagship keywords", () => {
-    expect(getPackageTier({ make: "Cadillac", model: "Escalade" })).toBe("premium");
-    expect(getPackageTier({ make: "Lincoln", model: "Navigator" })).toBe("premium");
+  it("does not price flagships as performance merely for being flagships", () => {
+    expect(getPackageTier({ make: "Cadillac", model: "Escalade" })).toBe("standard");
+    expect(getPackageTier({ make: "Lincoln", model: "Navigator" })).toBe("standard");
   });
 
-  it("returns plus for 3-row SUVs", () => {
-    expect(getPackageTier({ make: "Toyota", model: "Highlander" })).toBe("plus");
-    expect(getPackageTier({ make: "Honda", model: "Pilot" })).toBe("plus");
-    expect(getPackageTier({ make: "Chevrolet", model: "Tahoe" })).toBe("plus");
+  it("returns standard for gasoline 3-row SUVs without other qualifying signals", () => {
+    expect(getPackageTier({ make: "Toyota", model: "Highlander" })).toBe("standard");
+    expect(getPackageTier({ make: "Honda", model: "Pilot" })).toBe("standard");
+    expect(getPackageTier({ make: "Chevrolet", model: "Tahoe" })).toBe("standard");
+  });
+});
+
+describe("three-tier vehicle policy", () => {
+  const vehicle = (make: string, model: string, extras: Partial<Parameters<typeof classifyVehicle>[0]> = {}) =>
+    classifyVehicle({ make, model, year: 2010, ...extras });
+
+  it("does not elevate an ordinary expensive gasoline vehicle", () => {
+    expect(vehicle("Toyota", "Highlander", { askingPrice: 75000 }).packageTier).toBe("standard");
+    expect(vehicle("Cadillac", "Escalade", { askingPrice: 120000 }).packageTier).toBe("standard");
+  });
+
+  it("keeps European and EV vehicles Plus regardless of age, mileage or low price", () => {
+    expect(vehicle("BMW", "X5", { mileage: 200000, askingPrice: 5000 }).packageTier).toBe("plus");
+    expect(vehicle("Tesla", "Model 3", { mileage: 200000, askingPrice: 5000 }).packageTier).toBe("plus");
+    expect(vehicle("Volkswagen", "Jetta").packageTier).toBe("plus");
+    expect(vehicle("MINI", "Cooper").packageTier).toBe("plus");
+    expect(vehicle("Mercedes-Benz", "S580").packageTier).toBe("plus");
+    expect(vehicle("Mercedes-Benz", "Maybach S580").packageTier).toBe("plus");
+    expect(vehicle("Lexus", "RX", { fuelType: "gasoline" }).packageTier).toBe("standard");
+  });
+
+  it("uses explicit fuel when a name alone cannot identify diesel, hybrid or EV", () => {
+    for (const fuelType of ["diesel", "hybrid", "electric"] as const) {
+      expect(vehicle("Ford", "F-150", { fuelType }).packageTier).toBe("plus");
+    }
+    expect(vehicle("Ford", "F-150", { fuelType: "gasoline" }).packageTier).toBe("standard");
+    expect(vehicle("Volkswagen", "Golf TDI").packageTier).toBe("plus");
+  });
+
+  it("prices performance and collector models as Exotic, without matching similar names", () => {
+    expect(vehicle("Porsche", "911 Carrera").packageTier).toBe("exotic");
+    expect(vehicle("BMW", "M5").packageTier).toBe("exotic");
+    expect(vehicle("Mercedes-Benz", "AMG GT").packageTier).toBe("exotic");
+    expect(vehicle("Mercedes-Benz", "S63").packageTier).toBe("exotic");
+    expect(vehicle("Toyota", "Camry", { collector: true }).packageTier).toBe("exotic");
+    expect(vehicle("Toyota", "Camry M50").packageTier).toBe("standard");
   });
 });
 

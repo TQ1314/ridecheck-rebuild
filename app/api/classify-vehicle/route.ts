@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
       year: Number(body.year) || new Date().getFullYear(),
       mileage: body.mileage != null ? Number(body.mileage) : null,
       askingPrice: body.askingPrice != null ? Number(body.askingPrice) : null,
+      fuelType: ["gasoline", "diesel", "hybrid", "electric"].includes(body.fuelType)
+        ? body.fuelType : null,
+      collector: body.collector === true,
     };
 
     if (!input.make || !input.model) {

@@ -250,11 +250,10 @@ export default function PublicHomePage() {
             Flat pricing based on vehicle type. No hidden fees.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <PriceCard tier="Standard" price="$139" desc="Most sedans, SUVs, trucks" />
-            <PriceCard tier="Plus" price="$169" desc="Euro, EV, or heavy-duty vehicles" highlight />
-            <PriceCard tier="Premium" price="$189" desc="Luxury or flagship models" />
-            <PriceCard tier="Exotic" price="$299" desc="High-end exotic vehicles" />
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <PriceCard tier="Standard" price="$139" desc="Regular gasoline vehicles" />
+            <PriceCard tier="Plus" price="$169" desc="European, hybrid, EV, diesel & heavy-duty vehicles" highlight />
+            <PriceCard tier="Premium/Exotic" price="$299+" desc="Exotic, performance & collector vehicles" />
           </div>
 
           <div className="mt-6 text-center">

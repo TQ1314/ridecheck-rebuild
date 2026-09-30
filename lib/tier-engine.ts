@@ -1,57 +1,24 @@
-export type PackageTier = "standard" | "plus" | "premium";
+// Compatibility entry point: keep old callers on the same classification and
+// price schedule as the booking flow. "premium" is a legacy Plus alias.
+import { classifyVehicle } from "./vehicleClassification";
+import { getPriceCents as priceCents } from "./utils/pricing";
 
-interface VehicleInfo {
-  year?: number;
-  make?: string;
-  model?: string;
-  price?: number;
-}
+export type PackageTier = "standard" | "plus" | "premium" | "exotic";
 
-export function getPackageTier(vehicle: VehicleInfo): PackageTier {
-  const make = vehicle.make?.toLowerCase() || "";
-  const model = vehicle.model?.toLowerCase() || "";
-
-  // Premium brands
-  if (
-    make.includes("ferrari") ||
-    make.includes("lamborghini") ||
-    make.includes("bentley") ||
-    make.includes("rolls")
-  ) {
-    return "premium";
-  }
-
-  // Electric / luxury mid-tier
-  if (
-    make.includes("tesla") ||
-    make.includes("mercedes") ||
-    make.includes("bmw") ||
-    make.includes("audi")
-  ) {
-    return "plus";
-  }
-
-  // Default
-  return "standard";
+export function getPackageTier(vehicle: {
+  year?: number; make?: string; model?: string; price?: number;
+}): PackageTier {
+  return classifyVehicle({
+    make: vehicle.make || "",
+    model: vehicle.model || "",
+    year: vehicle.year || new Date().getFullYear(),
+    askingPrice: vehicle.price,
+  }).packageTier;
 }
 
 export function getPriceCents(
   tier: PackageTier,
-  bookingMethod: "concierge" | "buyer_arranged"
+  bookingMethod: "concierge" | "buyer_arranged",
 ): number {
-  const basePrices = {
-    standard: 12900,
-    plus: 16900,
-    premium: 24900,
-  };
-
-  const price = basePrices[tier];
-
-  // 5% discount for buyer-arranged inspections
-  if (bookingMethod === "buyer_arranged") {
-    return Math.round(price * 0.95);
-  }
-
-  return price;
+  return priceCents(tier, bookingMethod);
 }
-

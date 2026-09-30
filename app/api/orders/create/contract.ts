@@ -24,6 +24,8 @@ export const createOrderSchema = z.object({
   vehicle_year: z.number().int().min(1900).max(2030),
   vehicle_make: z.string().min(1).max(100),
   vehicle_model: z.string().min(1).max(100),
+  vehicle_fuel_type: z.enum(["gasoline", "diesel", "hybrid", "electric"]).nullable().optional(),
+  vehicle_collector: z.boolean().optional(),
   vehicle_description: z.string().max(2000).nullable().optional(),
   listing_url: z.string().url().nullable().optional(),
   vehicle_location: z.string().min(1).max(200),

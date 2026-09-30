@@ -58,7 +58,7 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold mb-3">2. Service Packages and Pricing</h2>
             <p className="text-muted-foreground mb-2">
               RideCheck assigns packages based on vehicle classification (year, make, model, mileage,
-              and market value). Current tiers are Basic ($139), Plus ($169), and Exotic ($299).
+              and vehicle category). Current tiers are Standard ($139), Plus ($169), and Premium/Exotic ($299+).
               Customers do not manually select tiers — the appropriate package is determined by our
               classification system.
             </p>

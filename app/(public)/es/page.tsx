@@ -278,11 +278,10 @@ export default function SpanishHomePage() {
             {t("home.pricingSubtitle", L)}
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <PriceCard tier={t("home.tierStandard", L)} price="$139" desc={t("home.tierStandardDesc", L)} />
             <PriceCard tier={t("home.tierPlus", L)} price="$169" desc={t("home.tierPlusDesc", L)} highlight />
-            <PriceCard tier={t("home.tierPremium", L)} price="$189" desc={t("home.tierPremiumDesc", L)} />
-            <PriceCard tier={t("home.tierExotic", L)} price="$299" desc={t("home.tierExoticDesc", L)} />
+            <PriceCard tier={t("home.tierExotic", L)} price="$299+" desc={t("home.tierExoticDesc", L)} />
           </div>
 
           <div className="mt-6 text-center">

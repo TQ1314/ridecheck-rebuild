@@ -150,9 +150,9 @@ export default function JoinPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { tier: "Standard", pay: "$50", desc: "Common vehicles" },
-              { tier: "Plus", pay: "$65", desc: "Euro, EV & HD trucks" },
-              { tier: "Premium", pay: "$80", desc: "Luxury & flagship" },
-              { tier: "Exotic", pay: "$130", desc: "Exotic & high-value" },
+              { tier: "Plus", pay: "$65", desc: "Euro, hybrid, EV, diesel & HD" },
+              { tier: "Premium", pay: "$80", desc: "Legacy assignment category" },
+              { tier: "Exotic", pay: "$130", desc: "Exotic, performance & collector" },
             ].map((item) => (
               <Card key={item.tier} data-testid={`card-pay-${item.tier.toLowerCase()}`}>
                 <CardContent className="pt-5 pb-4 text-center">

@@ -49,7 +49,7 @@ export default function FaqPage() {
           />
           <FaqItem
             q="How much does it cost?"
-            a="Flat pricing based on vehicle type: Standard $139, Plus $169, Premium $189, Exotic $299. No hidden fees."
+            a="Flat pricing based on vehicle type: Standard $139 for regular gasoline vehicles; Plus $169 for European, hybrid, EV, diesel, and heavy-duty vehicles (including ordinary Mercedes-Benz and BMW models); Premium/Exotic $299+ for exotic, performance, and collector vehicles. Luxury branding or a flagship badge alone does not make a vehicle Premium. Self-Arranged bookings save $10."
           />
           <FaqItem
             q="Is RideCheck a warranty or guarantee?"

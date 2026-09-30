@@ -1,0 +1,89 @@
+Use the following as RideCheck's authoritative vehicle classification and pricing policy for NEW requests.
+
+Do not reclassify or modify historical orders.
+
+RIDECHECK PRICING
+
+STANDARD — $139
+Regular gasoline vehicles that do not meet a Plus or Premium/Exotic criterion.
+
+PLUS — $169
+European vehicles, Hybrid vehicles, EVs, Diesel vehicles, and Heavy-Duty vehicles.
+
+PREMIUM / EXOTIC — $299+
+Exotic, Performance, and Collector vehicles.
+
+CLASSIFICATION PRIORITY
+
+Apply the highest applicable tier:
+
+Premium/Exotic
+↓
+Plus
+↓
+Standard
+
+EDGE-CASE DECISIONS
+
+1. ORDINARY VEHICLE PRICED $60,000+
+Do NOT classify a vehicle as Premium/Exotic solely because of asking price.
+Price alone is not a classification trigger.
+
+2. OLD OR HIGH-MILEAGE BMW / EV / OTHER PLUS VEHICLE
+Keep it Plus.
+Age, mileage, depreciation, or low asking price must NEVER downgrade a vehicle from its appropriate package.
+
+3. ORDINARY GASOLINE THREE-ROW SUVs
+Vehicles such as ordinary gasoline Toyota Highlander, Honda Pilot, Chevrolet Tahoe, etc. are Standard unless another characteristic independently qualifies them for Plus or Premium/Exotic.
+Three-row seating or large-SUV status alone is not a Plus trigger.
+
+4. MERCEDES S-CLASS / MAYBACH
+Plus by default because they are European vehicles.
+Do not classify them as Premium/Exotic merely because they are expensive or luxury/flagship vehicles.
+A specific performance, exotic, or collector variant may qualify for Premium/Exotic.
+
+5. EUROPEAN MAKES
+European vehicles are Plus by default.
+Do not limit this rule to BMW, Mercedes-Benz, or Audi.
+This includes makes such as Volkswagen, MINI, Volvo, Porsche, etc., unless a specific vehicle qualifies for Premium/Exotic.
+
+6. PORSCHE 911
+Classify Porsche 911, including base 911 variants, as Premium/Exotic because it is a performance sports car.
+Performance variants such as Porsche GT/Turbo remain Premium/Exotic.
+Ordinary non-performance Porsche SUVs such as standard Macan/Cayenne may remain Plus.
+
+PERFORMANCE EXAMPLES
+
+Vehicles that clearly qualify as performance vehicles — such as appropriate BMW M models, Mercedes-AMG performance models, Porsche 911/GT/Turbo models, and equivalent performance vehicles — should be Premium/Exotic.
+
+IMPORTANT CLASSIFICATION PRINCIPLES
+
+- Luxury brand alone does NOT mean Premium/Exotic.
+- Flagship designation alone does NOT mean Premium/Exotic.
+- Asking price alone does NOT mean Premium/Exotic.
+- Age or mileage must NEVER downgrade a package.
+- Additional vehicle complexity may move a vehicle upward, never downward.
+- If a vehicle is genuinely ambiguous, surface it for a business decision rather than guessing.
+
+PUBLIC PRICING CLEANUP
+
+The old $189 Premium rule is obsolete.
+
+Make the customer-facing website, FAQ, pricing configuration, vehicle classifier, checkout pricing, and automated tests consistent with:
+
+Standard $139
+Plus $169
+Premium/Exotic $299+
+
+Do not change historical orders or their prices.
+
+Before implementing, report:
+1. Exactly which files/pages/configuration/tests will change.
+2. Any remaining ambiguous vehicle classifications.
+3. Any place where the published website currently contradicts this policy.
+
+If there are no remaining ambiguities, implement the policy, run the COMPLETE test suite, and report the results.
+
+Do NOT deploy or publish anything.
+Do NOT create Stripe charges.
+Do NOT create test orders in the production/main Supabase database.

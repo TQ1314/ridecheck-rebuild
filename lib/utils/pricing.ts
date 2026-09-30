@@ -1,3 +1,5 @@
+import { classifyVehicle, type ClassificationInput } from "../vehicleClassification";
+
 export type BookingType = "self_arrange" | "concierge" | "buyer_arranged";
 export type PackageType = "standard" | "plus" | "premium" | "exotic";
 
@@ -8,7 +10,7 @@ export const SELF_ARRANGE_DISCOUNT = 10;
 export const PRICING: Record<PackageType, { full: number; self: number }> = {
   standard: { full: 139, self: 129 },
   plus: { full: 169, self: 159 },
-  premium: { full: 169, self: 159 },
+  premium: { full: 169, self: 159 }, // Legacy stored package alias; not a bookable tier.
   exotic: { full: 299, self: 289 },
 };
 
@@ -32,33 +34,16 @@ export function getPriceCents(
   return Math.round(finalPrice * 100);
 }
 
-export function getPackageTier(vehicle: {
-  make?: string;
-  model?: string;
-  year?: number;
-}): PackageTier {
-  const make = (vehicle.make || "").toLowerCase();
-  const model = (vehicle.model || "").toLowerCase();
-
-  const exoticMakes = ["ferrari", "lamborghini", "mclaren", "bentley", "rolls-royce", "aston martin", "bugatti", "pagani", "koenigsegg", "lotus", "maserati"];
-  if (exoticMakes.includes(make)) return "exotic";
-
-  const plusMakes = ["mercedes-benz", "mercedes", "bmw", "audi", "porsche", "lexus", "land rover", "range rover", "jaguar", "tesla", "volvo", "acura", "infiniti"];
-  if (plusMakes.includes(make)) return "plus";
-
-  const evMakes = ["rivian", "lucid", "polestar", "fisker"];
-  if (evMakes.includes(make)) return "plus";
-
-  const evKeywords = ["ev", "hybrid", "plug-in", "phev", "electric", "e-tron", "mach-e"];
-  if (evKeywords.some((kw) => model.includes(kw))) return "plus";
-
-  const threeRowKeywords = ["highlander", "pilot", "telluride", "palisade", "explorer", "traverse", "tahoe", "suburban", "expedition", "sequoia", "armada"];
-  if (threeRowKeywords.some((kw) => model.includes(kw))) return "plus";
-
-  const heavyDutyKeywords = ["f-250", "f-350", "f250", "f350", "2500", "3500", "duramax", "cummins", "powerstroke", "sprinter"];
-  if (heavyDutyKeywords.some((kw) => model.includes(kw))) return "plus";
-
-  return "standard";
+export function getPackageTier(vehicle: Partial<ClassificationInput>): PackageTier {
+  return classifyVehicle({
+    make: vehicle.make || "",
+    model: vehicle.model || "",
+    year: vehicle.year || new Date().getFullYear(),
+    mileage: vehicle.mileage,
+    askingPrice: vehicle.askingPrice,
+    fuelType: vehicle.fuelType,
+    collector: vehicle.collector,
+  }).packageTier;
 }
 
 export function formatCurrency(amount: number | string): string {
@@ -102,7 +87,7 @@ export const PACKAGE_INFO: Record<
   { name: string; tagline: string; features: string[] }
 > = {
   standard: {
-    name: "Basic",
+    name: "Standard",
     tagline: "Essential vehicle screening for informed decisions",
     features: [
       "Comprehensive multi-module inspection",
@@ -116,9 +101,9 @@ export const PACKAGE_INFO: Record<
   },
   plus: {
     name: "Plus",
-    tagline: "Euro, EV, hybrid & higher-complexity screening",
+    tagline: "European, EV, hybrid, diesel & heavy-duty screening",
     features: [
-      "Everything in Basic",
+      "Everything in Standard",
       "OBD-II diagnostic scan",
       "Undercarriage inspection",
       "Paint depth measurement",
@@ -134,7 +119,7 @@ export const PACKAGE_INFO: Record<
     name: "Plus",
     tagline: "Euro, EV, hybrid & higher-complexity screening",
     features: [
-      "Everything in Basic",
+      "Everything in Standard",
       "OBD-II diagnostic scan",
       "Undercarriage inspection",
       "Paint depth measurement",
@@ -147,8 +132,8 @@ export const PACKAGE_INFO: Record<
     ],
   },
   exotic: {
-    name: "Exotic",
-    tagline: "Full pre-purchase intelligence for specialty vehicles",
+    name: "Premium/Exotic",
+    tagline: "Full pre-purchase intelligence for exotic, performance & collector vehicles",
     features: [
       "Everything in Plus",
       "Title & ownership review",

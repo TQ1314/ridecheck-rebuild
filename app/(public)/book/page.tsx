@@ -117,6 +117,8 @@ function BookInner() {
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleTrim, setVehicleTrim] = useState("");
+  const [vehicleFuelType, setVehicleFuelType] = useState<"" | "gasoline" | "diesel" | "hybrid" | "electric">("");
+  const [vehicleCollector, setVehicleCollector] = useState(false);
   const [vehicleVin, setVehicleVin] = useState("");
   const [vehicleDescription, setVehicleDescription] = useState("");
   const [vehicleMileage, setVehicleMileage] = useState("");
@@ -198,7 +200,9 @@ function BookInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           make: vehicleMake,
-          model: vehicleModel,
+          model: [vehicleModel, vehicleTrim].filter(Boolean).join(" "),
+          fuelType: vehicleFuelType || null,
+          collector: vehicleCollector,
           year: parseInt(vehicleYear) || new Date().getFullYear(),
           mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
           askingPrice: vehiclePrice ? parseFloat(vehiclePrice) : null,
@@ -223,7 +227,7 @@ function BookInner() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [vehicleMake, vehicleModel, vehicleYear, vehicleMileage, vehiclePrice]);
+  }, [vehicleMake, vehicleModel, vehicleTrim, vehicleYear, vehicleMileage, vehiclePrice, vehicleFuelType, vehicleCollector]);
 
   const handleZipChange = (zip: string) => {
     const cleaned = zip.replace(/\D/g, "").slice(0, 5);
@@ -285,6 +289,8 @@ function BookInner() {
         setIntakeOriginalProposal, setIntakeProvenance, setIntakeWarning,
         setShowWhyModal, setStep,
       });
+      setVehicleFuelType("");
+      setVehicleCollector(false);
       setIntakeSessionCount(0);
       setIntakeSessionStatusError(false);
       if (intakeFileRef.current) intakeFileRef.current.value = "";
@@ -420,6 +426,8 @@ function BookInner() {
         vehicle_year: parseInt(vehicleYear),
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
+        vehicle_fuel_type: vehicleFuelType || null,
+        vehicle_collector: vehicleCollector,
         vehicle_trim: vehicleTrim || null,
         vin: vehicleVin || null,
         vehicle_description: vehicleDescription || null,
@@ -937,6 +945,26 @@ function BookInner() {
                   <Input id="vin" placeholder="17-character VIN" maxLength={17} value={vehicleVin} onChange={(e) => setVehicleVin(e.target.value.toUpperCase())} data-testid="input-vin" />
                 </div>
               </div>
+              <div>
+                <Label htmlFor="fuelType">{lang === "es" ? "Combustible (si lo sabe)" : "Fuel type (if known)"}</Label>
+                <select
+                  id="fuelType"
+                  value={vehicleFuelType}
+                  onChange={(e) => setVehicleFuelType(e.target.value as typeof vehicleFuelType)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  data-testid="select-fuel-type"
+                >
+                  <option value="">{lang === "es" ? "No estoy seguro" : "Not sure"}</option>
+                  <option value="gasoline">{lang === "es" ? "Gasolina" : "Gasoline"}</option>
+                  <option value="diesel">Diesel</option>
+                  <option value="hybrid">{lang === "es" ? "Híbrido" : "Hybrid"}</option>
+                  <option value="electric">{lang === "es" ? "Eléctrico" : "Electric"}</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={vehicleCollector} onChange={(e) => setVehicleCollector(e.target.checked)} data-testid="checkbox-collector" />
+                {lang === "es" ? "Este es un vehículo de colección" : "This is a collector vehicle"}
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="mileage">Mileage</Label>
@@ -1118,11 +1146,11 @@ function BookInner() {
                         </div>
                       </div>
                     </div>
-                    {(!vehicleMileage || !vehiclePrice) && (
+                    {!vehicleFuelType && (
                       <div className="flex items-start gap-2 mt-3 pt-3 border-t border-primary/20">
                         <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-muted-foreground">
-                          Add mileage and asking price above for the most accurate package match.
+                          If known, add fuel type above for the most accurate package match.
                         </p>
                       </div>
                     )}
@@ -1156,17 +1184,17 @@ function BookInner() {
                                 ))}
                               </ul>
                               <p className="text-xs text-muted-foreground border-t pt-2">
-                                Basic is not available for this vehicle category.
+                                Standard is not available for this vehicle category.
                               </p>
                             </>
                           )}
                           {classification.packageTier === "exotic" && (
                             <>
                               <p className="text-muted-foreground">
-                                This vehicle falls into a specialty or high-value category with higher inspection complexity and repair exposure. RideCheck requires the Exotic inspection level to provide the appropriate level of documentation and buyer protection.
+                                This vehicle is an exotic, performance, or collector model. RideCheck requires the Exotic inspection level for this vehicle category; asking price alone does not determine this tier.
                               </p>
                               <p className="text-xs text-muted-foreground border-t pt-2">
-                                Basic and Plus are not available for this vehicle category.
+                                Standard and Plus are not available for this vehicle category.
                               </p>
                             </>
                           )}
