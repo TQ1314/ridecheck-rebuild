@@ -1,0 +1,134 @@
+RIDECHECK CONTROLLED PRODUCTION E2E — VERIFY ENVIRONMENT + DESIGN CONTAINMENT
+
+Proceed with the next preflight step only.
+
+DO NOT create a booking.
+DO NOT create Stripe Checkout.
+DO NOT charge a card.
+DO NOT invoke payment override.
+DO NOT contact a seller.
+DO NOT notify/broadcast to a RideChecker.
+DO NOT send a report.
+DO NOT create/approve a payout.
+DO NOT deploy a change yet.
+
+PART 1 — VERIFY THE ACTUAL PUBLISHED ENVIRONMENT
+
+Using available read-only deployment/configuration capabilities, establish as much of the following as possible WITHOUT exposing secret values:
+
+1. Published RideCheck application identity/version/commit if available.
+2. Whether the published app corresponds to the current stabilized workspace code.
+3. Supabase project identity used by the published application.
+4. Confirm whether that project is RideCheck-v2.
+5. Stripe secret-key MODE: TEST or LIVE.
+6. Stripe publishable-key MODE: TEST or LIVE.
+7. Confirm both Stripe keys belong to the same mode/environment.
+8. Exact configured Stripe webhook destination.
+9. Confirm webhook signing secret corresponds to that destination without revealing it.
+10. ENABLE_STRIPE_TAX production value.
+11. Current Ops notification recipients/channels.
+12. Current Resend environment/configuration.
+13. Current Twilio environment/configuration.
+14. Existing eligible RideChecker recipients that could receive a broadcast.
+
+Do not print secret values.
+
+Classify each as:
+VERIFIED
+UNVERIFIED
+MISMATCH
+
+PART 2 — CONTROLLED TEST CONTAINMENT DESIGN
+
+Based on the existing code, design the SMALLEST possible order-scoped production E2E guard.
+
+This is not a staging system.
+
+The guard must apply ONLY to an explicitly marked controlled E2E order and must leave all ordinary customer orders unchanged.
+
+For a controlled E2E order, it must prevent communication with any unintended real person.
+
+Design containment for:
+
+- buyer email
+- buyer SMS
+- Ops email
+- Ops SMS
+- seller email
+- seller SMS
+- RideChecker email
+- RideChecker SMS
+- seller trust-confirmation after RC acceptance
+- report delivery
+
+All controlled-test communication must route only to explicitly allowlisted destinations we own/control OR be captured without external delivery.
+
+The guard must also prevent:
+- broadcast to any non-allowlisted RideChecker
+- accidental seller contact
+- accidental payout approval/paid state
+
+The guard MUST NOT:
+- bypass payment verification
+- fake a successful Stripe payment
+- weaken webhook verification
+- bypass seller/RC workflow logic
+- bypass inspection requirements
+- bypass QA
+- change behavior for ordinary orders
+
+We WANT the controlled order to exercise the real workflow while containing its external side effects.
+
+Use an unmistakable test marker such as:
+
+RIDECHECK-CONTROLLED-PROD-E2E-<date>-<short-id>
+
+But do not create the order yet.
+
+PART 3 — TEST IDENTITIES
+
+Identify what controlled accounts/destinations are required for:
+
+Buyer
+Seller
+RideChecker
+Ops
+
+Do not select a real customer, real seller, or uncontrolled RideChecker.
+
+PART 4 — PAYMENT
+
+Determine the minimum legitimate production payment we can use while still proving the canonical:
+
+/api/pay/create-session
+→ Stripe Checkout
+→ signed webhook
+→ paid/payment_received
+
+path.
+
+Do NOT alter RideCheck pricing merely to make the test cheaper.
+
+If the canonical test requires paying the actual package price, say so.
+
+Confirm how a human-authorized Stripe refund would be performed afterward and what application records would intentionally remain for audit.
+
+PART 5 — REPORT ONLY
+
+Return:
+
+A. Production environment verification table
+B. Remaining unknowns/mismatches
+C. Exact proposed containment mechanism
+D. Files that would need modification
+E. Controlled identities/accounts required
+F. Maximum real charge required
+G. Refund/reconciliation procedure
+H. Risks that remain even with containment
+I. Whether the controlled production E2E can safely proceed after the guard is reviewed/deployed
+
+STOP.
+
+Do not implement the guard.
+Do not deploy.
+Do not create the first booking.
