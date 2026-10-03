@@ -6,12 +6,14 @@ id = "4TjoVNv2U1cpOw872y8Xz"
 uri = "file://docs/ops-sop.md"
 type = "text"
 title = "RideCheck Operations SOP v1.0"
+logical_id = "427d5ce6-21a4-4e6d-82e8-7a88cc78b196"
 
 [[outputs]]
 id = "Co0COUYlBRqrF1o3GB_Zr"
 uri = "file://docs/ridechecker-training-guide.md"
 type = "text"
 title = "RideChecker Operations & Training Guide v1.0"
+logical_id = "93157ae8-f6b3-4e7d-a097-01c97407d34b"
 
 [[outputs]]
 id = "BGZpxo6VNnjd6rnRPob13"
@@ -19,3 +21,18 @@ uri = "file://RC-GRC-002%20%E2%80%94%20Asset%20&%20Data%20Inventory.xlsx"
 type = "table"
 title = "RC-GRC-002 — Asset & Data Inventory"
 description = "Read-only RideCheck asset and data inventory with 23 assets, required classifications, CIA ratings, dependencies, and a legend/method sheet."
+logical_id = "4518b000-8ed9-407e-bb3f-906f9b93cbfa"
+
+[[outputs]]
+id = "lOi2KzU6fxiWraVX3md42"
+uri = "file://docs/facebook-marketplace-contact-report.md"
+type = "text"
+title = "Facebook Marketplace contact — completion report"
+description = "Changes, preserved behavior, files, reused schema, audit events, test results, verification limits, and setup requirements."
+logical_id = "042ff2d5-7e59-496e-b13c-da1e879c0770"
+content_hash = "sha256:af616e05f4550f59c73f415e235bb7703b7d86bc7b744479367a047ab975ef14"
+size = 10072
+mtime_ms = 1790987564058
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:38fdf3ca-48b6-43ce-a062-21bf2b7baf14/042ff2d5-7e59-496e-b13c-da1e879c0770/a39a90f5-4771-4c2b-aca5-94e2c3f15ea2"
+storage_version_token = "1790987586022285"
+content_type = "text/markdown"

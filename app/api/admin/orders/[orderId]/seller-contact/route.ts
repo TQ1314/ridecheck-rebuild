@@ -22,7 +22,20 @@ export async function GET(
       return NextResponse.json({ error: "Failed to fetch attempts" }, { status: 500 });
     }
 
-    return NextResponse.json({ attempts: data || [] });
+    const { data: consent, error: consentError } = await supabaseAdmin
+      .from("order_events")
+      .select("details")
+      .eq("order_id", params.orderId)
+      .eq("event_type", "seller_consent_reported")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return NextResponse.json({
+      attempts: data || [],
+      facebook_handoff: (consent as any)?.details?.source === "facebook_marketplace"
+        ? (consent as any).details : null,
+      ...(consentError ? { facebook_handoff_unavailable: true } : {}),
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

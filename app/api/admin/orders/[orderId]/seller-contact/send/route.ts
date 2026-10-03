@@ -24,6 +24,7 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { sendDirect } from "@/lib/notifications/send-preferred";
 import { z } from "zod";
+import { recordFacebookCoordinationStarted } from "@/lib/seller-contact/facebook-coordination.server";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export async function POST(
       .from("orders")
       .select(
         "payment_status, payment_required, payment_override_approved, " +
-        "vehicle_year, vehicle_make, vehicle_model, listing_source, preferred_date, order_number"
+         "vehicle_year, vehicle_make, vehicle_model, listing_source, platform_source, preferred_date, order_number"
       )
       .eq("id", params.orderId)
       .single();
@@ -205,6 +206,9 @@ export async function POST(
       .from("orders")
       .update(orderUpdate)
       .eq("id", params.orderId);
+    if ((gateOrder as any).platform_source === "facebook_marketplace" && r.success && (r.messageId || r.sid)) {
+      await recordFacebookCoordinationStarted(params.orderId, actor.userId, actor.email);
+    }
 
     // ── Audit + event ──
     const details = {

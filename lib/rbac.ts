@@ -79,7 +79,7 @@ export function isAuthorized(
  * It does NOT appear to have resource_type.
  */
 export async function writeAuditLog(params: {
-  actorId: string;
+  actorId: string | null;
   actorEmail: string;
   actorRole: string; // single role string from profiles.role
   action: string;
@@ -88,6 +88,7 @@ export async function writeAuditLog(params: {
   newValue?: Record<string, any> | null;
   metadata?: Record<string, any> | null;
   ipAddress?: string | null;
+  throwOnError?: boolean;
 }) {
   const payload = {
     actor_user_id: params.actorId,
@@ -104,13 +105,14 @@ export async function writeAuditLog(params: {
   const { error } = await supabaseAdmin.from("audit_log").insert(payload);
   if (error) {
     console.error("[audit_log insert error]", error);
+    if (params.throwOnError) throw new Error("Audit event could not be saved");
   }
 }
 
 export async function writeOrderEvent(params: {
   orderId: string;
   eventType: string;
-  actorId: string;
+  actorId: string | null;
   actorEmail: string;
   details?: Record<string, any>;
   isInternal?: boolean;

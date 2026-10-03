@@ -40,7 +40,14 @@ import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { IntakeProposalCard } from "@/components/booking-intake/IntakeProposalCard";
+import { FacebookSellerContact } from "@/components/booking/FacebookSellerContact";
 import { clearVehicleAttempt } from "@/lib/booking-intake/resetVehicle";
+import {
+  emptyFacebookContactState,
+  isFacebookMarketplaceListing,
+  type FacebookContactEvent,
+  type FacebookContactState,
+} from "@/lib/seller-contact/facebook-marketplace";
 
 type IntakeField = {
   value: string | number | null;
@@ -127,13 +134,22 @@ function BookInner() {
   const [vehicleLocation, setVehicleLocation] = useState("");
   const [sellerName, setSellerName] = useState("");
   const [sellerPhone, setSellerPhone] = useState("");
+  const [sellerEmail, setSellerEmail] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
+  const [sellerAvailableTime, setSellerAvailableTime] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [buyerEmailInput, setBuyerEmailInput] = useState("");
 
   const [inspectionAddress, setInspectionAddress] = useState("");
   const [inspectionTimeWindow, setInspectionTimeWindow] = useState("");
   const [notesToInspector, setNotesToInspector] = useState("");
+  const [facebookContact, setFacebookContact] = useState<FacebookContactState>(emptyFacebookContactState);
+  const [facebookContactScope, setFacebookContactScope] = useState<string | null>(null);
+  const facebookStorageHydrated = useRef<string | null>(null);
+  const [facebookAuditIssue, setFacebookAuditIssue] = useState<{
+    events: FacebookContactEvent[];
+    onceKey?: string;
+  } | null>(null);
 
   const [serviceZip, setServiceZip] = useState("");
   const [zipStatus, setZipStatus] = useState<"idle" | "valid" | "invalid">("idle");
@@ -162,12 +178,90 @@ function BookInner() {
     Object.keys(intakeProvenance).length
   );
 
-  const isBuyerArranged = bookingType === "buyer_arranged";
+  const isFacebookFlow = isFacebookMarketplaceListing(listingUrl, platformSource);
+  const facebookStorageKey = isFacebookFlow
+    ? `ridecheck-facebook-contact:${encodeURIComponent(listingUrl.trim() || platformSource)}`
+    : null;
+  const activeFacebookContact = facebookStorageKey && facebookContactScope === facebookStorageKey
+    ? facebookContact
+    : emptyFacebookContactState();
+  const effectiveBookingType: BookingType = isFacebookFlow ? "concierge" : bookingType;
+  const isBuyerArranged = effectiveBookingType === "buyer_arranged";
 
   const pkg: PackageType = (classification?.packageTier || "standard") as PackageType;
-  const isSelfArrange = bookingType === "self_arrange" || bookingType === "buyer_arranged";
+  const isSelfArrange = effectiveBookingType === "self_arrange" || effectiveBookingType === "buyer_arranged";
   const basePrice = classification?.basePrice || TIER_PRICES.standard;
   const finalPrice = isSelfArrange ? Math.max(0, basePrice - 10) : basePrice;
+
+  useEffect(() => {
+    if (facebookStorageHydrated.current === facebookStorageKey) return;
+    const previousKey = facebookStorageHydrated.current;
+    facebookStorageHydrated.current = facebookStorageKey;
+    setFacebookAuditIssue(null);
+    // Preserve seller details just confirmed by the existing listing-intake
+    // path on first entry. A different Marketplace scope must not reuse them.
+    if (previousKey) {
+      setSellerName("");
+      setSellerPhone("");
+      setSellerEmail("");
+      setInspectionAddress("");
+      setPreferredDate("");
+      setSellerAvailableTime("");
+      setInspectionTimeWindow("");
+      setNotesToInspector("");
+    }
+    if (!facebookStorageKey) {
+      setFacebookContact(emptyFacebookContactState());
+      setFacebookContactScope(null);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(facebookStorageKey);
+      const saved = raw ? JSON.parse(raw) : null;
+      const savedContact = saved?.contact;
+      setFacebookContact(
+        savedContact && typeof savedContact.seller_consent_reported === "boolean"
+          ? {
+              seller_message_copied: savedContact.seller_message_copied === true,
+              facebook_listing_opened: savedContact.facebook_listing_opened === true,
+              seller_consent_reported: savedContact.seller_consent_reported === true,
+              seller_consent_reported_at: typeof savedContact.seller_consent_reported_at === "string"
+                ? savedContact.seller_consent_reported_at
+                : null,
+            }
+          : emptyFacebookContactState(),
+      );
+      if (saved) {
+        setSellerName(typeof saved.sellerName === "string" ? saved.sellerName : "");
+        setSellerPhone(typeof saved.sellerPhone === "string" ? saved.sellerPhone : "");
+        setSellerEmail(typeof saved.sellerEmail === "string" ? saved.sellerEmail : "");
+        setInspectionAddress(typeof saved.inspectionAddress === "string" ? saved.inspectionAddress : "");
+        setPreferredDate(typeof saved.preferredDate === "string" ? saved.preferredDate : "");
+        setSellerAvailableTime(typeof saved.sellerAvailableTime === "string" ? saved.sellerAvailableTime : "");
+      }
+      setFacebookContactScope(facebookStorageKey);
+    } catch {
+      setFacebookContact(emptyFacebookContactState());
+      setFacebookContactScope(facebookStorageKey);
+    }
+  }, [facebookStorageKey]);
+
+  useEffect(() => {
+    if (!facebookStorageKey || facebookContactScope !== facebookStorageKey || facebookStorageHydrated.current !== facebookStorageKey) return;
+    try {
+      sessionStorage.setItem(facebookStorageKey, JSON.stringify({
+        contact: facebookContact,
+        sellerName,
+        sellerPhone,
+        sellerEmail,
+        inspectionAddress,
+        preferredDate,
+        sellerAvailableTime,
+      }));
+    } catch {
+      // Booking remains usable if this browser does not allow session storage.
+    }
+  }, [facebookStorageKey, facebookContactScope, facebookContact, sellerName, sellerPhone, sellerEmail, inspectionAddress, preferredDate, sellerAvailableTime]);
 
   useEffect(() => {
     let active = true;
@@ -291,6 +385,11 @@ function BookInner() {
       });
       setVehicleFuelType("");
       setVehicleCollector(false);
+      setSellerEmail("");
+      setSellerAvailableTime("");
+      setFacebookContact(emptyFacebookContactState());
+      setFacebookContactScope(null);
+      setFacebookAuditIssue(null);
       setIntakeSessionCount(0);
       setIntakeSessionStatusError(false);
       if (intakeFileRef.current) intakeFileRef.current.value = "";
@@ -396,11 +495,16 @@ function BookInner() {
     if (step === 0)
       return (
         !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation &&
-        zipStatus === "valid" && !!bookingType
+        zipStatus === "valid" && !!bookingType &&
+        (!isFacebookFlow || activeFacebookContact.seller_consent_reported)
       );
     if (step === 1) {
       if (!buyerPhone || buyerPhone.length < 7) return false;
       if (!buyerEmailInput || !buyerEmailInput.includes("@")) return false;
+      if (isFacebookFlow) {
+        if (sellerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellerEmail)) return false;
+        return activeFacebookContact.seller_consent_reported;
+      }
       if (isBuyerArranged) {
         return !!inspectionAddress && !!inspectionTimeWindow && !!sellerPhone;
       }
@@ -409,7 +513,59 @@ function BookInner() {
     return true;
   };
 
+  const handleFacebookAudit = async (events: FacebookContactEvent[], onceKey?: string) => {
+    if (!isFacebookFlow || !facebookStorageKey) return false;
+    const marker = onceKey ? `${facebookStorageKey}:audit:${onceKey}` : null;
+    if (marker) {
+      try {
+        if (sessionStorage.getItem(marker) === "done") return true;
+      } catch {
+        // Continue with the server audit if this browser blocks session storage.
+      }
+    }
+    try {
+      const response = await fetch("/api/booking-intake/seller-contact-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listing_url: listingUrl.trim() || null,
+          platform_source: "facebook_marketplace",
+          events,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true) throw new Error("Seller-contact activity record was not confirmed");
+      try {
+        if (marker) sessionStorage.setItem(marker, "done");
+        if (onceKey === "initial") sessionStorage.setItem(`${facebookStorageKey}:initial-audit`, "done");
+      } catch {
+        // The successful API response is authoritative even if tab storage is blocked.
+      }
+      setFacebookAuditIssue((current) =>
+        current && current.onceKey === onceKey && current.events.join("|") === events.join("|") ? null : current,
+      );
+      return true;
+    } catch {
+      setFacebookAuditIssue({ events, onceKey });
+      return false;
+    }
+  };
+
+  const hasFacebookSellerDetails = Boolean(
+    sellerName.trim() || sellerPhone.trim() || sellerEmail.trim() ||
+    inspectionAddress.trim() || preferredDate || sellerAvailableTime,
+  );
+
+  const handleNext = async () => {
+    if (!canProceed()) return;
+    if (step === 1 && isFacebookFlow && hasFacebookSellerDetails) {
+      await handleFacebookAudit(["seller_contact_details_provided"], "seller-details");
+    }
+    setStep(step + 1);
+  };
+
   const handleSubmit = async () => {
+    if (isFacebookFlow && !activeFacebookContact.seller_consent_reported) return;
     setLoading(true);
     try {
       const {
@@ -437,13 +593,13 @@ function BookInner() {
         seller_phone: sellerPhone || null,
         buyer_phone: buyerPhone,
         buyer_email_input: buyerEmailInput || null,
-        booking_type: isBuyerArranged ? "self_arrange" : bookingType,
+        booking_type: isBuyerArranged ? "self_arrange" : effectiveBookingType,
         preferred_date: preferredDate || null,
         booking_method: isBuyerArranged ? "buyer_arranged" : "concierge",
         preferred_language: lang,
         listing_platform: listingPlatform,
         listing_source: listingSource,
-        platform_source: platformSource || null,
+        platform_source: isFacebookFlow ? "facebook_marketplace" : platformSource || null,
         seller_type: sellerType,
         vehicle_seen_location: vehicleSeenLocation || null,
         service_zip: serviceZip,
@@ -463,6 +619,16 @@ function BookInner() {
         body.inspection_address = inspectionAddress;
         body.inspection_time_window = inspectionTimeWindow;
         body.notes_to_inspector = notesToInspector || null;
+      }
+
+      if (isFacebookFlow) {
+        body.booking_type = "concierge";
+        body.booking_method = "concierge";
+        body.facebook_contact = activeFacebookContact;
+        body.seller_email = sellerEmail.trim() || null;
+        body.seller_available_date = preferredDate || null;
+        body.seller_available_time = sellerAvailableTime || null;
+        if (inspectionAddress.trim()) body.inspection_address = inspectionAddress.trim();
       }
 
       const headers: Record<string, string> = {
@@ -490,13 +656,20 @@ function BookInner() {
 
       const data = await res.json();
 
+      if (isFacebookFlow && typeof data.facebook_audit_warning === "string" && data.facebook_audit_warning.trim()) {
+        toast({
+          title: "Activity record warning",
+          description: data.facebook_audit_warning,
+        });
+      }
+
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
         return;
       }
 
       const trackParam = data.track_url ? `&track=${encodeURIComponent(data.track_url)}` : "";
-      const confirmUrl = `/order/confirmation?order_id=${data.order.id}&lang=${lang}&method=${isBuyerArranged ? "buyer_arranged" : bookingType}${trackParam}`;
+      const confirmUrl = `/order/confirmation?order_id=${data.order.id}&lang=${lang}&method=${isBuyerArranged ? "buyer_arranged" : effectiveBookingType}${trackParam}`;
       router.push(confirmUrl);
     } catch (err: any) {
       toast({
@@ -854,42 +1027,61 @@ function BookInner() {
               <Label className="text-base font-semibold mb-3 block">
                 {t("booking.bookingType", lang)}
               </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {availableBookingTypes.map((bt) => (
-                  <Card
-                    key={bt.value}
-                    className={`cursor-pointer transition-colors hover-elevate ${
-                      bookingType === bt.value ? "border-primary" : ""
-                    }`}
-                    onClick={() => setBookingType(bt.value)}
-                    data-testid={`card-booking-${bt.value}`}
-                  >
-                    <CardContent className="pt-5 pb-4">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                            bookingType === bt.value
-                              ? "border-primary bg-primary"
-                              : "border-muted-foreground/30"
-                          }`}
-                        >
-                          {bookingType === bt.value && (
-                            <Check className="h-3 w-3 text-primary-foreground" />
-                          )}
+              {isFacebookFlow ? (
+                <FacebookSellerContact
+                  key={facebookStorageKey}
+                  listingUrl={listingUrl}
+                  storageKey={facebookStorageKey!}
+                  contact={activeFacebookContact}
+                  auditWarning={facebookAuditIssue
+                    ? "We couldn’t save this activity record. Your reported choices remain in this order; retry the activity record when you’re ready."
+                    : ""}
+                  failedAudit={facebookAuditIssue}
+                  onAudit={handleFacebookAudit}
+                  onContactChange={setFacebookContact}
+                  onListingUrlChange={(url) => {
+                    setListingUrl(url);
+                    setIntakeUrl(url);
+                  }}
+                />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {availableBookingTypes.map((bt) => (
+                    <Card
+                      key={bt.value}
+                      className={`cursor-pointer transition-colors hover-elevate ${
+                        bookingType === bt.value ? "border-primary" : ""
+                      }`}
+                      onClick={() => setBookingType(bt.value)}
+                      data-testid={`card-booking-${bt.value}`}
+                    >
+                      <CardContent className="pt-5 pb-4">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                              bookingType === bt.value
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/30"
+                            }`}
+                          >
+                            {bookingType === bt.value && (
+                              <Check className="h-3 w-3 text-primary-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-sm">
+                              {bt.label}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {bt.desc}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-sm">
-                            {bt.label}
-                          </h3>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {bt.desc}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -1211,7 +1403,50 @@ function BookInner() {
 
         {step === 1 && (
           <div className="space-y-4">
-            {isBuyerArranged && (
+            {isFacebookFlow && facebookAuditIssue && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">
+                <p>We couldn’t save this activity record. Your reported choices remain in this order; retry the activity record when you’re ready.</p>
+                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void handleFacebookAudit(facebookAuditIssue.events, facebookAuditIssue.onceKey)}>Retry activity record</Button>
+              </div>
+            )}
+            {isFacebookFlow && (
+              <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">What the seller has shared so far</p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {`Facebook requires you to initiate contact with the seller. RideCheck will provide the message and take over coordination once the seller agrees.`}
+                    {" "}These details are optional. Continue with only the information you have; a simple yes is enough.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="fbSellerName">{t("booking.sellerName", lang)}</Label>
+                  <Input id="fbSellerName" value={sellerName} onChange={(e) => setSellerName(e.target.value)} placeholder="Seller name, if shared" data-testid="input-seller-name" />
+                </div>
+                <div>
+                  <Label htmlFor="fbSellerPhone">{t("booking.sellerPhone", lang)}</Label>
+                  <Input id="fbSellerPhone" type="tel" value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} placeholder="Seller phone, if shared" data-testid="input-seller-phone" />
+                </div>
+                <div>
+                  <Label htmlFor="fbSellerEmail">Seller email</Label>
+                  <Input id="fbSellerEmail" type="email" value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} placeholder="Seller email, if shared" data-testid="input-seller-email" />
+                </div>
+                <div>
+                  <Label htmlFor="inspectionAddress">Inspection address or location</Label>
+                  <Input id="inspectionAddress" value={inspectionAddress} onChange={(e) => setInspectionAddress(e.target.value)} placeholder="Where the vehicle can be inspected, if known" data-testid="input-inspection-address" />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="date">Seller availability date</Label>
+                    <Input id="date" type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} data-testid="input-preferred-date" />
+                  </div>
+                  <div>
+                    <Label htmlFor="sellerAvailableTime">Seller availability time</Label>
+                    <Input id="sellerAvailableTime" type="time" value={sellerAvailableTime} onChange={(e) => setSellerAvailableTime(e.target.value)} data-testid="input-seller-available-time" />
+                  </div>
+                </div>
+              </div>
+            )}
+            {!isFacebookFlow && isBuyerArranged && (
               <>
                 <div>
                   <Label htmlFor="inspectionAddress">
@@ -1275,7 +1510,7 @@ function BookInner() {
                 </div>
               </>
             )}
-            {bookingType === "concierge" && (
+            {!isFacebookFlow && bookingType === "concierge" && (
               <>
                 <div>
                   <Label htmlFor="sellerName">
@@ -1366,6 +1601,13 @@ function BookInner() {
         )}
 
         {step === 2 && (
+          <>
+          {isFacebookFlow && facebookAuditIssue && (
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">
+              <p>We couldn’t save this activity record. Your reported choices remain in this order; retry the activity record when you’re ready.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void handleFacebookAudit(facebookAuditIssue.events, facebookAuditIssue.onceKey)}>Retry activity record</Button>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
@@ -1416,7 +1658,7 @@ function BookInner() {
                 <span>
                   {isBuyerArranged
                     ? t("booking.buyerArranged", lang)
-                    : bookingType === "self_arrange"
+                    : effectiveBookingType === "self_arrange"
                       ? t("booking.selfArrange", lang)
                       : t("booking.concierge", lang)}
                 </span>
@@ -1471,13 +1713,13 @@ function BookInner() {
                   <span className="truncate max-w-[65%]" title={listingUrl}>{listingUrl}</span>
                 </div>
               )}
-              {sellerName && (
+              {(sellerName || sellerPhone || (isFacebookFlow && sellerEmail)) && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Seller</span>
-                  <span>{sellerName}{sellerPhone ? ` · ${sellerPhone}` : ""}</span>
+                  <span>{[sellerName, sellerPhone, isFacebookFlow ? sellerEmail : ""].filter(Boolean).join(" · ")}</span>
                 </div>
               )}
-              {isBuyerArranged && inspectionAddress && (
+              {(isBuyerArranged || isFacebookFlow) && inspectionAddress && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     {t("booking.inspectionAddress", lang)}
@@ -1491,6 +1733,12 @@ function BookInner() {
                     {t("booking.inspectionTimeWindow", lang)}
                   </span>
                   <span>{inspectionTimeWindow}</span>
+                </div>
+              )}
+              {isFacebookFlow && sellerAvailableTime && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Seller availability time</span>
+                  <span>{sellerAvailableTime}</span>
                 </div>
               )}
               {isBuyerArranged && notesToInspector && (
@@ -1510,7 +1758,7 @@ function BookInner() {
               {preferredDate && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {t("booking.preferredDate", lang)}
+                    {isFacebookFlow ? "Seller availability date" : t("booking.preferredDate", lang)}
                   </span>
                   <span>{preferredDate}</span>
                 </div>
@@ -1533,12 +1781,16 @@ function BookInner() {
                   <span data-testid="text-review-total">{formatCurrency(finalPrice)}</span>
                 </div>
               </div>
-              {bookingType === "concierge" && (
+              {isFacebookFlow ? (
+                <p className="text-xs leading-relaxed text-slate-700 bg-blue-50 rounded-md p-3 mt-2 dark:bg-blue-950/30 dark:text-blue-200">
+                  Facebook requires you to initiate contact with the seller. RideCheck will provide the message and take over coordination once the seller agrees. Seller agreement here is buyer-reported and is not independent confirmation of the seller or arrangements.
+                </p>
+              ) : effectiveBookingType === "concierge" && (
                 <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-3 mt-2">
                   {t("booking.conciergeNote", lang)}
                 </p>
               )}
-              {(bookingType === "self_arrange" || isBuyerArranged) && (
+              {!isFacebookFlow && (effectiveBookingType === "self_arrange" || isBuyerArranged) && (
                 <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-3 mt-2">
                   {isBuyerArranged
                     ? t("booking.buyerArrangedNote", lang)
@@ -1550,6 +1802,7 @@ function BookInner() {
               </p>
             </CardContent>
           </Card>
+          </>
         )}
 
         <div className="flex justify-between mt-8">
@@ -1564,7 +1817,7 @@ function BookInner() {
           </Button>
           {step < STEPS.length - 1 ? (
             <Button
-              onClick={() => setStep(step + 1)}
+              onClick={handleNext}
               disabled={!canProceed()}
               data-testid="button-next"
             >

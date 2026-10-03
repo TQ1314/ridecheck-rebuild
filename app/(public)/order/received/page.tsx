@@ -8,7 +8,8 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, ArrowRight, Home, MessageSquare, RefreshCw, Copy, Check } from "lucide-react";
-import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
+import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE, isFacebookBuyerHandoff } from "@/lib/order-journey";
+import { FACEBOOK_CONTACT_EXPLANATION, FACEBOOK_SELLER_MESSAGE } from "@/lib/seller-contact/facebook-marketplace";
 import { useJourneyOrder } from "@/lib/use-journey-order";
 
 export default function OrderReceivedPage() {
@@ -34,7 +35,8 @@ function OrderReceivedInner() {
   const paymentProcessing = status === "paid" && !isPaid;
   const selfArrange = isSelfArranged(order?.booking_type);
   const showIntroduction = isPaid && !!order && isMarketplaceConcierge(order);
-  const sellerMessage = showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
+  const facebookHandoff = isFacebookBuyerHandoff(order);
+  const sellerMessage = facebookHandoff ? FACEBOOK_SELLER_MESSAGE : showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
 
   const handleCopy = async () => {
     try {
@@ -139,10 +141,10 @@ function OrderReceivedInner() {
 
             {(selfArrange || showIntroduction) && <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-5 text-left mb-6 border border-emerald-200 dark:border-emerald-800">
               <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-2">
-                {selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
+                {facebookHandoff ? "Facebook Marketplace seller contact" : selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
               </p>
               <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70 mb-3">
-                {selfArrange
+                {facebookHandoff ? `${FACEBOOK_CONTACT_EXPLANATION} Your reported agreement is not an independently confirmed appointment.` : selfArrange
                   ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck."
                   : "If you're already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination. This is optional."}
               </p>

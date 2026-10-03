@@ -1,3 +1,4 @@
+import { recordFacebookCoordinationStarted } from "@/lib/seller-contact/facebook-coordination.server";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
@@ -34,7 +35,7 @@ export async function POST(
     // Payment gate — check before recording any outreach
     const { data: gateOrder } = await supabaseAdmin
       .from("orders")
-      .select("payment_status, payment_required, payment_override_approved")
+      .select("payment_status, payment_required, payment_override_approved, platform_source")
       .eq("id", params.orderId)
       .single();
 
@@ -130,6 +131,9 @@ export async function POST(
         newValue: details,
       }),
     ]);
+    if ((gateOrder as any).platform_source === "facebook_marketplace" && channel !== "buyer_message" && status !== "failed") {
+      await recordFacebookCoordinationStarted(params.orderId, actor.userId, actor.email);
+    }
 
     return NextResponse.json({
       success: true,

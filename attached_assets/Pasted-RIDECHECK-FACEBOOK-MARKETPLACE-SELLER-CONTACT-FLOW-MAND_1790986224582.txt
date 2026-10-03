@@ -1,0 +1,400 @@
+RIDECHECK — FACEBOOK MARKETPLACE SELLER CONTACT FLOW
+
+MANDATORY STABILITY RULE
+
+Do not modify, refactor, remove, rename, relocate, or replace functionality that already works unless explicitly required by this prompt.
+
+Before writing code:
+
+- Inspect the existing listing-source detection.
+- Inspect seller-contact selection.
+- Inspect seller communication.
+- Inspect booking/order creation.
+- Inspect existing order status / inspection completion fields.
+- Inspect existing audit/event infrastructure.
+- Reuse existing fields, tables, events, components, and workflows wherever possible.
+- Identify the smallest additive implementation.
+
+Preserve all existing working:
+
+- Non-Facebook Concierge flow
+- Seller communication
+- Seller reply capture
+- SMS/email delivery tracking
+- Payments/Stripe
+- RideChecker assignment
+- RideChecker compensation
+- Reporting/QA/delivery
+- Authentication/middleware
+- Existing audit trails
+- Existing order/inspection lifecycle
+
+Do not create parallel systems when RideCheck already has an authoritative workflow.
+
+---
+
+PROBLEM
+
+RideCheck cannot reliably initiate a Messenger conversation with an unconnected Facebook Marketplace seller.
+
+Therefore, when a buyer submits a Facebook Marketplace listing, RideCheck must not offer seller contact in a way that implies RideCheck will initiate that Messenger conversation.
+
+This implementation is specifically about the INITIAL Facebook Marketplace seller contact.
+
+Once the buyer has initiated contact and the seller agrees, RideCheck may continue through the existing seller-coordination workflow using whatever contact information the seller provides.
+
+---
+
+PRODUCT RULE
+
+NON-FACEBOOK LISTINGS
+
+Preserve the existing choices:
+
+1. I will contact the seller
+2. RideCheck Concierge will contact the seller
+
+Do not change this working flow.
+
+---
+
+FACEBOOK MARKETPLACE LISTINGS
+
+When the listing URL/source is reliably identified as Facebook Marketplace:
+
+Disable the normal:
+
+“RideCheck Concierge will contact the seller”
+
+initial-contact option.
+
+Replace it with:
+
+FACEBOOK MARKETPLACE SELLER CONTACT
+
+“Facebook requires you to initiate contact with the seller.
+
+RideCheck will provide the message and take over coordination once the seller agrees.”
+
+Display the prewritten seller message:
+
+“Hi, I'm interested in your vehicle and would like to have an independent pre-purchase inspection completed through RideCheck. There is no cost to you as the seller. Are you okay with RideCheck inspecting the vehicle before I make my decision?”
+
+Actions:
+
+[Copy Seller Message]
+
+[Open Facebook Listing]
+
+After copying, show:
+
+“Send this message to the seller through Facebook Messenger. Once the seller agrees, return here to continue.”
+
+Then provide:
+
+[Seller Agreed — Continue]
+
+---
+
+SELLER AGREED FLOW
+
+IMPORTANT:
+
+“Seller Agreed” means the BUYER IS REPORTING that the seller has agreed.
+
+It does NOT automatically mean RideCheck has independently confirmed the seller, inspection appointment, date, time, or location.
+
+Do not automatically convert buyer-reported consent into an existing authoritative “seller confirmed” status if that status currently means RideCheck/Ops has independently confirmed arrangements.
+
+Store buyer-reported consent separately where necessary.
+
+When the buyer selects:
+
+[Seller Agreed — Continue]
+
+Ask for any information the seller provided:
+
+- Seller name — optional
+- Seller phone — optional
+- Seller email — optional
+- Inspection address/location — optional
+- Seller availability/date/time — optional
+
+Do not require information the buyer does not yet have.
+
+The buyer must be able to continue even if the seller only said “yes” and has not yet provided phone, email, address, or availability.
+
+Save available information into existing authoritative seller/order fields where appropriate.
+
+Do not create duplicate seller fields if equivalent fields already exist.
+
+Then transition the order into the EXISTING RideCheck seller-coordination workflow.
+
+RideCheck can subsequently coordinate using seller-provided contact information.
+
+Do not create a second seller communication system.
+
+---
+
+SOURCE DETECTION
+
+Detect Facebook Marketplace only from appropriate Facebook Marketplace URL patterns or existing reliable source detection.
+
+Do NOT classify every facebook.com URL as Facebook Marketplace.
+
+If existing listing-source detection already identifies Facebook Marketplace reliably, reuse it.
+
+Store/reuse:
+
+source = facebook_marketplace
+
+Add or reuse an equivalent field/event for:
+
+concierge_unavailable_reason = meta_messaging_restriction
+
+seller_message_copied = true/false
+
+seller_consent_reported = true/false
+
+seller_consent_reported_at
+
+If equivalent fields or events already exist, reuse them rather than creating duplicate concepts.
+
+---
+
+IMPORTANT — INSPECTION COMPLETION
+
+DO NOT create a new Facebook-specific `inspection_completed` database field if RideCheck already tracks inspection completion through its existing inspection/order lifecycle.
+
+There must not be two sources of truth for inspection completion.
+
+For Facebook Marketplace funnel analytics:
+
+derive `inspection_completed` from RideCheck's existing authoritative inspection/order lifecycle.
+
+Example analytics funnel:
+
+facebook_marketplace_detected
+→ seller_message_copied
+→ seller_consent_reported
+→ seller_coordination_started
+→ existing inspection completion state
+
+---
+
+AUDIT / ANALYTICS
+
+Reuse RideCheck's existing audit/event infrastructure wherever possible.
+
+Record events for:
+
+facebook_marketplace_detected
+
+facebook_concierge_initial_contact_unavailable
+
+seller_message_displayed
+
+seller_message_copied
+
+facebook_listing_opened
+
+seller_consent_reported
+
+seller_contact_details_provided
+
+seller_coordination_started
+
+For inspection completion analytics, use the existing authoritative RideCheck inspection completion event/status rather than creating a duplicate Facebook completion flag.
+
+Include where appropriate:
+
+- order_id
+- timestamp
+- source
+- actor / actor_user_id
+- relevant metadata
+
+Do not overwrite historical events.
+
+Do not create a second audit system.
+
+---
+
+IMPORTANT LANGUAGE RULE
+
+Do NOT tell the buyer:
+
+“RideCheck will contact the Facebook seller.”
+
+Do NOT use ambiguous language such as:
+
+“RideCheck will assist you in contacting the seller.”
+
+Use:
+
+“Facebook requires you to initiate contact with the seller. RideCheck will provide the message and take over coordination once the seller agrees.”
+
+The distinction must remain clear throughout the UI.
+
+---
+
+UX REQUIREMENT
+
+This should feel like a guided RideCheck workflow, not an error or service failure.
+
+The buyer should immediately understand:
+
+Facebook Marketplace listing
+→ RideCheck recognizes Facebook
+→ Copy RideCheck seller message
+→ Open Facebook listing
+→ Buyer sends message through Messenger
+→ Seller agrees
+→ Buyer returns to RideCheck
+→ Buyer reports seller agreement
+→ Buyer enters whatever seller information is available
+→ RideCheck takes over normal coordination
+→ Inspection proceeds
+
+Do not dead-end the buyer because seller phone/email is unavailable.
+
+---
+
+MONTHLY META/MUSE WATCH
+
+Do not couple this implementation to the existing monthly Meta/Muse capability watch.
+
+This is the current production behavior.
+
+The monthly watch exists only to determine whether Meta eventually provides a verified supported capability that changes this limitation.
+
+If Meta later provides a verified supported method for RideCheck to initiate Marketplace seller communication, evaluate that capability separately before changing this production rule.
+
+Do not build speculative Muse integration as part of this task.
+
+---
+
+TESTING
+
+Test:
+
+1. FACEBOOK MARKETPLACE URL
+
+Expected:
+
+- Facebook Marketplace correctly detected.
+- Normal RideCheck Concierge initial-contact option unavailable.
+- Guided Facebook Marketplace seller-contact flow appears.
+
+2. COPY SELLER MESSAGE
+
+Expected:
+
+- Correct message copied.
+- Existing workflow remains stable.
+- Analytics/audit event created.
+
+3. OPEN FACEBOOK LISTING
+
+Expected:
+
+- Correct submitted listing opens.
+- Event recorded where appropriate.
+
+4. SELLER AGREED
+
+Expected:
+
+- Buyer can report seller consent.
+- This is recorded as buyer-reported consent.
+- It does not falsely mark an independently verified seller appointment as confirmed.
+
+5. SELLER CONTACT INFORMATION AVAILABLE
+
+Expected:
+
+- Buyer can enter seller name/phone/email/address/availability.
+- Existing seller/order fields are reused.
+- Existing RideCheck coordination workflow begins.
+
+6. FACEBOOK SELLER WITH NO PHONE OR EMAIL
+
+Expected:
+
+- Buyer can still continue after reporting seller consent.
+- Workflow does not dead-end.
+- Ops can see the current state.
+
+7. CRAIGSLIST
+
+Expected:
+
+- Existing Concierge flow unchanged.
+
+8. DEALERSHIP
+
+Expected:
+
+- Existing dealership flow unchanged.
+
+9. ROADSIDE / FOR SALE SIGN
+
+Expected:
+
+- Existing flow unchanged.
+
+10. ORDINARY NON-MARKETPLACE FACEBOOK URL
+
+Expected:
+
+- Must not be incorrectly classified as Facebook Marketplace.
+
+11. EXISTING HISTORICAL ORDERS
+
+Expected:
+
+- No change to historical orders.
+- No migration should destructively modify existing order data.
+
+12. EXISTING INSPECTION COMPLETION
+
+Expected:
+
+- Existing authoritative inspection completion status remains unchanged.
+- No duplicate Facebook-specific completion state is introduced.
+
+---
+
+COMPLETION REPORT
+
+Before declaring completion, provide:
+
+WHAT CHANGED
+
+WHAT DID NOT CHANGE
+
+FILES ADDED
+
+FILES MODIFIED
+
+DATABASE CHANGES
+
+EXISTING FIELDS/TABLES REUSED
+
+AUDIT / ANALYTICS EVENTS ADDED
+
+RISKS IDENTIFIED
+
+TESTS PERFORMED
+
+ANY ONE-TIME SETUP REQUIRED
+
+If a database migration is created, explicitly identify the migration filename and state whether it must be manually run in Supabase.
+
+FINAL STABILITY REQUIREMENT
+
+Do not change anything that already works unless this requirement specifically requires it.
+
+Prefer additive, backward-compatible changes.
+
+Do not refactor unrelated code while implementing this feature.

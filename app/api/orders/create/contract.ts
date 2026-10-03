@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { facebookContactSchema, isFacebookMarketplaceListing } from "@/lib/seller-contact/facebook-marketplace";
 
 const provenanceValueSchema = z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]);
 const provenanceFieldSchema = z.object({
@@ -31,6 +32,10 @@ export const createOrderSchema = z.object({
   vehicle_location: z.string().min(1).max(200),
   seller_name: z.string().max(100).nullable().optional(),
   seller_phone: z.string().max(20).nullable().optional(),
+  seller_email: z.string().email().nullable().optional(),
+  seller_available_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  seller_available_time: z.string().max(200).nullable().optional(),
+  facebook_contact: facebookContactSchema.optional(),
   buyer_phone: z.string().min(7).max(20),
   buyer_email_input: z.string().email().nullable().optional(),
   booking_type: z.enum(["self_arrange", "concierge"]),
@@ -57,6 +62,14 @@ export const createOrderSchema = z.object({
   vehicle_seen_location: z.string().max(300).nullable().optional(),
   seller_type: z.enum(["private_party", "dealership", "auction", "other"]).optional(),
 }).superRefine((value, ctx) => {
+  if (isFacebookMarketplaceListing(value.listing_url, value.platform_source)) {
+    if (value.facebook_contact?.seller_consent_reported !== true) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["facebook_contact"], message: "Report the seller's agreement before continuing with a Facebook Marketplace listing." });
+    }
+    if (value.booking_type !== "concierge" || (value.booking_method && value.booking_method !== "concierge")) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["booking_type"], message: "Facebook Marketplace uses buyer-initiated contact followed by RideCheck coordination." });
+    }
+  }
   if (value.booking_method === "buyer_arranged" && value.booking_type !== "self_arrange") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -81,6 +94,24 @@ export function buildOptionalOrderFields(
   setIfAvailable("preferred_language", data.preferred_language ?? "en");
   setIfAvailable("vehicle_trim", data.vehicle_trim ?? null);
   setIfAvailable("listing_platform", data.listing_platform ?? null);
+
+  if (isFacebookMarketplaceListing(data.listing_url, data.platform_source)) {
+    const sellerFields = {
+      seller_email: data.seller_email,
+      seller_available_date: data.seller_available_date,
+      seller_available_time: data.seller_available_time,
+      inspection_address: data.inspection_address,
+    };
+    const missing = Object.entries(sellerFields).filter(([column, value]) =>
+      value && !availableColumns.has(column),
+    ).map(([column]) => column);
+    if (missing.length) {
+      return { fields, error: { code: "seller_contact_storage_unavailable", message: "Seller information could not be saved. Please try again later.", missing_fields: missing } };
+    }
+    for (const [column, value] of Object.entries(sellerFields)) {
+      if (value) fields[column] = value;
+    }
+  }
 
   if (data.vin) {
     if (!availableColumns.has("listing_claimed_vin")) {

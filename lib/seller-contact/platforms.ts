@@ -1,3 +1,5 @@
+import { isFacebookMarketplaceUrl } from "./facebook-marketplace";
+
 export type SellerPlatform = 'facebook' | 'craigslist' | 'offerup' | 'dealer' | 'other';
 
 export type ContactChannel =
@@ -20,10 +22,7 @@ export function detectSellerPlatform(listingUrl?: string | null): SellerPlatform
   try {
     const hostname = new URL(listingUrl).hostname.toLowerCase();
     const matches = (domain: string) => hostname === domain || hostname.endsWith(`.${domain}`);
-    if (
-      matches('facebook.com') ||
-      matches('fb.com')
-    ) {
+    if (isFacebookMarketplaceUrl(listingUrl)) {
       return 'facebook';
     }
     if (matches('craigslist.org')) {

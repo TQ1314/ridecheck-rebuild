@@ -1,4 +1,5 @@
 import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
+import { FACEBOOK_CONTACT_EXPLANATION, FACEBOOK_SELLER_MESSAGE } from "@/lib/seller-contact/facebook-marketplace";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -16,6 +17,7 @@ export function orderConfirmationHtml({
   listingSource,
   trackUrl,
   payUrl,
+  facebookMarketplace = false,
 }: {
   orderNumber: string | null;
   customerName: string;
@@ -28,6 +30,7 @@ export function orderConfirmationHtml({
   listingSource: string | null;
   trackUrl?: string;
   payUrl?: string;
+  facebookMarketplace?: boolean;
 }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   const vehicleLabel = escapeHtml([vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(" "));
@@ -35,11 +38,11 @@ export function orderConfirmationHtml({
   const marketplace = isMarketplaceConcierge({ booking_type: bookingType, listing_source: listingSource });
   const sellerSection = selfArrange || marketplace
     ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:24px 0;">
-        <p style="margin:0 0 8px;font-weight:700;color:#166534;">${selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller (optional)"}</p>
-        <p>${selfArrange
+        <p style="margin:0 0 8px;font-weight:700;color:#166534;">${facebookMarketplace ? "Facebook Marketplace seller contact" : selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller (optional)"}</p>
+        <p>${facebookMarketplace ? `${FACEBOOK_CONTACT_EXPLANATION} Your reported seller agreement does not independently confirm an inspection appointment. Payment is required before RideCheck begins coordination.` : selfArrange
           ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck."
           : "Optional: If you're already messaging the seller, you can send this introduction. RideCheck will handle the coordination after payment is confirmed."}</p>
-        <div style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:16px;white-space:pre-line;line-height:1.6;">${escapeHtml(selfArrange ? SELF_ARRANGE_MESSAGE : sellerIntroduction({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }))}</div>
+        <div style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:16px;white-space:pre-line;line-height:1.6;">${escapeHtml(facebookMarketplace ? FACEBOOK_SELLER_MESSAGE : selfArrange ? SELF_ARRANGE_MESSAGE : sellerIntroduction({ vehicle_year: vehicleYear, vehicle_make: vehicleMake, vehicle_model: vehicleModel }))}</div>
       </div>`
     : "";
 
@@ -73,6 +76,7 @@ export function orderConfirmationHtml({
 
        <p>${selfArrange
          ? "You coordinate access and time with the seller. RideCheck will perform the inspection after payment and a confirmed appointment."
+         : facebookMarketplace ? "Once payment is completed, RideCheck will coordinate using the seller contact information you provide. If details are missing, Ops will help you obtain them through your existing Messenger conversation."
          : "Once payment is completed, RideCheck will begin coordinating with the seller to schedule your inspection."}</p>
        ${sellerSection}
 

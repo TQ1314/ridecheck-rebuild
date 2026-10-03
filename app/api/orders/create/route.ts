@@ -7,6 +7,9 @@ import { classifyVehicle } from "@/lib/vehicleClassification.server";
 import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveCounty";
 import { buildOptionalOrderFields, createOrderSchema } from "./contract";
 import { notifyNewOrderRequest } from "@/lib/notifications/order-created-ops";
+import { buildFacebookHandoffEvents, isFacebookMarketplaceListing, FACEBOOK_SOURCE } from "@/lib/seller-contact/facebook-marketplace";
+import { currentIntakeSession } from "@/lib/booking-intake/session";
+import { writeAuditLog } from "@/lib/rbac";
 
 export const runtime = "nodejs";
 
@@ -33,6 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    const facebookMarketplace = isFacebookMarketplaceListing(data.listing_url, data.platform_source);
 
     if (PILOT_CONFIG.enabled) {
       const county = resolveCounty(data.service_zip);
@@ -149,7 +153,7 @@ export async function POST(req: NextRequest) {
 
       listing_url: data.listing_url ?? null,
       listing_source: data.listing_source ?? "online_marketplace",
-      platform_source: data.platform_source ?? null,
+      platform_source: facebookMarketplace ? FACEBOOK_SOURCE : data.platform_source ?? null,
       vehicle_seen_location: data.vehicle_seen_location ?? null,
       seller_name: data.seller_name ?? null,
       seller_phone: data.seller_phone ?? null,
@@ -174,6 +178,7 @@ export async function POST(req: NextRequest) {
       "booking_method", "preferred_language", "inspection_address",
       "inspection_time_window", "notes_to_inspector", "vehicle_trim",
       "listing_platform", "listing_claimed_vin", "intake_provenance",
+      ...(facebookMarketplace ? ["seller_email", "seller_available_date", "seller_available_time"] : []),
     ] as const;
     const optionalColumnResults = await Promise.all(optionalOrderColumns.map(async (column) => {
       const { error } = await supabaseAdmin.from("orders").select(column).limit(0);
@@ -194,6 +199,13 @@ export async function POST(req: NextRequest) {
       }, { status: 503 });
     }
     Object.assign(insertPayload, optionalFields.fields);
+    if (facebookMarketplace) {
+      const { error: eventStorageError } = await supabaseAdmin
+        .from("order_events").select("order_id,event_type,details,actor_id,actor_email,is_internal").limit(0);
+      if (eventStorageError) {
+        return NextResponse.json({ error: "seller_consent_storage_unavailable", message: "Seller agreement could not be saved. Please try again later." }, { status: 503 });
+      }
+    }
 
     try {
       const { error: colErr } = await supabaseAdmin
@@ -252,6 +264,36 @@ export async function POST(req: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Buyer consent is evidence only. Never set seller_status,
+    // seller_contact_status, confirmed scheduling, or payment fields from it.
+    let facebookAuditWarning = false;
+    if (facebookMarketplace && data.facebook_contact) {
+      const now = new Date().toISOString();
+      const hasDetails = !!(data.seller_name || data.seller_phone || data.seller_email ||
+        data.inspection_address || data.seller_available_date || data.seller_available_time);
+      const rows = buildFacebookHandoffEvents(data.facebook_contact, now, hasDetails).map((event) => ({
+        order_id: order.id,
+        actor_id: customer_id,
+        actor_email: buyer_email,
+        ...event,
+        is_internal: true,
+      }));
+      const { error: eventError } = await supabaseAdmin.from("order_events").insert(rows);
+      if (eventError) {
+        facebookAuditWarning = true;
+        console.error("[Facebook handoff] order created but audit snapshot failed", { orderId: order.id, error: eventError });
+      }
+      try {
+        await writeAuditLog({
+          actorId: customer_id, actorEmail: buyer_email, actorRole: customer_id ? "buyer" : "guest",
+          action: "facebook_seller_contact_handoff", resourceId: order.id,
+          metadata: { intake_session_id: currentIntakeSession(), source: FACEBOOK_SOURCE, audit_snapshot_saved: !eventError },
+        });
+      } catch (auditError) {
+        console.error("[Facebook handoff] correlation failed", { orderId: order.id, auditError });
+      }
     }
 
     // An unpaid request is visible to Ops for recovery, never for fulfillment.
@@ -347,6 +389,7 @@ export async function POST(req: NextRequest) {
           finalPrice: String(finalPrice),
           bookingType: data.booking_type,
           listingSource: data.listing_source ?? "online_marketplace",
+          facebookMarketplace,
           trackUrl: track_url,
           payUrl,
         });
@@ -386,6 +429,7 @@ export async function POST(req: NextRequest) {
       },
       track_url,
       payment_channel: paymentChannel,
+      ...(facebookAuditWarning ? { facebook_audit_warning: "Your request was saved, but the buyer-reported seller agreement could not be added to the timeline. Tell Ops before seller coordination." } : {}),
     };
 
     if (isDebug) {

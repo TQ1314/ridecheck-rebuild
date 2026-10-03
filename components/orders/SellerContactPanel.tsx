@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Order, SellerContactAttempt, SellerContactChannel } from "@/types/orders";
 import { detectSellerPlatform, getAllowedChannels, getChannelLabel } from "@/lib/seller-contact/platforms";
+import { FACEBOOK_CONTACT_EXPLANATION, FACEBOOK_SELLER_MESSAGE, isFacebookMarketplaceListing } from "@/lib/seller-contact/facebook-marketplace";
 import { getTemplateForChannel, getSellerTemplates } from "@/lib/seller-contact/templates";
 import { getSellerMessage, getAllAttempts, getAttemptLabel } from "@/lib/seller-contact/sellerMessaging";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,6 +174,8 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
 
   // ── Existing state ──
   const [attempts, setAttempts]             = useState<SellerContactAttempt[]>([]);
+  const [facebookHandoff, setFacebookHandoff] = useState<Record<string, any> | null>(null);
+  const [facebookHandoffUnavailable, setFacebookHandoffUnavailable] = useState(false);
   const [attemptsLoading, setAttemptsLoading] = useState(true);
   const [newAttemptOpen, setNewAttemptOpen] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<string>("");
@@ -224,7 +227,8 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
   const [scheduleTime, setScheduleTime]     = useState(order.seller_available_time || "");
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
-  const platform       = detectSellerPlatform(order.listing_url);
+  const platform       = isFacebookMarketplaceListing(order.listing_url, order.platform_source)
+    ? "facebook" : detectSellerPlatform(order.listing_url);
   const allowedChannels = getAllowedChannels(platform);
   const vehicleLabel   = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
   const isConcierge    = order.booking_type === "concierge";
@@ -262,6 +266,8 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
       if (res.ok) {
         const data = await res.json();
         setAttempts(Array.isArray(data) ? data : data.attempts || []);
+        setFacebookHandoff(data.facebook_handoff ?? null);
+        setFacebookHandoffUnavailable(data.facebook_handoff_unavailable === true);
       }
     } catch {
       // silently fail
@@ -930,15 +936,41 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
           )}
 
           {/* ── Facebook Marketplace buyer bridge ── */}
-          {platform === "facebook" && isConcierge && (
+          {platform === "facebook" && facebookHandoffUnavailable && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+              Buyer-reported Marketplace agreement could not be loaded. Check the order timeline or ask the buyer; do not treat a missing record as verified seller consent.
+            </p>
+          )}
+          {facebookHandoff && isConcierge && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/30" data-testid="facebook-buyer-consent-ops">
+              <p className="text-sm font-semibold">Facebook Marketplace — buyer-reported seller agreement</p>
+              <p className="text-xs">{FACEBOOK_CONTACT_EXPLANATION}</p>
+              <p className="text-xs">
+                Buyer reported consent {facebookHandoff.seller_consent_reported_at
+                  ? new Date(facebookHandoff.seller_consent_reported_at).toLocaleString() : ""}.
+                {" "}This is not an independently confirmed seller, appointment, date, time, or location.
+              </p>
+              {order.seller_contact_status !== "accepted" && (
+                <p className="text-xs font-medium">
+                  {order.seller_phone || order.seller_email
+                    ? "After payment verification, use the existing contact tools to confirm the seller and arrangements."
+                    : "No seller phone or email yet. Ask the buyer to obtain contact details in Messenger; keep coordination pending, not confirmed."}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Seller message copied: {facebookHandoff.seller_message_copied ? "Yes" : "Not reported"}.
+                {" "}Inspection completion uses the existing inspection lifecycle.
+              </p>
+            </div>
+          )}
+          {platform === "facebook" && isConcierge && !facebookHandoff && (
             <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 space-y-3">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Facebook Marketplace — Buyer Bridge Required</p>
                   <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
-                    Facebook TOS prohibits direct automated outreach. The buyer must message the seller first to obtain consent.
-                    Direct Facebook contact is only permitted after seller approval is marked or buyer provides off-platform contact info.
+                    {FACEBOOK_CONTACT_EXPLANATION}
                   </p>
                 </div>
               </div>
@@ -946,13 +978,13 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
               <div className="space-y-1.5">
                 <Label className="text-xs text-blue-800 dark:text-blue-300">Buyer Script — Send this to the buyer to copy/paste</Label>
                 <div className="p-2.5 rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-blue-950/50 text-xs text-foreground leading-relaxed" data-testid="text-fb-buyer-script">
-                  "Hi, I'm interested in your vehicle. Before moving forward, I would like an independent RideCheck inspection. RideCheck may need to coordinate directly with you regarding access to the vehicle. Is that okay?"
+                  {FACEBOOK_SELLER_MESSAGE}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-1.5 text-xs border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900"
-                  onClick={() => handleCopyMessage(`"Hi, I'm interested in your vehicle. Before moving forward, I would like an independent RideCheck inspection. RideCheck may need to coordinate directly with you regarding access to the vehicle. Is that okay?"`)}
+                  onClick={() => handleCopyMessage(FACEBOOK_SELLER_MESSAGE)}
                   data-testid="button-copy-fb-buyer-script"
                 >
                   <Copy className="h-3.5 w-3.5" />

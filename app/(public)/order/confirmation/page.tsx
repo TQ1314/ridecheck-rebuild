@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, ArrowRight, Copy, Check, MessageSquare, Mail, Car } from "lucide-react";
-import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
+import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE, isFacebookBuyerHandoff } from "@/lib/order-journey";
+import { FACEBOOK_CONTACT_EXPLANATION, FACEBOOK_SELLER_MESSAGE } from "@/lib/seller-contact/facebook-marketplace";
 import { useJourneyOrder } from "@/lib/use-journey-order";
 
 export default function OrderConfirmationPage() {
@@ -29,7 +30,8 @@ function OrderConfirmationInner() {
   const { order, safeTrackUrl } = useJourneyOrder(orderId, trackUrl);
   const isSelfArrange = isSelfArranged(order?.booking_type || method);
   const showIntroduction = !!order && isMarketplaceConcierge(order);
-  const sellerMessage = showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
+  const facebookHandoff = isFacebookBuyerHandoff(order);
+  const sellerMessage = facebookHandoff ? FACEBOOK_SELLER_MESSAGE : showIntroduction ? sellerIntroduction(order) : SELF_ARRANGE_MESSAGE;
 
   const [copied, setCopied] = useState(false);
 
@@ -105,10 +107,10 @@ function OrderConfirmationInner() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-green-700 dark:text-green-400" />
-                     {isSelfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
+                     {facebookHandoff ? "Facebook Marketplace seller contact" : isSelfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller"}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {isSelfArrange
+                     {facebookHandoff ? `${FACEBOOK_CONTACT_EXPLANATION} Your reported agreement is not an independently confirmed appointment.` : isSelfArrange
                        ? "You coordinate access and timing with the seller. Share the confirmed details with RideCheck after payment."
                        : "If you're already messaging the seller, send this quick introduction. After that, RideCheck handles the coordination."}
                   </p>
@@ -181,8 +183,10 @@ function OrderConfirmationInner() {
                   <li className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
                     <div>
-                      <p className="font-medium">We contact the seller</p>
-                       <p className="text-muted-foreground text-xs mt-0.5">After payment, RideCheck coordinates access and scheduling with the seller.</p>
+                      <p className="font-medium">{facebookHandoff ? "RideCheck takes over coordination" : "We contact the seller"}</p>
+                       <p className="text-muted-foreground text-xs mt-0.5">{facebookHandoff
+                         ? "After payment, RideCheck coordinates using the details the seller provides. If contact details are missing, Ops will help you obtain them through your Messenger conversation."
+                         : "After payment, RideCheck coordinates access and scheduling with the seller."}</p>
                     </div>
                   </li>
                 )}

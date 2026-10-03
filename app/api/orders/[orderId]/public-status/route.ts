@@ -15,6 +15,7 @@ const SAFE_FIELDS = [
   "package",
   "booking_type",
   "listing_source",
+  "platform_source",
   "payment_status",
   "vehicle_year",
   "vehicle_make",
@@ -53,6 +54,13 @@ export async function GET(
     }
 
     const { tracking_token, ...safe } = order as any;
+    if (safe.platform_source === "facebook_marketplace") {
+      const { data: consent } = await supabaseAdmin.from("order_events").select("details")
+        .eq("order_id", params.orderId).eq("event_type", "seller_consent_reported")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      safe.facebook_consent_reported = (consent as any)?.details?.source === "facebook_marketplace"
+        && (consent as any)?.details?.seller_consent_reported === true;
+    }
     return NextResponse.json({ order: safe, verified: true });
   } catch (err: any) {
     return NextResponse.json(

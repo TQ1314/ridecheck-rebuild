@@ -2,11 +2,17 @@ export type JourneyOrder = {
   order_number: string | null;
   booking_type: string | null;
   listing_source: string | null;
+  platform_source?: string | null;
+  facebook_consent_reported?: boolean;
   payment_status: string | null;
   vehicle_year: number | null;
   vehicle_make: string | null;
   vehicle_model: string | null;
 };
+
+export function isFacebookBuyerHandoff(order: Pick<JourneyOrder, "platform_source" | "facebook_consent_reported"> | null): boolean {
+  return order?.platform_source === "facebook_marketplace" && order.facebook_consent_reported === true;
+}
 
 export function publicOrderReference(orderNumber: string | null | undefined): string | null {
   return orderNumber ? `Order #${orderNumber}` : null;

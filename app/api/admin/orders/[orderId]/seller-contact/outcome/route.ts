@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordFacebookCoordinationStarted } from "@/lib/seller-contact/facebook-coordination.server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
@@ -33,7 +34,7 @@ export async function POST(
     // Payment gate
     const { data: gateOrder } = await supabaseAdmin
       .from("orders")
-      .select("payment_status, payment_required, payment_override_approved")
+      .select("payment_status, payment_required, payment_override_approved, platform_source")
       .eq("id", params.orderId)
       .single();
 
@@ -113,6 +114,9 @@ export async function POST(
     ]);
 
     // ── Buyer Retention + Credit (non-fatal, only on seller decline) ─────────
+    if ((gateOrder as any).platform_source === "facebook_marketplace" && (outcome === "accepted" || outcome === "declined")) {
+      await recordFacebookCoordinationStarted(params.orderId, actor.userId, actor.email);
+    }
     if (outcome === "declined") {
       void (async () => {
         try {
