@@ -36,3 +36,17 @@ mtime_ms = 1790987564058
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:38fdf3ca-48b6-43ce-a062-21bf2b7baf14/042ff2d5-7e59-496e-b13c-da1e879c0770/a39a90f5-4771-4c2b-aca5-94e2c3f15ea2"
 storage_version_token = "1790987586022285"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "7xW9HJdvRAoD25zJLlr-o"
+uri = "file://exports/ridecheck-chatgpt-audit.zip"
+type = "unspecified"
+title = "RideCheck — sanitized source audit ZIP"
+description = "628 source/configuration files, migrations and tests, plus an audit brief, file manifest and sanitization report. Excludes environment files, private uploads, logs, agent profiles/history, dependencies and build outputs."
+logical_id = "a387a3f9-10bb-4df2-a8db-b752c59e09f4"
+content_hash = "sha256:62e0496b219791706f3d4839eed601e22754b3f81c98e1d089af9dd72dccfa30"
+size = 1316030
+mtime_ms = 1791036826129
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:38fdf3ca-48b6-43ce-a062-21bf2b7baf14/a387a3f9-10bb-4df2-a8db-b752c59e09f4/1212c7f1-0286-4e12-ac8b-8d37d6c1eee8"
+storage_version_token = "1791036833975940"
+content_type = "application/octet-stream"
