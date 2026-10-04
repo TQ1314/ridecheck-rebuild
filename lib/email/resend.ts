@@ -29,6 +29,11 @@ export async function sendEmail({
   template?: string;
   orderId?: string;
 }): Promise<{ success: boolean; dev?: boolean; messageId?: string; data?: any; error?: any }> {
+  if (template === "buyer-paid-confirmation" && orderId) {
+    const { sendEmail: sendPaidConfirmation } = await import("@/lib/notifications/email");
+    return sendPaidConfirmation({ to, subject, html, replyTo, event, template, orderId });
+  }
+
   if (stagingCaptureEnabled()) {
     await captureStagingNotification({
       recipient: to,

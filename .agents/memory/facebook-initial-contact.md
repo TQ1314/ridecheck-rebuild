@@ -32,3 +32,9 @@ Optional Facebook enrichment must not prevent the buyer's standard payment confi
 **Why:** The user explicitly required standard confirmation delivery plus an Ops-investigable failure log when enrichment fails, rather than skipping confirmation.
 
 **How to apply:** Preserve the standard confirmation as the fallback and log the enrichment failure. Verify notification content through the actual workflow caller, not just a helper; isolated helper tests can pass while another email path bypasses enrichment.
+
+Facebook routing work must stay within the approved routing, existing pricing/checkout, buyer instructions, and confirmed-appointment dispatch outcomes.
+
+**Why:** The user explicitly required: "No architecture cleanup. No new services. No database work. No new statuses. No additional workflow development."
+
+**How to apply:** Make only the smallest necessary correction. List unrelated findings as backlog rather than investigating or fixing them as part of this ticket. Do not deploy this ticket.
