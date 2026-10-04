@@ -32,20 +32,27 @@ export async function sendEmail({
   // Only enrich the existing paid confirmation template. Other messages and
   // non-Facebook/historical Concierge content are passed through unchanged.
   if (template === "buyer-paid-confirmation" && orderId) {
+    const standardHtml = html;
     try {
       const { supabaseAdmin } = await import("@/lib/supabase/admin");
       const { data: order, error } = await supabaseAdmin.from("orders")
         .select("booking_type, listing_url, platform_source, preferred_date")
         .eq("id", orderId).maybeSingle();
-      if (error || !order) throw new Error("Paid confirmation order details unavailable");
+      if (error) throw error;
+      if (!order) throw new Error("Paid confirmation order details unavailable");
       const { isFacebookSelfArrange } = await import("@/lib/seller-contact/facebook-self-arrange");
       if (isFacebookSelfArrange(order)) {
         const { facebookSelfArrangePaidConfirmationHtml } = await import("@/lib/email/templates/order-confirmation");
         html = facebookSelfArrangePaidConfirmationHtml(html, order.preferred_date, order.listing_url);
       }
     } catch (error) {
-      console.error("[Paid confirmation context]", error);
-      return { success: false, error };
+      html = standardHtml;
+      console.error("[Paid confirmation enrichment failed; sending standard confirmation]", {
+        orderId,
+        template,
+        reason: error instanceof Error ? error.message
+          : (error as { message?: string } | null)?.message ?? "Unknown enrichment failure",
+      });
     }
   }
 

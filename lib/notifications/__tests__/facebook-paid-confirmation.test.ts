@@ -50,12 +50,37 @@ describe("existing post-payment confirmation without Stripe changes", () => {
     expect((await sendEmail({ ...message, template: "other" })).success).toBe(true);
     expect(mocks.capture.mock.calls[0][0].content).toBe(original);
   });
-  it("fails explicitly instead of sending misleading copy when context cannot be verified", async () => {
+  it("sends the standard confirmation and logs context failure for Ops", async () => {
     mocks.error = new Error("Test context unavailable");
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      expect((await sendEmail(message)).success).toBe(false);
-      expect(mocks.capture).not.toHaveBeenCalled();
+      expect((await sendEmail(message)).success).toBe(true);
+      expect(mocks.capture.mock.calls[0][0].content).toBe(original);
+      expect(log).toHaveBeenCalledWith(
+        "[Paid confirmation enrichment failed; sending standard confirmation]",
+        { orderId: "order-1", template: "buyer-paid-confirmation", reason: "Test context unavailable" },
+      );
+    } finally { log.mockRestore(); }
+  });
+  it("also sends the standard confirmation if the order-context row is missing", async () => {
+    mocks.order = null;
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await sendEmail(message)).success).toBe(true);
+      expect(mocks.capture.mock.calls[0][0].content).toBe(original);
+      expect(log).toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
+  it("sends the standard confirmation if Facebook enrichment itself throws", async () => {
+    mocks.order.preferred_date = {};
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await sendEmail(message)).success).toBe(true);
+      expect(mocks.capture.mock.calls[0][0].content).toBe(original);
+      expect(log).toHaveBeenCalledWith(
+        "[Paid confirmation enrichment failed; sending standard confirmation]",
+        expect.objectContaining({ orderId: "order-1", reason: expect.any(String) }),
+      );
     } finally { log.mockRestore(); }
   });
 });

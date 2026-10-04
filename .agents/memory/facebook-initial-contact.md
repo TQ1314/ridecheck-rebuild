@@ -26,3 +26,9 @@ Facebook Marketplace uses the existing Self-Arrange service, with no Concierge h
 **Why:** The user explicitly superseded the earlier Concierge coordination approach with existing Self-Arrange routing and required everything else to remain unchanged.
 
 **How to apply:** Preserve normal Self-Arrange behavior, universal payments, non-Facebook choices, and historical orders. Seller details must not convert Facebook Self-Arrange to Concierge or trigger automated seller outreach. Preserve non-Facebook pre-payment requirements; do not create a status/queue or invent financial policy. Promise another-vehicle use only when existing credit/transfer handling actually supports it.
+
+Optional Facebook enrichment must not prevent the buyer's standard payment confirmation from being sent.
+
+**Why:** The user explicitly required standard confirmation delivery plus an Ops-investigable failure log when enrichment fails, rather than skipping confirmation.
+
+**How to apply:** Preserve the standard confirmation as the fallback and log the enrichment failure. Verify notification content through the actual workflow caller, not just a helper; isolated helper tests can pass while another email path bypasses enrichment.
