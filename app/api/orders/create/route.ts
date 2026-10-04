@@ -8,6 +8,7 @@ import { resolveCounty, checkPilotPhase, PILOT_CONFIG } from "@/lib/geo/resolveC
 import { buildOptionalOrderFields, createOrderSchema } from "./contract";
 import { notifyNewOrderRequest } from "@/lib/notifications/order-created-ops";
 import { buildFacebookHandoffEvents, isFacebookMarketplaceListing, FACEBOOK_SOURCE } from "@/lib/seller-contact/facebook-marketplace";
+import { facebookSelfArrangeInstructions } from "@/lib/seller-contact/facebook-self-arrange";
 import { currentIntakeSession } from "@/lib/booking-intake/session";
 import { writeAuditLog } from "@/lib/rbac";
 
@@ -350,7 +351,9 @@ export async function POST(req: NextRequest) {
         const { sendSMS } = await import("@/lib/notifications/sms");
         const smsResult = await sendSMS({
           to: buyer_phone,
-          body: `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
+          body: facebookMarketplace
+            ? `RideCheck: Inspection request for ${vehicleLabel}. Pay securely here: ${payUrl}\n\n${facebookSelfArrangeInstructions(data.preferred_date, data.listing_url)}`
+            : `RideCheck: Confirm your inspection for ${vehicleLabel}. Pay securely here: ${payUrl}`,
           event: "order.payment-link",
           template: "order-payment-link-sms",
           orderId: order.id,
@@ -390,6 +393,8 @@ export async function POST(req: NextRequest) {
           bookingType: data.booking_type,
           listingSource: data.listing_source ?? "online_marketplace",
           facebookMarketplace,
+          preferredDate: data.preferred_date,
+          listingUrl: data.listing_url,
           trackUrl: track_url,
           payUrl,
         });

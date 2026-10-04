@@ -12,4 +12,4 @@
 - [OBD report evidence policy](obd-report-evidence.md) — keep unreviewed extracted DTCs as raw evidence, but exclude them from buyer interpretation until linked and accepted.
 - [Payment-first order policy](payment-first-order-policy.md) — persisted requests are not actionable orders; payment evidence and fulfillment activation must remain separate.
 - [RideCheck pricing policy](ridecheck-pricing-policy.md) — three tiers; no price-only, flagship-only, three-row-only, or age-downgrade triggers; legacy Premium is not a new-sale tier.
-- [Facebook initial contact](facebook-initial-contact.md) — buyer initiates Messenger; optional seller details; reported agreement stays separate from verified states and paid Concierge coordination.
+- [Facebook initial contact](facebook-initial-contact.md) — Self-Arrange only; date-only request; Ops-confirmed appointment required before dispatch; no seller outreach or Phase 1 reminders.

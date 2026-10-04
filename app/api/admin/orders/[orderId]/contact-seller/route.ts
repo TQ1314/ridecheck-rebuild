@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { z } from "zod";
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
+import { isFacebookSelfArrange, FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR } from "@/lib/seller-contact/facebook-self-arrange";
 
 const contactSchema = z.object({
   notes: z.string().optional(),
@@ -25,7 +26,7 @@ export async function POST(
 
     const { data: currentOrder } = await supabaseAdmin
       .from("orders")
-      .select("seller_contact_attempts, seller_contacted_at, payment_status, payment_required, payment_override_approved")
+      .select("seller_contact_attempts, seller_contacted_at, payment_status, payment_required, payment_override_approved, booking_type, listing_url, platform_source")
       .eq("id", params.orderId)
       .single();
 
@@ -34,6 +35,9 @@ export async function POST(
     }
     if (!canProceedWithRideCheck(currentOrder)) {
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
+    }
+    if (isFacebookSelfArrange(currentOrder)) {
+      return NextResponse.json({ error: FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR }, { status: 409 });
     }
 
     const newAttempts = (currentOrder.seller_contact_attempts || 0) + 1;

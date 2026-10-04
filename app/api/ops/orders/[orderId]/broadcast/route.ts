@@ -4,6 +4,7 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { z } from "zod";
+import { facebookAppointmentError } from "@/lib/seller-contact/facebook-self-arrange";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export async function POST(
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, last_known_lat, last_known_lng, payment_status, payment_required, payment_override_approved")
+      .select("id, order_id, last_known_lat, last_known_lng, payment_status, payment_required, payment_override_approved, booking_type, listing_url, platform_source, seller_contact_status, seller_available_date, seller_available_time, seller_inspection_address")
       .eq("id", params.orderId)
       .single();
 
@@ -49,6 +50,10 @@ export async function POST(
     }
     if (!canProceedWithRideCheck(order)) {
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.assignment }, { status: 402 });
+    }
+    const appointmentError = facebookAppointmentError(order);
+    if (appointmentError) {
+      return NextResponse.json({ error: appointmentError }, { status: 409 });
     }
 
     const { data: rcProfiles } = await supabaseAdmin

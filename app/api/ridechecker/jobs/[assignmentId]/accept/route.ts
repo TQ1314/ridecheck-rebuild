@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isFacebookSelfArrange } from "@/lib/seller-contact/facebook-self-arrange";
 import { createRouteHandlerSupabaseClient } from "@/lib/supabase/route-handler";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { writeOrderEvent } from "@/lib/rbac";
@@ -157,14 +158,14 @@ export async function POST(
           .from("orders")
           .select(
             "id, seller_phone, seller_email, seller_contact_status, payment_status, " +
-            "payment_override_approved, vehicle_year, vehicle_make, vehicle_model, scheduled_date"
+            "payment_override_approved, vehicle_year, vehicle_make, vehicle_model, scheduled_date, booking_type, listing_url, platform_source"
           )
           .eq("id", assignment.order_id)
           .maybeSingle();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const order = orderRaw as any;
 
-        if (!order) return;
+        if (!order || isFacebookSelfArrange(order)) return;
 
         const isPaid = PAID_STATUSES.includes(order.payment_status as any)
           || order.payment_override_approved;

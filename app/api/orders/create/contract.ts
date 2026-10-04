@@ -63,11 +63,11 @@ export const createOrderSchema = z.object({
   seller_type: z.enum(["private_party", "dealership", "auction", "other"]).optional(),
 }).superRefine((value, ctx) => {
   if (isFacebookMarketplaceListing(value.listing_url, value.platform_source)) {
-    if (value.facebook_contact?.seller_consent_reported !== true) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["facebook_contact"], message: "Report the seller's agreement before continuing with a Facebook Marketplace listing." });
+    if (value.booking_type !== "self_arrange" || (value.booking_method && value.booking_method !== "self_arrange")) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["booking_type"], message: "Facebook Marketplace requires Self-Arrange. Concierge is unavailable." });
     }
-    if (value.booking_type !== "concierge" || (value.booking_method && value.booking_method !== "concierge")) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["booking_type"], message: "Facebook Marketplace uses buyer-initiated contact followed by RideCheck coordination." });
+    if (!value.preferred_date?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["preferred_date"], message: "A preferred date is required for Facebook Self-Arrange." });
     }
   }
   if (value.booking_method === "buyer_arranged" && value.booking_type !== "self_arrange") {

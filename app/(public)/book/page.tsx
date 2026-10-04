@@ -40,7 +40,7 @@ import { t, type Language } from "@/lib/i18n/translations";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { IntakeProposalCard } from "@/components/booking-intake/IntakeProposalCard";
-import { FacebookSellerContact } from "@/components/booking/FacebookSellerContact";
+import { resolveFacebookBookingType } from "@/lib/seller-contact/facebook-self-arrange";
 import { clearVehicleAttempt } from "@/lib/booking-intake/resetVehicle";
 import {
   emptyFacebookContactState,
@@ -185,7 +185,7 @@ function BookInner() {
   const activeFacebookContact = facebookStorageKey && facebookContactScope === facebookStorageKey
     ? facebookContact
     : emptyFacebookContactState();
-  const effectiveBookingType: BookingType = isFacebookFlow ? "concierge" : bookingType;
+  const effectiveBookingType: BookingType = resolveFacebookBookingType(isFacebookFlow, bookingType);
   const isBuyerArranged = effectiveBookingType === "buyer_arranged";
 
   const pkg: PackageType = (classification?.packageTier || "standard") as PackageType;
@@ -495,15 +495,14 @@ function BookInner() {
     if (step === 0)
       return (
         !!vehicleYear && !!vehicleMake && !!vehicleModel && !!vehicleLocation &&
-        zipStatus === "valid" && !!bookingType &&
-        (!isFacebookFlow || activeFacebookContact.seller_consent_reported)
+        zipStatus === "valid" && !!bookingType
       );
     if (step === 1) {
       if (!buyerPhone || buyerPhone.length < 7) return false;
       if (!buyerEmailInput || !buyerEmailInput.includes("@")) return false;
       if (isFacebookFlow) {
         if (sellerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellerEmail)) return false;
-        return activeFacebookContact.seller_consent_reported;
+        return !!preferredDate.trim();
       }
       if (isBuyerArranged) {
         return !!inspectionAddress && !!inspectionTimeWindow && !!sellerPhone;
@@ -565,7 +564,7 @@ function BookInner() {
   };
 
   const handleSubmit = async () => {
-    if (isFacebookFlow && !activeFacebookContact.seller_consent_reported) return;
+    if (isFacebookFlow && !preferredDate.trim()) return;
     setLoading(true);
     try {
       const {
@@ -622,11 +621,11 @@ function BookInner() {
       }
 
       if (isFacebookFlow) {
-        body.booking_type = "concierge";
-        body.booking_method = "concierge";
+        body.booking_type = "self_arrange";
+        body.booking_method = "self_arrange";
         body.facebook_contact = activeFacebookContact;
         body.seller_email = sellerEmail.trim() || null;
-        body.seller_available_date = preferredDate || null;
+        // preferred_date is a request, not confirmed seller availability.
         body.seller_available_time = sellerAvailableTime || null;
         if (inspectionAddress.trim()) body.inspection_address = inspectionAddress.trim();
       }
@@ -1028,22 +1027,11 @@ function BookInner() {
                 {t("booking.bookingType", lang)}
               </Label>
               {isFacebookFlow ? (
-                <FacebookSellerContact
-                  key={facebookStorageKey}
-                  listingUrl={listingUrl}
-                  storageKey={facebookStorageKey!}
-                  contact={activeFacebookContact}
-                  auditWarning={facebookAuditIssue
-                    ? "We couldn’t save this activity record. Your reported choices remain in this order; retry the activity record when you’re ready."
-                    : ""}
-                  failedAudit={facebookAuditIssue}
-                  onAudit={handleFacebookAudit}
-                  onContactChange={setFacebookContact}
-                  onListingUrlChange={(url) => {
-                    setListingUrl(url);
-                    setIntakeUrl(url);
-                  }}
-                />
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm dark:bg-blue-950/30" data-testid="facebook-self-arrange">
+                  <p className="font-semibold">Facebook Marketplace — Self-Arrange</p>
+                  <p>Concierge is unavailable for Facebook Marketplace. After checkout, use the seller message in your confirmation email or text to arrange the appointment through Messenger.</p>
+                  <p>Payment and a requested date do not confirm an appointment. No dispatch until the seller confirms.</p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {availableBookingTypes.map((bt) => (
@@ -1414,8 +1402,7 @@ function BookInner() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">What the seller has shared so far</p>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {`Facebook requires you to initiate contact with the seller. RideCheck will provide the message and take over coordination once the seller agrees.`}
-                    {" "}These details are optional. Continue with only the information you have; a simple yes is enough.
+                    You arrange the appointment with the seller through Messenger. Seller contact details are optional; a preferred inspection date is required. These details do not confirm an appointment.
                   </p>
                 </div>
                 <div>
@@ -1436,8 +1423,8 @@ function BookInner() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="date">Seller availability date</Label>
-                    <Input id="date" type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} data-testid="input-preferred-date" />
+                    <Label htmlFor="date">Preferred inspection date *</Label>
+                    <Input id="date" type="date" required value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} data-testid="input-preferred-date" />
                   </div>
                   <div>
                     <Label htmlFor="sellerAvailableTime">Seller availability time</Label>
@@ -1758,7 +1745,7 @@ function BookInner() {
               {preferredDate && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    {isFacebookFlow ? "Seller availability date" : t("booking.preferredDate", lang)}
+                    {isFacebookFlow ? "Requested inspection date" : t("booking.preferredDate", lang)}
                   </span>
                   <span>{preferredDate}</span>
                 </div>
@@ -1783,7 +1770,7 @@ function BookInner() {
               </div>
               {isFacebookFlow ? (
                 <p className="text-xs leading-relaxed text-slate-700 bg-blue-50 rounded-md p-3 mt-2 dark:bg-blue-950/30 dark:text-blue-200">
-                  Facebook requires you to initiate contact with the seller. RideCheck will provide the message and take over coordination once the seller agrees. Seller agreement here is buyer-reported and is not independent confirmation of the seller or arrangements.
+                  Facebook Marketplace uses Self-Arrange. After checkout, send the provided seller message through Messenger. Once the seller confirms, reply to your confirmation message with the confirmed date, time, and vehicle address. No dispatch until the seller confirms.
                 </p>
               ) : effectiveBookingType === "concierge" && (
                 <p className="text-xs text-muted-foreground bg-muted/50 rounded-md p-3 mt-2">

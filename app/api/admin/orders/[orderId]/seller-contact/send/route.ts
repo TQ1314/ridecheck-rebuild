@@ -25,6 +25,7 @@ import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/paym
 import { sendDirect } from "@/lib/notifications/send-preferred";
 import { z } from "zod";
 import { recordFacebookCoordinationStarted } from "@/lib/seller-contact/facebook-coordination.server";
+import { isFacebookSelfArrange, FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR } from "@/lib/seller-contact/facebook-self-arrange";
 
 export const dynamic = "force-dynamic";
 
@@ -73,13 +74,16 @@ export async function POST(
       .from("orders")
       .select(
         "payment_status, payment_required, payment_override_approved, " +
-         "vehicle_year, vehicle_make, vehicle_model, listing_source, platform_source, preferred_date, order_number"
+         "vehicle_year, vehicle_make, vehicle_model, listing_source, platform_source, preferred_date, order_number, booking_type, listing_url"
       )
       .eq("id", params.orderId)
       .single();
 
     if (!gateOrder || !canProceedWithRideCheck(gateOrder as any)) {
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.seller_outreach }, { status: 402 });
+    }
+    if (isFacebookSelfArrange(gateOrder as any)) {
+      return NextResponse.json({ error: FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR }, { status: 409 });
     }
 
     // ── Build branded HTML email body ──

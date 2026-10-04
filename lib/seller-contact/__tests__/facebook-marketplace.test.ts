@@ -15,7 +15,7 @@ const base = {
 const consent = { ...emptyFacebookContactState(), seller_consent_reported: true,
   seller_consent_reported_at: "2026-10-02T14:00:00.000Z" };
 const facebook = { ...base, listing_url: "https://www.facebook.com/marketplace/item/123",
-  facebook_contact: consent };
+  booking_type: "self_arrange", booking_method: "self_arrange", preferred_date: "2026-10-05", facebook_contact: consent };
 
 describe("reliable Marketplace detection", () => {
   it.each([
@@ -45,18 +45,22 @@ describe("reliable Marketplace detection", () => {
   });
 });
 
-describe("buyer-reported consent contract", () => {
-  it("accepts only yes with no seller name/phone/email/address/availability", () => {
+describe("Facebook Self-Arrange contract and legacy evidence", () => {
+  it("accepts a requested date with no seller name/phone/email/address/availability", () => {
     expect(createOrderSchema.safeParse(facebook).success).toBe(true);
   });
-  it("requires reported consent on both detected and explicitly selected Marketplace", () => {
-    expect(createOrderSchema.safeParse({ ...facebook, facebook_contact: undefined }).success).toBe(false);
-    expect(createOrderSchema.safeParse({ ...base, platform_source: "facebook_marketplace" }).success).toBe(false);
+  it("does not require pre-checkout reported consent on detected or selected Marketplace", () => {
+    expect(createOrderSchema.safeParse({ ...facebook, facebook_contact: undefined }).success).toBe(true);
+    expect(createOrderSchema.safeParse({ ...facebook, listing_url: undefined, platform_source: "facebook_marketplace", facebook_contact: undefined }).success).toBe(true);
   });
-  it("rejects an accidental self-arrange/buyer-arranged path for the guided coordination service", () => {
-    expect(createOrderSchema.safeParse({ ...facebook, booking_type: "self_arrange" }).success).toBe(false);
+  it("rejects Concierge and buyer-arranged variants for new Facebook bookings", () => {
+    expect(createOrderSchema.safeParse({ ...facebook, booking_type: "concierge" }).success).toBe(false);
     expect(createOrderSchema.safeParse({ ...facebook, booking_method: "buyer_arranged" }).success).toBe(false);
-    expect(createOrderSchema.safeParse({ ...facebook, booking_method: "self_arrange" }).success).toBe(false);
+    expect(createOrderSchema.safeParse({ ...facebook, booking_method: "concierge" }).success).toBe(false);
+  });
+  it.each([undefined, null, "", "  ", "\n\t"])("requires a non-blank Facebook preferred date: %s", (preferred_date) => {
+    expect(createOrderSchema.safeParse({ ...facebook, preferred_date }).success).toBe(false);
+    expect(createOrderSchema.safeParse({ ...base, preferred_date }).success).toBe(true);
   });
   it.each(["craigslist", "dealership", "roadside"])("keeps ordinary %s orders valid without new consent", (source) => {
     expect(createOrderSchema.safeParse({ ...base, platform_source: source }).success).toBe(true);

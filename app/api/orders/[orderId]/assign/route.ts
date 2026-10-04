@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib/rbac";
 import { canProceedWithRideCheck } from "@/lib/payment/payment-gate";
 import { z } from "zod";
+import { facebookAppointmentError } from "@/lib/seller-contact/facebook-self-arrange";
 
 const assignSchema = z.object({
   assigned_ops_id: z.string().uuid().optional(),
@@ -40,7 +41,7 @@ export async function PATCH(
     if (parsed.data.inspector_id) {
       const { data: order, error: paymentLookupError } = await supabaseAdmin
         .from("orders")
-        .select("payment_status, payment_required, payment_override_approved")
+        .select("payment_status, payment_required, payment_override_approved, booking_type, listing_url, platform_source, seller_contact_status, seller_available_date, seller_available_time, seller_inspection_address")
         .eq("id", params.orderId)
         .maybeSingle();
       if (paymentLookupError) {
@@ -50,6 +51,10 @@ export async function PATCH(
       if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
       if (!canProceedWithRideCheck(order)) {
         return NextResponse.json({ error: "Payment is required before assigning an inspector." }, { status: 402 });
+      }
+      const appointmentError = facebookAppointmentError(order);
+      if (appointmentError) {
+        return NextResponse.json({ error: appointmentError }, { status: 409 });
       }
       paymentGateOrder = order;
       updatePayload.assigned_inspector_id = parsed.data.inspector_id;

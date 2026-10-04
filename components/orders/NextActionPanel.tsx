@@ -11,6 +11,8 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { differenceInDays, parseISO, isToday, isPast, startOfDay } from "date-fns";
+import { facebookAppointmentError, isFacebookSelfArrange } from "@/lib/seller-contact/facebook-self-arrange";
+import { canProceedWithRideCheck } from "@/lib/payment/payment-gate";
 
 interface NextActionPanelProps {
   order: Order;
@@ -48,15 +50,24 @@ function getOverdueInfo(preferredDate: string | null, status: string): {
   return { urgency: "normal", daysOverdue: 0 };
 }
 
-function getNextAction(order: Order, attemptCount: number): { icon: React.ReactNode; text: string; sub?: string } {
+export function getNextAction(order: Order, attemptCount: number): { icon: React.ReactNode; text: string; sub?: string } {
   const isConcierge = order.booking_type === "concierge";
   const contactStatus = order.seller_contact_status;
 
-  if (order.payment_status !== "paid") {
+  if (order.payment_status !== "paid" && !(isFacebookSelfArrange(order) && canProceedWithRideCheck(order))) {
     return {
       icon: <ArrowRight className="h-4 w-4" />,
       text: "Awaiting payment",
       sub: "Send payment link to buyer before proceeding",
+    };
+  }
+
+  const appointmentError = facebookAppointmentError(order);
+  if (appointmentError) {
+    return {
+      icon: <Clock className="h-4 w-4" />,
+      text: "Awaiting seller confirmation",
+      sub: `${appointmentError} Record the buyer's confirmed details using the existing seller confirmation action.`,
     };
   }
 

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole, isAuthorized, writeAuditLog } from "@/lib/rbac";
 import { sendDirect } from "@/lib/notifications/send-preferred";
+import { isFacebookSelfArrange, FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR } from "@/lib/seller-contact/facebook-self-arrange";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function POST(
       .select(
         `id, order_id, attempt_number, channel, destination,
          message_template_key, message_body, delivery_status,
-         orders ( seller_phone, seller_email, vehicle_year, vehicle_make, vehicle_model )`
+         orders ( seller_phone, seller_email, vehicle_year, vehicle_make, vehicle_model, booking_type, listing_url, platform_source )`
       )
       .eq("id", params.attemptId)
       .maybeSingle();
@@ -59,6 +60,9 @@ export async function POST(
     }
 
     const order = Array.isArray(attempt.orders) ? attempt.orders[0] : attempt.orders;
+    if (isFacebookSelfArrange(order ?? {})) {
+      return NextResponse.json({ error: FACEBOOK_SELF_ARRANGE_OUTREACH_ERROR }, { status: 409 });
+    }
     const to: string | null =
       attempt.destination ||
       (channel === "sms" ? order?.seller_phone : order?.seller_email);

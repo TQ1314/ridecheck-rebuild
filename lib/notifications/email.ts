@@ -29,6 +29,26 @@ export async function sendEmail({
   template?: string;
   orderId?: string;
 }): Promise<{ success: boolean; dev?: boolean; messageId?: string; data?: any; error?: any }> {
+  // Only enrich the existing paid confirmation template. Other messages and
+  // non-Facebook/historical Concierge content are passed through unchanged.
+  if (template === "buyer-paid-confirmation" && orderId) {
+    try {
+      const { supabaseAdmin } = await import("@/lib/supabase/admin");
+      const { data: order, error } = await supabaseAdmin.from("orders")
+        .select("booking_type, listing_url, platform_source, preferred_date")
+        .eq("id", orderId).maybeSingle();
+      if (error || !order) throw new Error("Paid confirmation order details unavailable");
+      const { isFacebookSelfArrange } = await import("@/lib/seller-contact/facebook-self-arrange");
+      if (isFacebookSelfArrange(order)) {
+        const { facebookSelfArrangePaidConfirmationHtml } = await import("@/lib/email/templates/order-confirmation");
+        html = facebookSelfArrangePaidConfirmationHtml(html, order.preferred_date, order.listing_url);
+      }
+    } catch (error) {
+      console.error("[Paid confirmation context]", error);
+      return { success: false, error };
+    }
+  }
+
   if (stagingCaptureEnabled()) {
     await captureStagingNotification({
       recipient: to,

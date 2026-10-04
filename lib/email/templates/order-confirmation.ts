@@ -1,9 +1,23 @@
 import { isMarketplaceConcierge, isSelfArranged, publicOrderReference, sellerIntroduction, SELF_ARRANGE_MESSAGE } from "@/lib/order-journey";
 import { FACEBOOK_CONTACT_EXPLANATION, FACEBOOK_SELLER_MESSAGE } from "@/lib/seller-contact/facebook-marketplace";
+import { facebookSelfArrangeInstructions } from "@/lib/seller-contact/facebook-self-arrange";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]!);
+
+/** Enrich the existing paid email without touching Stripe or payment processing. */
+export function facebookSelfArrangePaidConfirmationHtml(
+  html: string,
+  preferredDate?: string | null,
+  listingUrl?: string | null,
+) {
+  const paymentOnly = html.replace(
+    "Your RideCheck assessment has been confirmed and is now in our queue.",
+    "Your payment is confirmed. Your inspection appointment is not confirmed until the seller agrees to the date, time, and vehicle address.",
+  );
+  return `${paymentOnly}<div style="font-family:Arial,sans-serif;max-width:600px;margin:24px auto;padding:20px;white-space:pre-line;">${escapeHtml(facebookSelfArrangeInstructions(preferredDate, listingUrl))}${listingUrl ? `<p><a href="${escapeHtml(listingUrl)}">Open original Facebook listing</a></p>` : ""}</div>`;
+}
 
 export function orderConfirmationHtml({
   orderNumber,
@@ -18,6 +32,8 @@ export function orderConfirmationHtml({
   trackUrl,
   payUrl,
   facebookMarketplace = false,
+  preferredDate,
+  listingUrl,
 }: {
   orderNumber: string | null;
   customerName: string;
@@ -31,12 +47,17 @@ export function orderConfirmationHtml({
   trackUrl?: string;
   payUrl?: string;
   facebookMarketplace?: boolean;
+  preferredDate?: string | null;
+  listingUrl?: string | null;
 }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   const vehicleLabel = escapeHtml([vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(" "));
   const selfArrange = isSelfArranged(bookingType);
   const marketplace = isMarketplaceConcierge({ booking_type: bookingType, listing_source: listingSource });
-  const sellerSection = selfArrange || marketplace
+  const facebookSelfArrange = facebookMarketplace && selfArrange;
+  const sellerSection = facebookSelfArrange
+    ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:24px 0;white-space:pre-line;">${escapeHtml(facebookSelfArrangeInstructions(preferredDate, listingUrl))}${listingUrl ? `<p><a href="${escapeHtml(listingUrl)}">Open original Facebook listing</a></p>` : ""}</div>`
+    : selfArrange || marketplace
     ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin:24px 0;">
         <p style="margin:0 0 8px;font-weight:700;color:#166534;">${facebookMarketplace ? "Facebook Marketplace seller contact" : selfArrange ? "Coordinate access with the seller" : "Introduce RideCheck to the seller (optional)"}</p>
         <p>${facebookMarketplace ? `${FACEBOOK_CONTACT_EXPLANATION} Your reported seller agreement does not independently confirm an inspection appointment. Payment is required before RideCheck begins coordination.` : selfArrange
@@ -64,7 +85,7 @@ export function orderConfirmationHtml({
       <h2 style="color:#1e293b;margin-bottom:16px;">Inspection Request — Pending Payment</h2>
        <p>Hi ${escapeHtml(customerName)},</p>
       <p>Thanks for your request. It is pending payment and is not yet a confirmed inspection.</p>
-       <p>Use the secure payment link below. Payment must be confirmed before RideCheck contacts the seller or schedules the inspection.</p>
+       <p>${facebookSelfArrange ? "Use the secure payment link below. You arrange the appointment through Messenger; RideCheck does not contact the seller for this Self-Arrange booking." : "Use the secure payment link below. Payment must be confirmed before RideCheck contacts the seller or schedules the inspection."}</p>
 
       <table style="width:100%;border-collapse:collapse;margin:20px 0;background:#f8fafc;border-radius:8px;">
         ${orderNumber ? `<tr><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569;">Order</td><td style="padding:10px 16px;border-bottom:1px solid #e2e8f0;">${escapeHtml(publicOrderReference(orderNumber)!)}</td></tr>` : ""}

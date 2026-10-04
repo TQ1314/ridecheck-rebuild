@@ -4,6 +4,7 @@ import { requireRole, isAuthorized, writeAuditLog, writeOrderEvent } from "@/lib
 import { canProceedWithRideCheck, PAYMENT_GATE_ERRORS } from "@/lib/payment/payment-gate";
 import { getRideCheckerAssignmentEligibility } from "@/lib/ridecheckers/eligibility";
 import { z } from "zod";
+import { facebookAppointmentError } from "@/lib/seller-contact/facebook-self-arrange";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export async function PATCH(
 
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from("orders")
-      .select("id, order_id, order_number, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved, last_known_lat, last_known_lng")
+      .select("id, order_id, order_number, vehicle_year, vehicle_make, vehicle_model, assignment_status, current_offer, base_pay, boost_amount, payment_status, payment_required, payment_override_approved, last_known_lat, last_known_lng, booking_type, listing_url, platform_source, seller_contact_status, seller_available_date, seller_available_time, seller_inspection_address")
       .eq("id", params.orderId)
       .single();
 
@@ -49,6 +50,10 @@ export async function PATCH(
     // Payment gate — only check when actually assigning (not unassigning)
     if (ridechecker_id && !canProceedWithRideCheck(order)) {
       return NextResponse.json({ error: PAYMENT_GATE_ERRORS.assignment }, { status: 402 });
+    }
+    const appointmentError = ridechecker_id ? facebookAppointmentError(order) : null;
+    if (appointmentError) {
+      return NextResponse.json({ error: appointmentError }, { status: 409 });
     }
 
     // Enforce pay-before-assign rule

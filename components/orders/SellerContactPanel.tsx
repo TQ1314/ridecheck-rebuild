@@ -1,4 +1,5 @@
 "use client";
+import { facebookAppointmentError, isFacebookSelfArrange } from "@/lib/seller-contact/facebook-self-arrange";
 
 import { useState, useEffect } from "react";
 import type { Order, SellerContactAttempt, SellerContactChannel } from "@/types/orders";
@@ -232,6 +233,8 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
   const allowedChannels = getAllowedChannels(platform);
   const vehicleLabel   = `${order.vehicle_year} ${order.vehicle_make} ${order.vehicle_model}`;
   const isConcierge    = order.booking_type === "concierge";
+  const facebookSelfArrange = isFacebookSelfArrange(order);
+  const appointmentError = facebookAppointmentError(order);
   const isSelfArranged = order.booking_type === "self_arrange";
   const contactStatus  = order.seller_contact_status || "not_started";
 
@@ -812,6 +815,7 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
                   <TooltipTrigger asChild>
                     <button
                       onClick={openSmsModal}
+                      disabled={facebookSelfArrange}
                       className="font-medium text-primary hover:underline flex items-center gap-1.5 group"
                       data-testid="button-clickable-phone"
                     >
@@ -832,6 +836,7 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
                   <TooltipTrigger asChild>
                     <button
                       onClick={openEmailModal}
+                      disabled={facebookSelfArrange}
                       className="font-medium text-primary hover:underline flex items-center gap-1.5 group"
                       data-testid="button-clickable-email"
                     >
@@ -866,7 +871,7 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
           )}
 
           {/* ── Quick action bar ── */}
-          {showActionBar && (
+          {showActionBar && !facebookSelfArrange && (
             <div className="rounded-md border bg-muted/20 p-3 space-y-2.5">
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Info className="h-3 w-3 shrink-0" />
@@ -940,6 +945,13 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
             <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
               Buyer-reported Marketplace agreement could not be loaded. Check the order timeline or ask the buyer; do not treat a missing record as verified seller consent.
             </p>
+          )}
+          {facebookSelfArrange && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 space-y-1.5 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30" data-testid="facebook-self-arrange-ops">
+              <p className="text-sm font-semibold">Facebook Marketplace — Self-Arrange</p>
+              <p className="text-xs">{appointmentError ? `Awaiting seller confirmation. ${appointmentError}` : "Seller appointment confirmed — appointment dispatch conditions satisfied."}</p>
+              <p className="text-xs">The buyer contacts the seller through Messenger and replies with the confirmed date, time, and vehicle address. Record these using the existing seller confirmation action below. No seller SMS, email, or Concierge outreach.</p>
+            </div>
           )}
           {facebookHandoff && isConcierge && (
             <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/30" data-testid="facebook-buyer-consent-ops">
@@ -2110,6 +2122,7 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
                 else toast({ title: "Use the Assignment section above to assign a RideChecker." });
               }}
               data-testid="button-assign-ridechecker"
+              disabled={!!appointmentError}
               className="text-xs gap-1.5"
             >
               <User className="h-3.5 w-3.5" />
@@ -2117,7 +2130,7 @@ export function SellerContactPanel({ order, onRefresh, paymentBlocked = false }:
             </Button>
 
             {/* Mark Seller Confirmed */}
-            {contactStatus !== "confirmed" ? (
+            {contactStatus !== "confirmed" || appointmentError ? (
               <Button
                 size="sm"
                 onClick={handleMarkSellerConfirmed}

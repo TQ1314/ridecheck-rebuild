@@ -37,6 +37,7 @@ const base = {
   buyer_email_input: "buyer@example.test", booking_type: "concierge", booking_method: "concierge",
 };
 const facebook = { ...base, listing_url: "https://facebook.com/marketplace/item/123",
+  booking_type: "self_arrange", booking_method: "self_arrange", preferred_date: "2026-10-05",
   facebook_contact: { seller_message_copied: true, facebook_listing_opened: true,
     seller_consent_reported: true, seller_consent_reported_at: "2026-10-02T14:00:00Z" } };
 function request(body: object) {
@@ -58,7 +59,7 @@ describe("Facebook handoff uses canonical unpaid order creation", () => {
     expect(response.status).toBe(200);
     const order = mocks.inserts.find((insert) => insert.table === "orders")!.payload;
     expect(order).toMatchObject({ platform_source: "facebook_marketplace",
-      payment_status: "unpaid", ops_status: "pending_payment", status: "submitted", final_price: 139 });
+      payment_status: "unpaid", ops_status: "pending_payment", status: "submitted", final_price: 129, booking_type: "self_arrange" });
     expect(order).not.toHaveProperty("seller_contact_status");
     expect(order).not.toHaveProperty("seller_confirmed_at");
     expect(order).not.toHaveProperty("inspection_completed");
@@ -77,10 +78,34 @@ describe("Facebook handoff uses canonical unpaid order creation", () => {
       seller_available_time: "Afternoon",
     });
   });
-  it("rejects missing consent before any mutation or notification", async () => {
-    expect((await POST(request({ ...facebook, facebook_contact: undefined }))).status).toBe(400);
+  it("allows booking before seller confirmation without fabricating an appointment", async () => {
+    expect((await POST(request({ ...facebook, facebook_contact: undefined }))).status).toBe(200);
+    const order = mocks.inserts.find((insert) => insert.table === "orders")!.payload;
+    expect(order).not.toHaveProperty("seller_contact_status");
+    expect(order).not.toHaveProperty("seller_available_date");
+  });
+  it.each([undefined, null, "", "   "])("rejects missing requested date %s before mutation", async (preferred_date) => {
+    expect((await POST(request({ ...facebook, preferred_date }))).status).toBe(400);
     expect(mocks.inserts).toHaveLength(0);
     expect(mocks.notify).not.toHaveBeenCalled();
+  });
+  it("rejects new Facebook Concierge orders before mutation", async () => {
+    expect((await POST(request({ ...facebook, booking_type: "concierge", booking_method: "concierge" }))).status).toBe(400);
+    expect(mocks.inserts).toHaveLength(0);
+  });
+  it("sends instructions only to the buyer, including requested date and original listing", async () => {
+    await POST(request({ ...facebook, seller_email: "seller@example.test", seller_phone: "2245550199" }));
+    expect(mocks.sms).toHaveBeenCalledTimes(1);
+    expect(mocks.email).toHaveBeenCalledTimes(1);
+    for (const [notification] of mocks.sms.mock.calls) {
+      expect(notification.to).not.toBe("2245550199");
+      expect(notification.body).toContain("2026-10-05");
+      expect(notification.body).toContain(facebook.listing_url);
+      expect(notification.body).toContain("Once the seller confirms, reply to this message with the confirmed date, time, and vehicle address.");
+    }
+    expect(mocks.email.mock.calls[0][0].to).toBe("buyer@example.test");
+    expect(mocks.email.mock.calls[0][0].html).toContain("2026-10-05");
+    expect(mocks.email.mock.calls[0][0].html).toContain(facebook.listing_url);
   });
   it("detects unavailable consent storage before creating an order", async () => {
     mocks.eventsUnavailable = true;
