@@ -13,3 +13,4 @@
 - [Payment-first order policy](payment-first-order-policy.md) — persisted requests are not actionable orders; payment evidence and fulfillment activation must remain separate.
 - [RideCheck pricing policy](ridecheck-pricing-policy.md) — three tiers; no price-only, flagship-only, three-row-only, or age-downgrade triggers; legacy Premium is not a new-sale tier.
 - [Facebook initial contact](facebook-initial-contact.md) — Self-Arrange only; date-only request; Ops-confirmed appointment required before dispatch; no seller outreach or Phase 1 reminders.
+- [Launch certification](launch-certification.md) — read/test only; classify findings as blockers, manual controls, or post-launch; do not automatically fix them.
